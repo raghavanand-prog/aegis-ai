@@ -33,9 +33,9 @@ from app.evaluation.splits import (
     build_split,
 )
 from app.ml.features.extractor import FEATURE_NAMES, FeatureExtractor
+from app.models.enums import SourceType
 from app.telemetry.base import RawTelemetry
 from app.telemetry.normalizer import normalize
-from app.models.enums import SourceType
 
 BASE_TIME = datetime(2015, 1, 22, 12, 0, tzinfo=timezone.utc)
 

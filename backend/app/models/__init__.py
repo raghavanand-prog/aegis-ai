@@ -7,6 +7,11 @@ what Alembic autogeneration and ``create_all`` rely on.
 from app.models.ai_analysis import AIAnalysis
 from app.models.audit import AuditLog
 from app.models.base import Base, JSONType, TimestampMixin, utcnow
+from app.models.evaluation import (
+    EvaluationDatasetRecord,
+    Experiment,
+    ExperimentRun,
+)
 from app.models.event import Event
 from app.models.incident import Incident
 from app.models.ioc import IOC, event_iocs, incident_iocs
@@ -20,7 +25,10 @@ __all__ = [
     "AIAnalysis",
     "AuditLog",
     "Base",
+    "EvaluationDatasetRecord",
     "Event",
+    "Experiment",
+    "ExperimentRun",
     "IOC",
     "Incident",
     "JSONType",
