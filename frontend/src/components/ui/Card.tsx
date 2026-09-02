@@ -16,13 +16,22 @@ export default function Card({
         `
         rounded-2xl
         border
-        border-border
+        border-border/70
         bg-gradient-to-br
         from-slate-950
         via-slate-900
         to-blue-950
-        shadow-xl
-        p-8
+
+        shadow-lg
+        transition-all
+        duration-300
+
+        hover:border-blue-500/40
+        hover:shadow-2xl
+        hover:-translate-y-1
+
+        backdrop-blur-xl
+        overflow-hidden
         `,
         className
       )}

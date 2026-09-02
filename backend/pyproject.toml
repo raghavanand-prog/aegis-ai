@@ -1,0 +1,38 @@
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [".venv", "alembic/versions/__pycache__", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # import sorting
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "S",    # bandit-style security checks
+]
+ignore = [
+    "S101",  # asserts are how the test suite is written
+    "B008",  # FastAPI's Depends() in defaults is the framework's own idiom
+    "E501",  # long lines are caught by the formatter's line-length instead
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixtures contain obvious dummy passwords.
+"app/tests/*" = ["S105", "S106"]
+# Telemetry simulation and the evaluation dataset use `random` on purpose: they
+# generate fake events, not secrets. Anything security-sensitive uses `secrets`
+# (see app/core/security.py).
+"app/telemetry/sources/synthetic.py" = ["S311"]
+"app/evaluation/datasets/labeled_dataset.py" = ["S311"]
+# The ML training corpus is generated simulation data for the same reason.
+"app/ml/training/corpus.py" = ["S311"]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]

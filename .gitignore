@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+
+# Environments and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local databases
+*.db
+*.sqlite3
+
+# Archives (project backups do not belong in git)
+*.zip
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

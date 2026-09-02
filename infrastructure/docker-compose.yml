@@ -1,0 +1,74 @@
+# AEGISX development stack: PostgreSQL + backend API + frontend console.
+#
+#   docker compose -f infrastructure/docker-compose.yml up --build
+#   → console  http://localhost:5173
+#   → API docs http://localhost:8000/docs
+#
+# Deliberately three containers and nothing else: no queue, no cache, no
+# orchestrator. AEGISX is a modular monolith and the stack should say so.
+
+name: aegisx
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegisx-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aegisx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aegisx}
+      POSTGRES_DB: ${POSTGRES_DB:-aegisx}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - aegisx-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aegisx} -d ${POSTGRES_DB:-aegisx}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build:
+      context: ../backend
+    container_name: aegisx-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-aegisx}:${POSTGRES_PASSWORD:-aegisx}@postgres:5432/${POSTGRES_DB:-aegisx}
+      # Development value. Generate a real one before exposing this anywhere:
+      #   python -c "import secrets; print(secrets.token_urlsafe(64))"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-insecure-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      TELEMETRY_ENABLED: "true"
+      TELEMETRY_INTERVAL_SECONDS: "5"
+      TELEMETRY_EVENTS_PER_TICK: "1"
+      TELEMETRY_ALLOW_EXTERNAL_SOURCES: "false"
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      SEED_DEMO_USER: "true"
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-analyst@aegisx.dev}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-AegisX!Demo123}
+      EVALUATION_REPORTS_DIR: /app/app/evaluation/reports
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    container_name: aegisx-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+volumes:
+  aegisx-postgres-data:
