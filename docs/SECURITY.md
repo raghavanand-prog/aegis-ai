@@ -1,5 +1,11 @@
 # Security Model
 
+> **Scope note.** Written for V2 and still accurate for everything it describes.
+> V3 added ML artifact digest verification, SSRF protection on outbound
+> enrichment, three-layer prompt-injection defence and per-process budgets; V4
+> added the `evaluation:read` permission and a read-only research API. The V3
+> and V4 additions are summarised at the end of this file.
+
 What AEGISX V2 actually enforces, and what it does not. Nothing here claims the
 system is production-secure; it describes the controls that exist and names the
 gaps that remain.
@@ -134,3 +140,36 @@ Stated plainly, because a security document that only lists wins is marketing:
 
 See [THREAT_MODEL.md](THREAT_MODEL.md) for the attacks these controls are and
 are not designed to stop.
+
+
+---
+
+## V3 additions
+
+| Control | Behaviour |
+| --- | --- |
+| Model artifact verification | SHA-256 checked on **every** load; a mismatch refuses to load |
+| Model path validation | Name and version validated as single safe path components; resolved path confined to `ML_MODEL_DIR` |
+| SSRF protection | Strict allowlist grammar per indicator type; private, loopback, link-local, reserved, multicast and RFC 5737/3849 documentation ranges refused; redirects refused |
+| Prompt injection | Three layers — structural fencing, lexical sanitization, and **capability**: the AI analyst has no tools, no write access and no authority. The third is the one that matters. |
+| API keys | Server-side only; absent from every payload, log line and error message. The browser never contacts a provider. |
+| Budgets | Per-process daily ceilings for threat intel (400) and AI (200); bounded enrichment queue that drops rather than grows |
+
+V3 permissions: `ml:read`, `ml:manage` (admin only — analysts cannot deploy
+models), `sequences:read`, `threatintel:read`, `threatintel:enrich`, `ai:read`,
+`ai:request`, `ai:configure`.
+
+## V4 additions
+
+| Control | Behaviour |
+| --- | --- |
+| `evaluation:read` | Granted to **viewer** and above. Measured quality is transparency, not privilege. |
+| No experiment execution over HTTP | The evaluation router exposes **GET only**, asserted by a test. Running an experiment is minutes of CPU over a whole corpus; over HTTP that is a resource-exhaustion primitive. |
+| Datasets are untrusted input | Parquet is read as data. No dataset content is executed, and no arbitrary pickled Python object is loaded from an untrusted source. |
+| Dataset digest verification | Every shard is SHA-256 verified on load; a mismatch refuses to evaluate rather than warning |
+| Bounded CLIs | Every evaluation CLI takes `--max-seconds` (default 900), exiting 142 with thread stacks rather than hanging |
+
+Degraded-mode behaviour is now **measured**, not asserted: five scenarios (no
+model, corrupt artifact, digest mismatch, no threat intel, AI unavailable) each
+confirm that ingestion, normalization and rule detection continue. See
+`app/evaluation/system_eval.py`.
