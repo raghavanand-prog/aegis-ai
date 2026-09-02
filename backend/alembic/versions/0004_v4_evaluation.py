@@ -33,8 +33,9 @@ The downgrade drops all three cleanly; the V3 schema is recoverable.
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 revision = "0004_v4_evaluation"
 down_revision = "0003_v3_hybrid"
