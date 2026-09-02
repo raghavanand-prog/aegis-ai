@@ -1,5 +1,14 @@
 # Detection Engine
 
+> **Scope note.** This document describes the **deterministic rule engine**,
+> which is accurate and current — the rules are unchanged since V2 and remain
+> first-class detection. What it does *not* cover is the V3 ML detector that
+> runs alongside them (`docs/ml-architecture.md`), behavioural correlation
+> (`docs/correlation.md`), or the V4 measurement of all three
+> (`docs/EVALUATION_METHODOLOGY.md`). The statement below that there is no
+> machine learning is scoped to V1 and V2, and stays true of *this engine*: the
+> rule engine has no model. Since V3 the platform does.
+
 AEGISX detects with **hand-written, deterministic rules**. There is no machine
 learning anywhere in V1 or V2: no model, no training, no inference. Anything in
 the product that sounds like it might be a model (the "Derived Insights" panel)
@@ -129,3 +138,33 @@ event because one matcher has a bug is worse than missing one detection, and
   V3 work.
 
 See [EVALUATION.md](EVALUATION.md) for how these statements are measured.
+
+
+---
+
+## Where the rules stand after V3 and V4
+
+**V3** added an Isolation Forest as an *independent, additional* detector. It
+did not replace the rules and architecturally cannot dominate them: ML
+contributes at most 25 risk points and the High band starts at 70, so **ML alone
+cannot raise an event to High**. No detection output is an ML feature (a test
+asserts it), and the model contributes no MITRE techniques.
+
+`GET /detection/rules` reports `usesMachineLearning: false`. That is accurate for
+*this engine* — the rule engine has no model. Platform-level ML status is at
+`GET /ml/status`.
+
+**V4** measured the rules on two corpora, with results that are worth knowing
+before quoting any rule metric:
+
+- On the synthetic corpus (`aegisx-detection-eval`), which was built to exercise
+  rule thresholds, the rules perform strongly and are the backbone of the hybrid.
+- On **UNSW-NB15 network flows the rules detect nothing at all**, and that is a
+  property of the telemetry rather than a failure of the rules. Ten of the twelve
+  read endpoint, identity or process fields a flow record does not carry; the
+  port-scan rule needs a policy decision a passive capture never made; and the
+  exfiltration rule needs 500 MB when the largest flow in that corpus is 13.7 MB.
+
+The lesson is scope, not quality: these rules describe endpoint and identity
+behaviour, and a flow-only sensor cannot exercise them. See
+`docs/DATASET_CARD.md` and `docs/RESEARCH_REPORT.md`.

@@ -1,5 +1,13 @@
 # Detection Evaluation
 
+> **Scope note.** This document describes the **V2 rule evaluation**, which is
+> still current and still runs (`python -m app.evaluation.run_detection_eval`).
+> V4 built a broader framework around it — public datasets, reproducible splits,
+> supervised baselines, ablation, correlation and AI evaluation — documented in
+> `docs/EVALUATION_METHODOLOGY.md`. The two coexist: this one answers "how good
+> are the rules on the synthetic corpus", V4 answers "does the hybrid
+> architecture provide measurable value, and under what conditions".
+
 The most important thing V2 adds is the ability to answer *"how good is the
 detection engine, actually?"* with a number that can be reproduced.
 
