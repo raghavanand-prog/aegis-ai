@@ -27,3 +27,6 @@ venv/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Research datasets: large, third-party licensed, fetched by an explicit step.
+backend/data/
