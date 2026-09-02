@@ -86,6 +86,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="also evaluate the registered production model artifact (needs a database)",
     )
     parser.add_argument("--output-dir", default=None, help="where to write the report")
+    parser.add_argument(
+        "--persist",
+        action="store_true",
+        help=(
+            "also index the results in the database so the evaluation API and research "
+            "dashboard can read them (the JSON report stays the archival artifact)"
+        ),
+    )
     add_timeout_argument(parser)
     return parser
 
@@ -363,7 +371,39 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - one flat CLI
             prefix=f"{REPORT_PREFIX}-{args.dataset}-{args.split}",
         )
         print(f"  Report written to {detailed}")
-        print(f"  Latest pointer   {latest}\n")
+        print(f"  Latest pointer   {latest}")
+
+        if args.persist:
+            from app.core.database import get_session_factory
+            from app.services import evaluation_service
+
+            to_store: list[tuple[Any, int]] = [
+                (result, args.seed) for result in baselines.results
+            ]
+            if ablation is not None:
+                to_store.extend((result, args.seed) for result in ablation.results)
+
+            session = get_session_factory()()
+            try:
+                stored = evaluation_service.store_report(
+                    session,
+                    to_store,
+                    report_path=str(detailed),
+                    leakage=payload["leakageAudit"],
+                )
+                session.commit()
+                print(f"  Indexed {len(stored)} run(s) in the database")
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+        else:
+            print(
+                "  Not indexed in the database (pass --persist to make these results "
+                "visible to the evaluation API and research dashboard)"
+            )
+        print()
         return 0
     finally:
         if watchdog is not None:
