@@ -177,7 +177,45 @@ def _groups(dataset: EvaluationDataset) -> dict[str, list[EvaluationSample]]:
     return groups
 
 
-def _group_label(members: list[EvaluationSample]) -> bool:
+def label_collisions(groups: dict[str, list[EvaluationSample]]) -> dict[str, Any]:
+    """Groups whose members disagree about the binary label.
+
+    Under source grouping this must be empty: identical source records that
+    disagree are a contradiction in the data. Under *feature* grouping it is
+    expected and informative - it counts the samples AEGISX's feature schema
+    cannot tell apart, and therefore bounds what any detector built on those
+    features could achieve. The best a detector can do on a colliding vector is
+    the majority label; the minority is irreducible error.
+    """
+    mixed = {
+        key: members
+        for key, members in groups.items()
+        if len({member.is_malicious for member in members}) > 1
+    }
+    affected = sum(len(members) for members in mixed.values())
+    irreducible = sum(
+        min(
+            sum(1 for m in members if m.is_malicious),
+            sum(1 for m in members if not m.is_malicious),
+        )
+        for members in mixed.values()
+    )
+    total = sum(len(members) for members in groups.values())
+    return {
+        "collidingGroups": len(mixed),
+        "affectedSamples": affected,
+        "affectedShare": round(affected / total, 6) if total else None,
+        "irreducibleErrors": irreducible,
+        "irreducibleErrorRate": round(irreducible / total, 6) if total else None,
+        "note": (
+            "Samples the feature schema maps onto one point while carrying different "
+            "labels. The irreducible error rate is a floor on the error of ANY "
+            "detector built on these features."
+        ),
+    }
+
+
+def _group_label(members: list[EvaluationSample], *, allow_collisions: bool = False) -> bool:
     """The binary ground truth of a group.
 
     Stratification keys on the binary label rather than the attack category,
@@ -197,6 +235,11 @@ def _group_label(members: list[EvaluationSample]) -> bool:
     """
     labels = {member.is_malicious for member in members}
     if len(labels) > 1:
+        if allow_collisions:
+            # Feature-vector grouping: assign by majority so the group still
+            # travels whole, and let the caller report the collision rate.
+            malicious = sum(1 for member in members if member.is_malicious)
+            return malicious * 2 >= len(members)
         raise SplitError(
             "duplicate group carries conflicting labels "
             f"{sorted({m.category for m in members})}; identical observations "
@@ -253,6 +296,7 @@ def stratified_group_split(
     *,
     seed: int = 1337,
     fractions: dict[str, float] | None = None,
+    allow_label_collisions: bool = False,
 ) -> SplitPlan:
     """Random split, group-aware and stratified by ground-truth category."""
     fractions = fractions or {TRAIN: 0.6, VALIDATION: 0.2, TEST: 0.2}
@@ -261,7 +305,7 @@ def stratified_group_split(
     groups = _groups(dataset)
     by_label: dict[bool, list[str]] = defaultdict(list)
     for key, members in groups.items():
-        by_label[_group_label(members)].append(key)
+        by_label[_group_label(members, allow_collisions=allow_label_collisions)].append(key)
 
     assignment: dict[str, str] = {}
     for _label, keys in sorted(by_label.items()):
@@ -289,6 +333,17 @@ def stratified_group_split(
                 "distinct group(s); it cannot be represented in every split"
             )
     warnings.extend(_ambiguity_warnings(groups))
+    if allow_label_collisions:
+        collisions = label_collisions(groups)
+        if collisions["collidingGroups"]:
+            warnings.append(
+                f"{collisions['collidingGroups']} group(s) covering "
+                f"{collisions['affectedSamples']} sample(s) carry both labels: the "
+                "feature schema maps them onto one point. Best-case irreducible error "
+                f"is {collisions['irreducibleErrors']} sample(s) "
+                f"({(collisions['irreducibleErrorRate'] or 0) * 100:.3f}%), a floor on "
+                "the error of any detector built on these features."
+            )
 
     return SplitPlan(
         strategy=STRATIFIED_GROUP,
@@ -316,6 +371,7 @@ def temporal_split(
     *,
     seed: int = 1337,
     fractions: dict[str, float] | None = None,
+    allow_label_collisions: bool = False,  # noqa: ARG001 - chronology needs no label
 ) -> SplitPlan:
     """Chronological split: fit on the past, evaluate on the future."""
     fractions = fractions or {TRAIN: 0.6, VALIDATION: 0.2, TEST: 0.2}
@@ -398,8 +454,21 @@ def build_split(
     strategy: str = STRATIFIED_GROUP,
     seed: int = 1337,
     fractions: dict[str, float] | None = None,
+    allow_label_collisions: bool = False,
 ) -> SplitPlan:
+    """Build a split.
+
+    ``allow_label_collisions`` is for feature-vector grouping, where two records
+    the schema cannot tell apart may legitimately carry different labels. Under
+    source grouping it must stay False: there, a disagreement is a contradiction
+    in the data and should stop the run.
+    """
     builder = STRATEGIES.get(strategy)
     if builder is None:
         raise SplitError(f"unknown split strategy {strategy!r}; known: {sorted(STRATEGIES)}")
-    return builder(dataset, seed=seed, fractions=fractions)
+    return builder(
+        dataset,
+        seed=seed,
+        fractions=fractions,
+        allow_label_collisions=allow_label_collisions,
+    )

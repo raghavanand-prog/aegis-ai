@@ -108,7 +108,8 @@ def stored(request) -> dict:
         evaluation_service.store_report(
             session,
             [(rules, 23), (anomaly, 23)],
-            report_path="/tmp/fixture-report.json",
+            # A path string only; nothing is written here.
+            report_path="fixture-report.json",  # noqa: S108 - not a filesystem path in use
             leakage={"splits": {}, "concerning": False},
         )
         session.commit()
