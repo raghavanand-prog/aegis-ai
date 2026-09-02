@@ -12,6 +12,7 @@ import AnalyticsPage from "../features/analytics/AnalyticsPage";
 import SettingsPage from "../pages/dashboard/SettingsPage";
 import EventsPage from "../pages/events/EventsPage";
 import SequencesPage from "../pages/dashboard/SequencesPage";
+import ResearchPage from "../features/research/ResearchPage";
 
 export default function AppRoutes() {
   return (
@@ -59,6 +60,11 @@ export default function AppRoutes() {
         <Route
           path="/dashboard/sequences"
           element={<SequencesPage />}
+        />
+
+        <Route
+          path="/dashboard/research"
+          element={<ResearchPage />}
         />
 
         <Route
