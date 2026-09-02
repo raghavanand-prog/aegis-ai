@@ -90,3 +90,34 @@ def test_collector_status_reports_sources() -> None:
     assert status["running"] is False
     assert status["externalSourcesAllowed"] is False
     assert status["sources"][0]["name"] == "Synthetic Telemetry"
+
+
+def test_seeded_source_is_reproducible() -> None:
+    """The seed must control every random field, or nothing downstream is reproducible.
+
+    The generator used to draw source addresses from the global ``random``
+    module and identifiers from ``uuid.uuid4()``, so two sources built with the
+    same seed emitted different records. That silently broke the training
+    corpus, whose whole claim is that a seed pins the data.
+    """
+    first = [record.raw for record in SyntheticTelemetrySource(seed=99).collect(120)]
+    second = [record.raw for record in SyntheticTelemetrySource(seed=99).collect(120)]
+
+    volatile = {"Timestamp", "UtcTime", "createdDateTime", "timestamp", "detected_at"}
+
+    def stable(raw: dict) -> dict:
+        return {key: value for key, value in raw.items() if key not in volatile}
+
+    assert [stable(raw) for raw in first] == [stable(raw) for raw in second]
+
+
+def test_generated_timestamps_have_a_fixed_width() -> None:
+    """Variable-width timestamps leaked wall-clock noise into raw_log length."""
+    lengths = set()
+    for record in SyntheticTelemetrySource(seed=5).collect(60):
+        for key in ("Timestamp", "UtcTime", "createdDateTime", "timestamp"):
+            value = record.raw.get(key)
+            if isinstance(value, str) and value.endswith("+00:00"):
+                lengths.add(len(value))
+    assert lengths, "no generated record carried an ISO timestamp"
+    assert len(lengths) == 1, f"timestamp width varies: {sorted(lengths)}"

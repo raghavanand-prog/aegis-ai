@@ -22,6 +22,12 @@ scikit-learn==1.7.2
 numpy==2.3.4
 joblib==1.5.2
 
+# --- V4: research datasets -------------------------------------------------
+# Public evaluation corpora ship as parquet. Used only by the evaluation
+# package; nothing on the ingestion or API path imports pandas.
+pandas==3.0.5
+pyarrow==25.0.1
+
 # --- V3: outbound HTTP -----------------------------------------------------
 # Used by the threat-intelligence and AI provider clients. Already present for
 # the test suite; promoted to a runtime dependency in V3.
