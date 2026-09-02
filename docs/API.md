@@ -118,3 +118,36 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/detection/rules
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
   localhost:8000/api/v1/events/EVT-000042/promote
 ```
+
+
+---
+
+## Research evaluation (V4)
+
+Read-only. Measured detection quality on labelled corpora, kept separate from
+the production detection endpoints.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/evaluation/status` | Whether any results exist; says **why** it is empty when it is |
+| GET | `/evaluation/datasets` | Dataset versions results were measured on |
+| GET | `/evaluation/datasets/{id}` | Full dataset card: provenance, licence, label schema, limitations |
+| GET | `/evaluation/experiments` | Recorded configurations with their latest run |
+| GET | `/evaluation/experiments/{id}` | One experiment in full, every run |
+| GET | `/evaluation/experiments/{id}/confusion-matrix` | Counts and row-normalized rates |
+| GET | `/evaluation/experiments/{id}/threshold-sweep` | The **validation** curve the frozen threshold came from |
+| GET | `/evaluation/compare` | Refuses to call experiments comparable across dataset fingerprints |
+
+Permission: `evaluation:read`, held by **viewer** and above — measured quality
+is transparency, not privilege.
+
+**There is deliberately no endpoint that runs an experiment.** Running one is
+minutes of CPU over a whole corpus; exposing that over HTTP would hand any
+authenticated user a resource-exhaustion primitive. Experiments run from the
+CLI (`python -m app.evaluation.run_experiments --persist`). A test asserts the
+entire router exposes `GET` only.
+
+Every payload carries the provenance of the number it reports — dataset name,
+version and fingerprint, split strategy and fingerprint, feature schema version,
+ruleset fingerprint, model version and artifact digest — and a `scoreKind` that
+keeps an anomaly ranking from being read as a probability.

@@ -1,5 +1,11 @@
 # Threat Model
 
+> **Scope note.** Written for V2. V3 introduced three new outward- or
+> upward-facing surfaces (outbound threat-intel lookups, an LLM prompt path, and
+> a loadable model artifact) and V4 introduced a fourth (third-party dataset
+> files read from disk). Those are covered at the end of this file; the V2
+> analysis below remains accurate for what it describes.
+
 Scope: AEGISX V2 as it actually exists - an internal SOC console for
 authenticated analysts, ingesting synthetic telemetry, deployed on a trusted
 network by the person developing it.
@@ -63,3 +69,21 @@ Documenting a mitigation is not the same as being secure. Several rows below say
 3. Shared-store rate limiting and connection accounting (threats 1, 5, 13).
 4. Correlation rules so evasion by staying under thresholds is harder (threat 9).
 5. Dependency and container scanning in CI (threat 14).
+
+
+---
+
+## V3 and V4 surfaces
+
+| Surface | Threat | Mitigation | Residual risk |
+| --- | --- | --- | --- |
+| Outbound threat-intel lookup | SSRF into internal services or cloud metadata | Strict per-type allowlist grammar; private/loopback/link-local/reserved/documentation ranges refused; redirects refused | Provider itself is trusted once reached; never exercised against a live provider |
+| LLM prompt path | Prompt injection via attacker-controlled event data | Structural fencing, lexical sanitization, and **no capability**: no tools, no write access, no authority over severity/status/risk | An injected string can still influence prose the analyst reads; it cannot change any stored verdict |
+| Model artifact | Loading a tampered or swapped model | SHA-256 verified on every load; path confined to `ML_MODEL_DIR`; name/version validated as safe path components | An operator with write access to both the artifact and the registry row could still swap both |
+| Third-party dataset files (V4) | Malicious content in a downloaded corpus | Read as data via parquet; digest-verified against recorded SHA-256; no dataset content executed; no arbitrary pickle load | A corpus that hashes correctly but is mislabelled at source would yield wrong metrics, not code execution |
+| Evaluation API (V4) | Resource exhaustion by triggering experiments | **No execution endpoint exists**; the router is GET-only, asserted by a test | An operator can still exhaust their own machine from the CLI, which is bounded by `--max-seconds` |
+
+**Not mitigated, and worth stating plainly:** in-process rate limits and budgets
+are per worker and multiply across uvicorn processes; a shared store is the
+answer above one process. The enrichment queue drops under sustained overload
+(reported, never silent).

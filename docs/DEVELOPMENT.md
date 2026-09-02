@@ -137,3 +137,32 @@ never invents numbers.
 
 **Frontend cannot reach the API** - check `VITE_API_URL` in `frontend/.env.local`
 and that the origin appears in `CORS_ORIGINS` in `backend/.env`.
+
+
+---
+
+## Research evaluation (V4)
+
+```bash
+cd backend
+
+# One-off: fetch the public corpus (230 MB, third-party licensed, gitignored)
+python -m app.evaluation.datasets.unsw_nb15.fetch
+
+# Rules vs ML vs hybrid, plus the ablation matrix
+python -m app.evaluation.run_experiments --dataset unsw-nb15 --persist
+python -m app.evaluation.run_experiments --dataset aegisx-synthetic --persist
+
+# Correlation, AI analyst, threat intelligence, degraded mode
+python -m app.evaluation.run_system_eval
+```
+
+`--persist` indexes results so the research API and `/dashboard/research` can
+read them; the JSON report under `app/evaluation/reports/` remains the archival
+artifact either way.
+
+Every evaluation CLI accepts `--max-seconds` (default 900, `0` disables) and
+exits 142 with thread stacks on expiry rather than hanging.
+
+Full reproduction instructions, including expected fingerprints and the
+numerical tolerance to expect, are in `docs/REPRODUCIBILITY.md`.

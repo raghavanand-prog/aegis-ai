@@ -51,9 +51,17 @@ enabled; response actions are recorded but never executed; the default AI
 provider is a deterministic offline template, labelled as such everywhere; no
 threat-intelligence provider is configured by default.
 
-**Not claimed**: real-world detection accuracy, real attack detection, or any
-measurement on real traffic. Every number in this repository comes from
-synthetic data and says so.
+**Measured on real data (V4)**: detection quality is now evaluated on
+**UNSW-NB15**, a public capture of 2.28M labelled network flows, alongside the
+synthetic corpus — with group-aware splits, thresholds frozen on validation
+before test is read, and a leakage audit printed beside every result.
+
+**Not claimed**: real-world detection accuracy on *production* traffic, or that
+results transfer across telemetry classes. V4 measured directly that they do
+not: AEGISX's endpoint-oriented rules detect **nothing** on flow-only telemetry,
+which the dataset card states up front rather than leaving to be discovered.
+Every number in this repository names the dataset, split and configuration that
+produced it.
 
 ## Quick start
 
@@ -88,6 +96,26 @@ instance**.
 
 Skipping the training step is a supported configuration: the platform runs
 rules-only and every ML surface explains that no model is loaded.
+
+## Research and evaluation (V4)
+
+```bash
+cd backend
+python -m app.evaluation.datasets.unsw_nb15.fetch          # 230 MB, gitignored
+python -m app.evaluation.run_experiments --dataset unsw-nb15 --persist
+python -m app.evaluation.run_system_eval
+```
+
+Results appear at `/dashboard/research` and under `/api/v1/evaluation` (read
+only — no endpoint can start an experiment).
+
+| Document | What it covers |
+| --- | --- |
+| `docs/RESEARCH_REPORT.md` | The measured results, including the unflattering ones |
+| `docs/EVALUATION_METHODOLOGY.md` | The protocol, and why each choice was made |
+| `docs/DATASET_CARD.md` | Both corpora: provenance, labels, duplicates, and what each cannot evaluate |
+| `docs/MODEL_CARD.md` | The anomaly detector, its failure modes, and why its score is not a probability |
+| `docs/REPRODUCIBILITY.md` | How to get the same numbers back |
 
 ## The flow
 

@@ -1,6 +1,13 @@
-# AEGISX Architecture (V1)
+# AEGISX Architecture
 
-## Shape
+> **Scope note.** The diagram and prose below describe the **V1** shape, which
+> remains the foundation and is still accurate for the ingestion path. V2 added
+> hardening, RBAC and audit; V3 added ML, correlation, threat intelligence and
+> the AI analyst; V4 added the research/evaluation layer. What each version
+> changed is summarised at the end of this file, with pointers to the documents
+> that describe them in full.
+
+## Shape (V1)
 
 A modular monolith backend and a single-page frontend.
 
@@ -214,3 +221,58 @@ hide controls, but the check that matters happens server-side.
 * Threat Intelligence remains static demo content and is labelled as such.
 * "Derived Insights" remains arithmetic over aggregates and says so on screen.
 * No ML. See [DETECTION.md](DETECTION.md) and [EVALUATION.md](EVALUATION.md).
+
+
+---
+
+## What later versions changed
+
+### V2 — hardening
+RBAC on every route, append-only audit logging, structured logs, health
+endpoints, rate limiting, and the first detection evaluation
+(`docs/EVALUATION.md`).
+
+### V3 — hybrid detection
+The pipeline gained a **fast path** and a **slow path**, which the V1 diagram
+above does not show:
+
+```
+FAST PATH (synchronous, in the collector/request thread)
+  telemetry -> normalize -> feature extraction (45 features)
+            -> deterministic rules + ML inference + event context
+            -> hybrid risk scoring -> persist -> WebSocket
+            -> enqueue enrichment
+
+SLOW PATH (one bounded worker thread)
+  threat intelligence -> correlation -> rescore + rebroadcast
+
+ANALYST-DRIVEN (never automatic)
+  SecuritySequence --(analyst promotes)--> Incident -> AI analyst
+```
+
+ML is on the fast path because it is a sub-millisecond in-process call needing
+events in arrival order; **network** calls are what get deferred. Correlation
+never creates an incident. The AI layer has no tools, no database access and no
+authority. See `docs/ml-architecture.md`, `docs/correlation.md`,
+`docs/threat-intelligence.md`, `docs/ai-architecture.md`.
+
+### V4 — research and evaluation
+A measurement layer *around* the system, conceptually separate from it:
+
+```
+dataset -> deterministic adapter -> PRODUCTION normalizer -> normalized event
+        -> PRODUCTION feature extractor -> detector -> prediction
+        -> ground truth -> metrics -> experiment result
+```
+
+Nothing in `app/evaluation` participates in detection, and no HTTP endpoint can
+start an experiment. The evaluation layer reuses the production normalizer and
+feature extractor deliberately: a metric computed over features the running
+system does not produce would measure something that was never deployed.
+
+New modules: `app/evaluation/{datasets,experiments,splits,metrics}`,
+`app/models/evaluation.py`, `app/api/v1/evaluation.py`,
+`frontend/src/features/research/`. Migration `0004_v4_evaluation`.
+
+See `docs/EVALUATION_METHODOLOGY.md`, `docs/DATASET_CARD.md`,
+`docs/MODEL_CARD.md`, `docs/REPRODUCIBILITY.md`, `docs/RESEARCH_REPORT.md`.
