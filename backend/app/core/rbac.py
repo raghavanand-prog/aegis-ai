@@ -37,6 +37,12 @@ class Permission(str, Enum):
     DETECTION_READ = "detection:read"
     DETECTION_EVALUATE = "detection:evaluate"
 
+    # Research evaluation (V4). Read-only: these endpoints publish measured
+    # results, and nothing here can start an experiment. Running one is a CLI
+    # operation on purpose - it is minutes of CPU over a whole corpus, which is
+    # not something an HTTP request should be able to trigger.
+    EVALUATION_READ = "evaluation:read"
+
     # Machine learning (V3)
     ML_READ = "ml:read"
     ML_MANAGE = "ml:manage"
@@ -82,6 +88,10 @@ VIEWER_PERMISSIONS: frozenset[Permission] = frozenset(
         Permission.SEQUENCES_READ,
         Permission.THREAT_INTEL_READ,
         Permission.AI_READ,
+        # V4: measured evaluation results are transparency, not privilege.
+        # Anyone who can see what the platform concluded may see how well it
+        # actually performs.
+        Permission.EVALUATION_READ,
     }
 )
 
