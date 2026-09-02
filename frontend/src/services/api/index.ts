@@ -18,5 +18,6 @@ export * from "./mlTypes";
 export * from "./ml";
 export * from "./ai";
 export * from "./threatIntel";
+export * from "./evaluation";
 export * from "./sequences";
 export { clearToken, getToken, setToken } from "./tokenStore";
