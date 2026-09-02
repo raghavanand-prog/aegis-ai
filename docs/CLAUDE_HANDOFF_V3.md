@@ -35,8 +35,9 @@ were *not* verifiable on the development machine:
 
 ### Unresolved at handoff
 
-1. **The entire backend, docs and CI are UNTRACKED in git.** See §20. This is the
-   single most important thing to address before any V4 work.
+1. ~~**The entire backend, docs and CI are UNTRACKED in git.**~~ **RESOLVED
+   2026-09-02** — commit `a272545` checkpointed the verified V3 tree (380 files)
+   and pushed it to `origin/main`. See §20.
 2. **Six V2 docs were not updated for V3** (`ARCHITECTURE`, `DETECTION`, `API`,
    `SECURITY`, `DEVELOPMENT`, `THREAT_MODEL`). They contain no *false* ML claims
    (checked), but they describe a V2-shaped system.
@@ -191,15 +192,19 @@ clean **on SQLite only**.
 
 ## 5. API
 
-62 routes. Only routes that exist are listed.
+**65 HTTP operations** — re-measured 2026-09-02 from the live OpenAPI schema
+(64 under `/api/v1` plus the root `GET /`). Only routes that exist are listed,
+but the groups below cover the V2/V3 surface only: `notifications` (4),
+`iocs` (1), `telemetry` (2) and `audit` (1) also exist and are not detailed here.
 
 **auth** (7) `POST /auth/login` · `POST /auth/logout` · `POST /auth/logout-all` ·
 `GET /auth/me` · `GET /auth/permissions` · `POST /auth/users` · `POST /auth/change-password`
 
-**events** (4) `GET /events` (filters incl. **`isAnomaly`**) · `GET /events/{id}` ·
+**events** (5) `GET /events` (filters incl. **`isAnomaly`**) · `GET /events/{id}` ·
 `POST /events` · `PATCH /events/{id}/status` · `POST /events/{id}/promote`
 
-**incidents** (3) `GET /incidents` · `GET|PATCH /incidents/{id}` · `POST /incidents/{id}/response`
+**incidents** (5) `GET /incidents` · `POST /incidents` · `GET|PATCH /incidents/{id}` ·
+`POST /incidents/{id}/response`
 
 **ml** (11) `GET /ml/status` · `/ml/features` · `/ml/scoring` · `/ml/models` ·
 `/ml/models/{id}` · `/ml/registry/summary` · `/ml/events/{event_id}` ·
@@ -651,12 +656,16 @@ providers only**.
 
 ### Open issues / limitations
 
-**Repository hygiene (highest priority)**
-- **The backend, docs, CI, and root config are UNTRACKED in git.** Only 38
-  frontend files are tracked across 2 commits. All V1/V2/V3 backend work exists
-  solely as working-tree files. **One `git clean` would destroy the project.**
-- `frontend/src/pages/login/LoginPage.tsx` shows as deleted but uncommitted.
-- Stray empty file `frontend/frontend@0.0.0` (shell-redirect accident).
+**Repository hygiene — RESOLVED 2026-09-02 (commit `a272545`)**
+- ~~The backend, docs, CI, and root config are UNTRACKED in git.~~ All of it is
+  now committed and pushed to `origin/main`: 380 files, 43,293 insertions.
+  `.env`, local databases, virtualenvs, caches, model artifacts and generated
+  evaluation reports remain gitignored and were verified absent from the commit.
+- ~~`frontend/src/pages/login/LoginPage.tsx` shows as deleted but uncommitted.~~
+  Committed as a **rename** to `features/auth/pages/LoginPage.tsx` (R063).
+- ~~Stray empty file `frontend/frontend@0.0.0`.~~ Deleted, along with two other
+  0-byte shell-redirect artifacts (`frontend/vite`, a stray root-level
+  `src/features/auth/pages/ForgotPasswordPage.tsx`). All three were empty.
 
 **Dead code**
 - `features/incidents/components/IncidentDrawer.tsx` has **no importers** and is
@@ -782,8 +791,8 @@ foundation exists would mean changing the detector and the yardstick at once.
 ## 19. Recommended First Steps For New Claude Session
 
 1. **Read this handoff** — then treat it as a hypothesis, not fact.
-2. **Address git first.** The backend is untracked (§15). Consider committing the
-   current state before any changes, so V4 work is diffable.
+2. ~~**Address git first.**~~ Done — the V3 baseline is committed and pushed
+   (`a272545`), so V4 work is already diffable against it.
 3. **Inspect the repository** — `backend/app/`, `frontend/src/`, `docs/`.
 4. **Verify this handoff against source.** Spot-check §4 (models), §5 (routes),
    §6 (ML constants), §7 (rerun the evaluations).
@@ -815,11 +824,10 @@ foundation exists would mean changing the detector and the yardstick at once.
 | Browser Verification | PASS | Real backend + frontend, full V3 flow + degraded mode |
 
 ```
-Last verified commit:  ef90cb2  "feat: add forgot password page"
-                       ⚠ Contains NO backend/docs/CI — V1/V2/V3 are all UNCOMMITTED
-Current branch:        main
-Working tree:          DIRTY — 53 untracked entries (incl. all of backend/ and docs/),
-                       24 modified, 1 deleted
+V3 checkpoint commit: a272545  "feat: commit AEGISX V1-V3 backend, frontend, docs and CI"
+                       380 files, 43,293 insertions — pushed to origin/main
+Current branch:        main  (tracking origin/main, 0 ahead / 0 behind)
+Working tree:          CLEAN
 Latest migration:      0003_v3_hybrid
 Backend test count:    301 passed
 Frontend test count:   33 passed
