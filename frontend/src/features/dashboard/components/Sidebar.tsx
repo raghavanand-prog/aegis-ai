@@ -5,6 +5,7 @@ import {
   FileText,
   BarChart3,
   Network,
+  FlaskConical,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -113,6 +114,14 @@ export default function Sidebar({
         >
           <Network className="h-5 w-5 flex-shrink-0" />
           {!collapsed && <span>Correlation</span>}
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/research"
+          className={navLinkClass}
+        >
+          <FlaskConical className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span>Research</span>}
         </NavLink>
 
         <NavLink
