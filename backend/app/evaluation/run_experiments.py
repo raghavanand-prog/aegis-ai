@@ -66,6 +66,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seed", type=int, default=1337, help="split and model seed")
     parser.add_argument(
+        "--group-by",
+        default="source",
+        choices=["source", "features"],
+        help=(
+            "what a duplicate group is. 'source' groups rows identical in the source "
+            "record (the dataset's own notion of a duplicate). 'features' groups rows "
+            "that AEGISX's feature extractor maps onto the same vector - stricter, and "
+            "the only setting under which a memorised training row provably cannot be "
+            "recognised in test (default: source)"
+        ),
+    )
+    parser.add_argument(
         "--seeds",
         type=int,
         default=1,
@@ -272,6 +284,27 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - one flat CLI
         print(f"\nExtracting features for {len(dataset)} samples...")
         features = extract_features(dataset)
 
+        if args.group_by == "features":
+            # Regroup on the feature vector itself. The source grouping catches
+            # the dataset's own duplicates; it cannot catch two genuinely
+            # distinct records that AEGISX's schema maps onto one point, and a
+            # model tested on such a record is answering from memory. Grouping
+            # here uses no label, so it introduces no leakage of its own.
+            import hashlib
+
+            for sample in dataset.samples:
+                vector = features.get(sample.id)
+                if vector is None:
+                    continue
+                digest = hashlib.sha256(
+                    ",".join(f"{value!r}" for value in vector).encode()
+                ).hexdigest()[:24]
+                sample.group_key = f"fv-{digest}"
+            print(
+                f"  Regrouped on feature vectors: {dataset.group_count()} distinct "
+                f"groups (was {len(dataset)} samples)"
+            )
+
         registered = None
         if args.include_registered:
             registered = load_registered()
@@ -282,7 +315,12 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - one flat CLI
 
         for offset in range(max(1, args.seeds)):
             seed = args.seed + offset
-            plan = build_split(dataset, strategy=args.split, seed=seed)
+            plan = build_split(
+                dataset,
+                strategy=args.split,
+                seed=seed,
+                allow_label_collisions=args.group_by == "features",
+            )
             specs = build_baseline_specs(
                 anomaly_threshold=settings.ml_anomaly_threshold,
                 contamination=settings.ml_contamination,
@@ -350,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - one flat CLI
             "dataset": dataset.describe(),
             "split": plan.to_dict(),
             "objective": args.objective,
+            "groupBy": args.group_by,
             "seed": args.seed,
             "seedsRun": args.seeds,
             "baselines": baselines.to_dict(),
@@ -368,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - one flat CLI
         detailed, latest = write_report(
             payload,
             directory or settings.evaluation_reports_dir or None,
-            prefix=f"{REPORT_PREFIX}-{args.dataset}-{args.split}",
+            prefix=f"{REPORT_PREFIX}-{args.dataset}-{args.split}-{args.group_by}",
         )
         print(f"  Report written to {detailed}")
         print(f"  Latest pointer   {latest}")
