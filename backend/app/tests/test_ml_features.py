@@ -221,3 +221,18 @@ def test_unknown_entity_kind_is_ignored_rather_than_raising() -> None:
     context = BehaviorContext()
     context.observe("nonsense", "value", timestamp=BASE_TIME)
     assert context.observation_count == 0
+
+
+def test_training_corpus_is_reproducible() -> None:
+    """A seed must pin the corpus, otherwise no experiment built on it reproduces.
+
+    ``build_corpus`` documents byte-identical output for a given seed. Until the
+    generator was fixed it produced a different fingerprint on every call.
+    """
+    from app.ml.training.corpus import build_corpus
+
+    first = build_corpus(samples=400)
+    second = build_corpus(samples=400)
+
+    assert first.fingerprint() == second.fingerprint()
+    assert first.vectors == second.vectors

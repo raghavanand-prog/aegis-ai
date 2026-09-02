@@ -150,6 +150,13 @@ class Settings(BaseSettings):
     # (backend/app/evaluation/reports).
     evaluation_reports_dir: str = ""
 
+    # --- Research datasets (V4) --------------------------------------------
+    # Where public evaluation corpora live on disk. Datasets are large, are
+    # licensed by third parties and are never committed, so this points at a
+    # gitignored directory that an operator populates with the documented
+    # fetch step. Empty means the package default (backend/data/datasets).
+    evaluation_data_dir: str = ""
+
     # --- Logging -----------------------------------------------------------
     # "json" for machine-readable structured logs (the production default),
     # "console" for readable local development output.
@@ -200,6 +207,14 @@ class Settings(BaseSettings):
     def ml_artifact_dir(self) -> Path:
         """Absolute artifact directory, resolved against the backend package."""
         candidate = Path(self.ml_model_dir)
+        if candidate.is_absolute():
+            return candidate
+        return BACKEND_ROOT / candidate
+
+    @property
+    def evaluation_dataset_dir(self) -> Path:
+        """Absolute dataset directory, resolved against the backend package."""
+        candidate = Path(self.evaluation_data_dir or "data/datasets")
         if candidate.is_absolute():
             return candidate
         return BACKEND_ROOT / candidate
