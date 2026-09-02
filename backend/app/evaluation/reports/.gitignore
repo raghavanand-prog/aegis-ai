@@ -1,0 +1,4 @@
+# Generated evaluation output: reproducible from the dataset + engine, so it is
+# not committed. Run `python -m app.evaluation.run_detection_eval` to produce it.
+detection-eval-*.json
+latest.json
