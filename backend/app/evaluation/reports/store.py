@@ -16,6 +16,7 @@ from app.core.config import settings
 
 REPORTS_DIR = Path(__file__).resolve().parent
 LATEST_FILENAME = "latest.json"
+DEFAULT_PREFIX = "detection-eval"
 
 
 def reports_dir(directory: str | Path | None = None) -> Path:
@@ -27,15 +28,24 @@ def reports_dir(directory: str | Path | None = None) -> Path:
 
 
 def write_report(
-    report: dict[str, Any], directory: str | Path | None = None
+    report: dict[str, Any],
+    directory: str | Path | None = None,
+    *,
+    prefix: str = DEFAULT_PREFIX,
 ) -> tuple[Path, Path]:
-    """Write a timestamped report plus ``latest.json``. Returns both paths."""
+    """Write a timestamped report plus its ``latest`` pointer. Returns both paths.
+
+    ``prefix`` namespaces a report family. The V2 detection evaluation keeps the
+    original ``detection-eval-*`` / ``latest.json`` names, which the
+    ``/detection/quality`` endpoint reads; a V4 experiment report writes under
+    its own prefix so the two cannot overwrite each other.
+    """
     target = reports_dir(directory)
     target.mkdir(parents=True, exist_ok=True)
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    detailed = target / f"detection-eval-{stamp}.json"
-    latest = target / LATEST_FILENAME
+    detailed = target / f"{prefix}-{stamp}.json"
+    latest = target / (LATEST_FILENAME if prefix == DEFAULT_PREFIX else f"latest-{prefix}.json")
 
     payload = json.dumps(report, indent=2, sort_keys=False)
     detailed.write_text(payload, encoding="utf-8")
@@ -43,9 +53,12 @@ def write_report(
     return detailed, latest
 
 
-def load_latest(directory: str | Path | None = None) -> dict[str, Any] | None:
-    """Return the most recent report, or None when none has been produced."""
-    latest = reports_dir(directory) / LATEST_FILENAME
+def load_latest(
+    directory: str | Path | None = None, *, prefix: str = DEFAULT_PREFIX
+) -> dict[str, Any] | None:
+    """Return the most recent report of one family, or None if never produced."""
+    name = LATEST_FILENAME if prefix == DEFAULT_PREFIX else f"latest-{prefix}.json"
+    latest = reports_dir(directory) / name
     if not latest.exists():
         return None
     try:
@@ -54,10 +67,10 @@ def load_latest(directory: str | Path | None = None) -> dict[str, Any] | None:
         return None
 
 
-def list_reports(directory: str | Path | None = None) -> list[str]:
+def list_reports(
+    directory: str | Path | None = None, *, prefix: str = DEFAULT_PREFIX
+) -> list[str]:
     target = reports_dir(directory)
     if not target.exists():
         return []
-    return sorted(
-        path.name for path in target.glob("detection-eval-*.json") if path.is_file()
-    )
+    return sorted(path.name for path in target.glob(f"{prefix}-*.json") if path.is_file())
