@@ -7,9 +7,16 @@ produce results that look fine and mean nothing.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from app.adaptation.experiments import simulation
+from app.adaptation.experiments import (
+    run_adaptation_eval,
+    scenarios,
+    seeds,
+    simulation,
+)
 from app.adaptation.feedback.labels import FeedbackLabel
 
 
@@ -109,3 +116,96 @@ class TestCurationArm:
         vectors = [(1.0,), (2.0,)]
         with pytest.raises(ValueError, match="fit set"):
             simulation.curate_fit_set(vectors, {0: True, 1: True})
+
+
+class TestSeedPlan:
+    """V6 Track 1 needs substantially more than three seeds, and the V5 result
+    must stay reproducible from its own published command. Both constraints
+    land on the seed plan, so the plan is tested rather than assumed."""
+
+    def test_the_first_three_seeds_are_the_v5_seeds(self) -> None:
+        """`--seeds 3` must still reproduce docs/V5_RESEARCH_REPORT.md exactly.
+        Changing these would silently invalidate a published result."""
+        assert seeds.build_seeds(3) == [1337, 4242, 99]
+
+    def test_a_longer_plan_extends_a_shorter_one(self) -> None:
+        """Adding seeds must not resample the ones already reported, or every
+        V6 run would be incomparable with the run before it."""
+        short = seeds.build_seeds(5)
+        long = seeds.build_seeds(50)
+        assert long[: len(short)] == short
+
+    def test_it_produces_the_requested_count(self) -> None:
+        assert len(seeds.build_seeds(50)) == 50
+
+    def test_seeds_are_distinct(self) -> None:
+        """A repeated seed is a repeated run reported as an independent one,
+        which would understate the variance the V5 report called unsettled."""
+        plan = seeds.build_seeds(50)
+        assert len(set(plan)) == 50
+
+    def test_it_is_deterministic_across_calls(self) -> None:
+        assert seeds.build_seeds(50) == seeds.build_seeds(50)
+
+    def test_it_refuses_a_non_positive_count(self) -> None:
+        with pytest.raises(ValueError, match="at least one seed"):
+            seeds.build_seeds(0)
+
+
+class TestRunnerSeedWiring:
+    """The V5 runner truncated against a five-element list, so `--seeds 50`
+    silently ran five. Track 1's whole point is more seeds than that."""
+
+    def test_the_runner_honours_a_seed_count_beyond_the_v5_list(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        calls: list[int] = []
+
+        def fake_run_condition(corpus, *, condition, seed, **kwargs):
+            calls.append(seed)
+            return scenarios.ScenarioResult(
+                name=condition,
+                condition=condition,
+                seed=seed,
+                metrics=dict.fromkeys(("precision", "recall", "f1", "falsePositiveRate", "falseNegativeRate", "alertVolume", "threshold"), 0.0),
+            )
+
+        monkeypatch.setattr(scenarios, "run_condition", fake_run_condition)
+        monkeypatch.setattr(
+            run_adaptation_eval.scenarios, "run_condition", fake_run_condition
+        )
+
+        exit_code = run_adaptation_eval.main(
+            ["--seeds", "8", "--output-dir", str(tmp_path), "--max-seconds", "600"]
+        )
+
+        assert exit_code == 0
+        reported = json.loads(
+            next(tmp_path.glob("v5-adaptation-*.json")).read_text()
+        )
+        for result in reported["results"]:
+            assert len(result["seeds"]) == 8
+            assert len(set(result["seeds"])) == 8
+        assert set(calls) == set(seeds.build_seeds(8))
+
+
+class TestNoiseInvariantConditions:
+    def test_the_random_control_is_run_once_rather_than_per_noise_rate(self) -> None:
+        """`shuffle_labels` skips the noise branch entirely, so the control is
+        identical at every noise rate - the V5 report shows all three rows at
+        F1 0.106497. Running it three times per seed triples the cost of the
+        single most important control for no extra evidence."""
+        assert "random_feedback" in run_adaptation_eval.NOISE_INVARIANT
+
+    def test_the_control_really_is_invariant_to_the_requested_noise(self) -> None:
+        """The reason the condition may be collapsed. If the simulator ever
+        starts consuming noise under shuffling, this fails before the runner
+        silently drops a genuine dimension."""
+        truth = [True, False] * 100
+        quiet = simulation.simulate_feedback(
+            truth, seed=17, noise_rate=0.0, coverage=1.0, shuffle_labels=True
+        )
+        loud = simulation.simulate_feedback(
+            truth, seed=17, noise_rate=0.15, coverage=1.0, shuffle_labels=True
+        )
+        assert [(v.index, v.label) for v in quiet] == [(v.index, v.label) for v in loud]
