@@ -28,13 +28,14 @@ from collections import Counter
 from functools import lru_cache
 from typing import Any
 
-from app.adaptation.experiments import arm2, feedback_caps, simulation
+from app.adaptation.experiments import arm2, simulation
 from app.adaptation.experiments.scenarios import (
     DEFAULT_THRESHOLD,
     _fit,
     _matrix,
     _metrics,
 )
+from app.adaptation.feedback import caps as feedback_caps
 from app.adaptation.feedback.labels import FeedbackLabel
 from app.evaluation.datasets.adapters import synthetic_dataset
 from app.evaluation.metrics.ranking import roc_auc

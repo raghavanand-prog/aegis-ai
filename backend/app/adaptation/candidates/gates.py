@@ -62,6 +62,21 @@ class GatePolicy:
     #: latency changes the platform's throughput, whatever its metrics say.
     max_latency_increase_ratio: float = 2.0
 
+    #: Aggregate recall hides a single-category collapse. V6 §8 measured a
+    #: candidate losing 0.2026 of one attack category's recall while aggregate
+    #: recall moved 0.0232 - less than half its own seed noise of 0.0426. Every
+    #: aggregate gate passed that candidate. This bound is per category.
+    #:
+    #: Looser than ``max_recall_drop`` on purpose: per-category recall is
+    #: measured over far fewer samples, so its own variance is higher (V6 §8.5
+    #: measured intervals as wide as [0.334, 0.836]). A tighter bound would
+    #: veto on noise.
+    max_per_category_recall_drop: float = 0.10
+
+    #: Below this many malicious samples a per-category recall figure is noise,
+    #: and the category is reported as unmeasured rather than judged.
+    min_category_samples: int = 10
+
     #: Below this many samples a comparison is noise dressed as evidence.
     min_evaluation_samples: int = 100
 
@@ -81,6 +96,18 @@ class GatePolicy:
             "max_precision_drop": (
                 "Precision may fall if recall rises - that trade is sometimes "
                 "wanted. It may not collapse."
+            ),
+            "max_per_category_recall_drop": (
+                "Aggregate recall divides a single-category collapse by the "
+                "number of categories. V6 §8 measured a candidate losing 0.2026 "
+                "of one category's recall while the aggregate moved 0.0232 - "
+                "below its own seed noise of 0.0426 - and every aggregate gate "
+                "passed it. Looser than the aggregate bound because per-category "
+                "recall is measured over far fewer samples and is noisier."
+            ),
+            "min_category_samples": (
+                "Below this many malicious samples a per-category recall figure "
+                "is noise. Such a category is reported unmeasured, not judged."
             ),
             "max_f1_drop": (
                 "A summary backstop for a candidate that is worse on every axis. "
@@ -184,6 +211,99 @@ def _regression_check(
     )
 
 
+def _per_category_check(
+    *,
+    baseline: dict[str, ConfusionMatrix] | None,
+    candidate: dict[str, ConfusionMatrix] | None,
+    policy: GatePolicy,
+) -> tuple[GateCheck, list[str]]:
+    """The gate aggregate metrics cannot see.
+
+    When no per-category data is supplied this is **advisory**, not a veto.
+    Every pre-V6 caller passes none, so vetoing would reject every candidate;
+    but the absence is surfaced to the approver rather than counted as a pass,
+    which is what ``advisory`` is for. Supplying the data makes it a hard gate.
+    """
+    name = "per_category_recall"
+    description = (
+        "Recall per attack category, against the incumbent. Aggregate recall "
+        "divides a single-category collapse by the number of categories and can "
+        "hide it beneath its own seed noise (V6 §8)."
+    )
+
+    if baseline is None or candidate is None:
+        return (
+            GateCheck(
+                name=name,
+                description=(
+                    f"{description} Not supplied for this evaluation, so a "
+                    "single-category regression cannot be ruled out. Advisory: "
+                    "surfaced to the approver rather than treated as a pass."
+                ),
+                passed=True,
+                status="not_measured",
+                advisory=True,
+            ),
+            [],
+        )
+
+    failures: list[str] = []
+    worst_drop: float | None = None
+    for category, baseline_matrix in sorted(baseline.items()):
+        if baseline_matrix.actual_positives < policy.min_category_samples:
+            continue  # too few to judge; reported by the caller, not guessed at
+
+        candidate_matrix = candidate.get(category)
+        if candidate_matrix is None:
+            failures.append(
+                f"per-category recall: {category} was measured on the incumbent "
+                "but not on the candidate, so the candidate has not been shown "
+                "safe on it"
+            )
+            continue
+
+        baseline_recall = baseline_matrix.recall
+        candidate_recall = candidate_matrix.recall
+        if baseline_recall is None or candidate_recall is None:
+            continue
+
+        drop = baseline_recall - candidate_recall
+        worst_drop = drop if worst_drop is None else max(worst_drop, drop)
+        if drop > policy.max_per_category_recall_drop:
+            failures.append(
+                f"per-category recall: {category} fell {drop:.4f} "
+                f"({baseline_recall:.4f} -> {candidate_recall:.4f}), above the "
+                f"{policy.max_per_category_recall_drop} bound"
+            )
+
+    if worst_drop is None and not failures:
+        return (
+            GateCheck(
+                name=name,
+                description=(
+                    f"{description} No category had enough malicious samples to "
+                    "judge. Advisory rather than a pass."
+                ),
+                passed=True,
+                status="not_measured",
+                advisory=True,
+            ),
+            [],
+        )
+
+    return (
+        GateCheck(
+            name=name,
+            description=description,
+            passed=not failures,
+            status="ok" if not failures else "failed",
+            threshold=policy.max_per_category_recall_drop,
+            observed=round(worst_drop, 6) if worst_drop is not None else None,
+        ),
+        failures,
+    )
+
+
 def evaluate(
     *,
     baseline: ConfusionMatrix,
@@ -192,6 +312,8 @@ def evaluate(
     candidate_latency_ms: float | None = None,
     baseline_dataset_fingerprint: str | None = None,
     candidate_dataset_fingerprint: str | None = None,
+    baseline_per_category: dict[str, ConfusionMatrix] | None = None,
+    candidate_per_category: dict[str, ConfusionMatrix] | None = None,
     policy: GatePolicy | None = None,
 ) -> GateResult:
     """Run every gate. Writes nothing and promotes nothing."""
@@ -244,6 +366,13 @@ def evaluate(
         ),
     ]
 
+    per_category_check, per_category_failures = _per_category_check(
+        baseline=baseline_per_category,
+        candidate=candidate_per_category,
+        policy=policy,
+    )
+    checks.append(per_category_check)
+
     # Sample-size gate: a comparison over too little data is not evidence.
     checks.append(
         GateCheck(
@@ -293,6 +422,9 @@ def evaluate(
         for check in checks
         if not check.passed and not check.advisory
     ]
+    # Per-category failures name the category, which a generic check description
+    # cannot. An approver needs to know *which* attack class regressed.
+    failures.extend(per_category_failures)
 
     return GateResult(
         passed=not failures,
@@ -303,6 +435,8 @@ def evaluate(
             "maxFprIncrease": policy.max_fpr_increase,
             "maxPrecisionDrop": policy.max_precision_drop,
             "maxF1Drop": policy.max_f1_drop,
+            "maxPerCategoryRecallDrop": policy.max_per_category_recall_drop,
+            "minCategorySamples": float(policy.min_category_samples),
             "maxLatencyIncreaseRatio": policy.max_latency_increase_ratio,
             "minEvaluationSamples": float(policy.min_evaluation_samples),
         },
