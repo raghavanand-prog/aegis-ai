@@ -117,42 +117,149 @@ about, landing on one of its own numbers.
 
 ---
 
-## 2. Track 3 — a confound in the V5 novel-behaviour result **[IMPLEMENTATION]**
+## 2. Track 3 — the novel-behaviour confound, investigated **[MEASURED]**
 
-Recorded here before Track 3 runs, because it changes how V5 §3 should be read.
+### 2.1 The confound
 
 `scenarios.run_new_behaviour` withholds one attack category from the fit set,
-then simulates feedback from `fit_labels` — which is derived from the fit set
-the category was just removed from. **No verdict about the withheld category
-ever reaches the adaptation loop.** The threshold is likewise chosen only from
-fit-set scores. The function's own docstring says "adaptation then happens on
-feedback that includes it"; the code does not.
+then simulates feedback from `fit_labels` — which is derived from that same
+reduced fit set. **No verdict about the withheld category ever reaches the
+adaptation loop.** The threshold is likewise selected only from fit-set scores.
+The function's docstring claimed "adaptation then happens on feedback that
+includes it"; the code did not. Now reported as `verdictsAboutWithheld`, and
+measured as structurally zero.
 
-V5 §3 reported recall 0.000 → 0.0085 on withheld categories and concluded
-"**RQ4 is answered no**, measurably". The measurement stands. The conclusion is
-stronger than the harness supports: the experiment cannot distinguish
+It is a property of the **evaluation procedure** — not the adaptation
+mechanism, not the simulator (which labels whatever it is handed), not the
+dataset, and not the split.
 
-- *curation cannot teach a pattern the model has never seen* (V5's reading, and
-  mechanically plausible — curation only removes rows), from
-- *the loop was never told the pattern existed*.
+### 2.2 The controlled experiment
 
-**[LIMITATION]** Additionally, `run_new_behaviour` has no test and no CLI
-runner. Nothing in the repository calls it. V5 §3's numbers were produced by an
-ad-hoc invocation that was never committed, so they are not reproducible from a
-committed command.
+Same dataset, same seeds, same adaptation configuration, **one variable**:
+whether the analyst ever labelled an instance of the withheld category.
 
-Track 3 will run both variants — feedback withheld, and feedback supplied — and
-report the pair. **[INFERENCE]** The V5 conclusion may well survive; the point
-is that it has not yet been tested as stated.
+Held-out samples of the withheld category are partitioned into an *adaptation
+window* the analyst may label and a *scoring set* neither arm labels, so the
+corrected arm cannot simply leak test labels. Both arms score on the identical
+scoring set (asserted by test).
 
----
+```bash
+cd backend
+export DATABASE_URL="sqlite:///aegisx.db"
+python -m app.adaptation.experiments.run_novel_behaviour_eval --seeds 10 --max-seconds 3600
+```
+
+13 categories × 10 seeds × 2 arms = 260 runs. Seeds from the standing plan;
+noise 0.05, coverage 0.5, window fraction 0.5. Artifact:
+`app/evaluation/reports/v6-novel-behaviour-20260903T074713Z.json`.
+
+### 2.3 The confound is **benign** — and the reason matters
+
+Supplying feedback about the withheld category changed **nothing**, in every
+category, to six decimal places:
+
+| Category | separable | withheld arm | supplied arm | Δ |
+| --- | --- | --- | --- | --- |
+| PORT_SCAN | yes | 0.9500 | 0.9500 | **0.0** |
+| SUSPICIOUS_DNS | yes | 0.5685 | 0.5685 | **0.0** |
+| BRUTE_FORCE | yes | 0.4236 | 0.4236 | **0.0** |
+| SUSPICIOUS_POWERSHELL | yes | 0.0786 | 0.0786 | **0.0** |
+| the other nine | no | 0.0000 | 0.0000 | **0.0** |
+
+**Root cause: the threshold arm is already saturated.** In **256 of 260 runs**
+the selected threshold sits exactly on the clamp floor, `DEFAULT_THRESHOLD −
+MAX_THRESHOLD_STEP = 0.60` (the only other value observed is 0.605). The ~780
+fit-set verdicts drive the threshold to the boundary; the 2–4 additional
+verdicts about the withheld category have nowhere left to push it.
+
+So novel-behaviour feedback cannot matter **given the current clamp**, and the
+V5 result is not corrupted by the confound. **[LIMITATION]** This is a
+conditional finding: it says the confound is inert while `MAX_THRESHOLD_STEP`
+binds, not that novel-category feedback is worthless in general. A larger step
+would have to be re-tested.
+
+### 2.4 A larger problem than the confound: V5's conclusion is wrong
+
+V5 §3 reported novel-behaviour recall 0.000 → 0.0085 over 3 categories × 3
+seeds, "1 of 9 runs", and concluded **"RQ4 is answered no, measurably"**.
+
+Across all thirteen categories, that generalisation does not hold:
+
+| Category | static | adapted | gain |
+| --- | --- | --- | --- |
+| PORT_SCAN | 0.2575 | **0.9500** | +0.693 |
+| SUSPICIOUS_DNS | 0.0744 | **0.5685** | +0.494 |
+| BRUTE_FORCE | 0.0292 | **0.4236** | +0.394 |
+| SUSPICIOUS_POWERSHELL | 0.0000 | 0.0786 | +0.079 |
+| ANOMALOUS_SIGNIN, CREDENTIAL_ACCESS, DATA_EXFILTRATION, LATERAL_MOVEMENT, LOLBIN_EXECUTION, MALWARE, PRIVILEGE_ESCALATION, RANSOMWARE, SUSPICIOUS_DOWNLOAD | 0.0000 | 0.0000 | 0.000 |
+| **mean, all 13** | **0.0278** | **0.1554** | +0.128 |
+| **mean, the 4 separable** | **0.0903** | **0.5051** | +0.415 |
+
+**Adaptation does help against novel behaviour — in 4 of 13 categories, and
+substantially.** It cannot help in the other 9. The determining factor is
+whether the model separates the unseen category at all:
+
+| Category | novel median score | benign median | ≥ 0.60 floor |
+| --- | --- | --- | --- |
+| PORT_SCAN | 0.625 | 0.505 | 15/15, 16/16, 10/16 |
+| RANSOMWARE | 0.501 | 0.499 | 0/9, 0/9, 0/14 |
+| LATERAL_MOVEMENT | **0.440** | 0.499 | 0/11, 0/11, 0/15 |
+
+Lateral movement scores *below the benign median* — the detector rates novel
+attacks as more normal than normal traffic. No threshold recovers that.
+
+**[LIMITATION]** V5's 0.0085 figure could not be reproduced, because **the three
+categories it used were never recorded**. Running V5's own function today gives
+PORT_SCAN recall 0.533 (seed 1337) and 1.000 (seed 4242). No 3-category subset
+of the measured results averages 0.0085, so the figure cannot be reconstructed;
+it is consistent with a draw from the nine non-separable categories, but that is
+inference, not verification. **The V5 measurement is retained unchanged as a
+historical result. The corrected interpretation is recorded here, separately.**
+
+### 2.5 Which hypotheses survive
+
+| # | Hypothesis | Verdict |
+| --- | --- | --- |
+| 1 | Isolation Forest's representation is insufficient | **Confirmed, and it is the binding constraint** — 9 of 13 categories are unreachable at any threshold |
+| 2 | The feature space does not capture the new behaviour | **Confirmed**, same evidence; lateral movement lands below the benign median |
+| 3 | Curation cannot teach unseen patterns | **True but inert** — curation only removes fit-set rows and the category is not in the fit set, so it cannot act at all |
+| 4 | Threshold adaptation cannot solve representation failure | **Confirmed and quantified** — it fully solves the 4 separable categories and none of the other 9 |
+| 5 | Detector class is limiting adaptation | **Supported**, and now the highest-value V6 question |
+
+### 2.6 Impact on Track 2
+
+**None. Track 2 is safe to proceed on the original methodology.**
+
+The confound is a property of `run_new_behaviour`. Every Track 1 number,
+including the noise sensitivity in §1.3, comes from `run_condition`, which
+withholds no category and offers feedback over the entire fit set — so the
+confound has no precondition there. This is now asserted by test
+(`TestTrack1IsNotAffectedByTheConfound`) rather than left to be re-derived by
+reading. The noise-sensitivity finding stands unchanged.
+
+### 2.7 Two further code-level issues found
+
+1. **`run_condition`'s docstring claimed the split is chronological.** It is
+   stratified group-aware; V5's own report explains a chronological split was
+   rejected for putting zero malicious samples in test. Corrected.
+2. **The corpus has duplicate feature vectors across the split.** 5.1% of test
+   rows at seed 1337 (17 benign, 3 malicious) share a feature vector with a fit
+   row. Samples and groups are disjoint — `test_no_sample_appears_in_two_splits`
+   already covers that — so this is feature-space coarseness, **not leakage**,
+   but the detector does meet vectors in test that it fitted on. Pinned by test
+   as a known corpus property.
 
 ## 3. Reproducing
 
 ```bash
 cd backend
 export DATABASE_URL="sqlite:///aegisx.db"
+
+# section 1
 python -m app.adaptation.experiments.run_adaptation_eval --seeds 50 --max-seconds 5400
+
+# section 2
+python -m app.adaptation.experiments.run_novel_behaviour_eval --seeds 10 --max-seconds 3600
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
