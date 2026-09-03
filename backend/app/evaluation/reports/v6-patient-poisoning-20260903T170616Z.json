@@ -1,0 +1,242 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-03T17:06:16.305738+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_patient_poisoning_eval.py --seeds 8 --max-seconds 5400",
+  "question": "Can an adversary defeat the baseline_relative cap by raising the baseline over several feedback cycles instead of attacking one batch?",
+  "threatModel": "An analyst with ordinary feedback permissions and patience. Every control is respected and every individual batch is within policy; the campaign starts from honest history because production refuses a cold start.",
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395
+    ],
+    "cycles": 10,
+    "target": "MALWARE",
+    "defaultTolerance": 3.0,
+    "honestHistory": 3
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "arms": {
+    "honest": {
+      "allowanceByCycle": [
+        3.5,
+        3.65625,
+        3.45,
+        3.375,
+        3.321425,
+        3.40625,
+        3.583337,
+        3.475,
+        3.5341,
+        3.5
+      ],
+      "poisonByCycle": [
+        1.375,
+        0.875,
+        1.0,
+        1.0,
+        1.25,
+        1.625,
+        0.75,
+        1.375,
+        1.125,
+        1.375
+      ],
+      "maliciousAdmittedByCycle": [
+        13.875,
+        15.625,
+        14.375,
+        14.875,
+        14.625,
+        12.0,
+        11.875,
+        13.125,
+        14.0,
+        15.0
+      ],
+      "honestBaselineRate": 1.166675
+    },
+    "adversary": {
+      "allowanceByCycle": [
+        3.5,
+        5.25,
+        7.125,
+        9.4375,
+        12.053562,
+        14.953125,
+        18.083312,
+        20.8875,
+        24.170488,
+        27.46875
+      ],
+      "poisonByCycle": [
+        3.5,
+        4.875,
+        7.0,
+        9.25,
+        11.75,
+        14.375,
+        15.375,
+        19.0,
+        21.25,
+        22.875
+      ],
+      "maliciousAdmittedByCycle": [
+        16.0,
+        19.625,
+        20.375,
+        23.125,
+        25.125,
+        24.75,
+        26.5,
+        30.75,
+        34.125,
+        36.5
+      ],
+      "honestBaselineRate": 1.166675
+    }
+  },
+  "tolerance": [
+    {
+      "tolerance": 1.25,
+      "attackPoisonFinal": 2.0,
+      "honestAdmittedFinal": 407.25,
+      "honestTargetAdmittedFinal": 1.25
+    },
+    {
+      "tolerance": 1.5,
+      "attackPoisonFinal": 2.25,
+      "honestAdmittedFinal": 407.5,
+      "honestTargetAdmittedFinal": 1.25
+    },
+    {
+      "tolerance": 2.0,
+      "attackPoisonFinal": 6.375,
+      "honestAdmittedFinal": 407.5,
+      "honestTargetAdmittedFinal": 1.25
+    },
+    {
+      "tolerance": 3.0,
+      "attackPoisonFinal": 22.875,
+      "honestAdmittedFinal": 408.125,
+      "honestTargetAdmittedFinal": 1.375
+    }
+  ],
+  "damage": [
+    {
+      "cycles": 1,
+      "finalPoisonLanded": 3.5,
+      "targetRecallHonest": {
+        "mean": 0.8091,
+        "lower": 0.5854,
+        "upper": 0.9808,
+        "stdDev": 0.3213,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "targetRecallPoisoned": {
+        "mean": 0.9115,
+        "lower": 0.8259,
+        "upper": 0.9808,
+        "stdDev": 0.1238,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": 0.4205
+    },
+    {
+      "cycles": 3,
+      "finalPoisonLanded": 7.0,
+      "targetRecallHonest": {
+        "mean": 0.8989,
+        "lower": 0.8171,
+        "upper": 0.9599,
+        "stdDev": 0.1076,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "targetRecallPoisoned": {
+        "mean": 0.7242,
+        "lower": 0.4717,
+        "upper": 0.9539,
+        "stdDev": 0.3772,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -0.6298
+    },
+    {
+      "cycles": 6,
+      "finalPoisonLanded": 14.375,
+      "targetRecallHonest": {
+        "mean": 0.8252,
+        "lower": 0.5752,
+        "upper": 0.971,
+        "stdDev": 0.3383,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "targetRecallPoisoned": {
+        "mean": 0.7363,
+        "lower": 0.5282,
+        "upper": 0.893,
+        "stdDev": 0.288,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -0.2831
+    },
+    {
+      "cycles": 10,
+      "finalPoisonLanded": 22.875,
+      "targetRecallHonest": {
+        "mean": 0.7933,
+        "lower": 0.58,
+        "upper": 0.9323,
+        "stdDev": 0.3016,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "targetRecallPoisoned": {
+        "mean": 0.7112,
+        "lower": 0.5017,
+        "upper": 0.8858,
+        "stdDev": 0.3048,
+        "samples": 8,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -0.2709
+    }
+  ],
+  "caveats": [
+    "The ratchet on the allowance is the robust result. The recall damage is directionally present but its per-category intervals overlap heavily, exactly as V6 \u00a78.5 established for this metric at these sample sizes; no dose-response curve is claimed from it.",
+    "The honest arm is the control. It does not ratchet, which is what makes the adversarial ratchet attributable.",
+    "Poison is counted as malicious rows admitted *in the targeted group*. Honest label noise admits malicious rows too - measured around 14 per cycle - and a metric counting all of them cannot see this attack.",
+    "Feedback is simulated; both corpora are synthetic.",
+    "Nothing is deployed."
+  ]
+}

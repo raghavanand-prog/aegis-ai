@@ -133,6 +133,12 @@ recall while aggregate recall moved 0.0232 — **below its own seed noise of
 0.0426**. The `baseline_relative` cap cuts admitted poison to 4.0 rows and
 restores target recall, at no cost to honest feedback.
 
+**The patient adversary** (§11) feeds that cap rather than fighting it. Every
+batch stays within policy while the ceiling ratchets **3.5 → 27.5** over ten
+cycles; the honest control stays flat at 3.5, which is what makes the effect
+attributable. §9's defence is **delayed, not defeated** — it holds at one cycle
+and does not by three.
+
 ---
 
 ## 5. Corrections to earlier documents
@@ -259,11 +265,12 @@ are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
 
 Also unresolved, and load-bearing:
 
-9. **The patient baseline-poisoning adversary is untested.** §9's defence
-   learns its baseline from feedback history; an adversary who raises that
-   baseline across several datasets defeats it. **This is now more load-bearing,
-   not less**: since `baseline_relative` became the default, the baseline is
-   consulted on every run.
+9. **`caps.DEFAULT_TOLERANCE` is still 3.0**, which §11 measured lets a patient
+   adversary ratchet its allowance 3.5 → 27.5 over ten cycles. §11.4 measured
+   that 1.5 contains the attack 10× for a 0.15% honest-throughput cost. **One
+   line, evidence behind it, deliberately not changed** — §10.3's lesson was
+   that security defaults should be decided rather than inherited, including
+   from me.
 10. **`event_type` tracks attack category almost perfectly in this corpus**, so
     §9's result **flatters the defence**. The mechanism is sound; the effect size
     is unlikely to transfer to real telemetry where an attack spans many event
