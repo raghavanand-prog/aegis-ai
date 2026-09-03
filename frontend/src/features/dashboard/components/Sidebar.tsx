@@ -6,6 +6,7 @@ import {
   BarChart3,
   Network,
   FlaskConical,
+  Repeat,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -114,6 +115,14 @@ export default function Sidebar({
         >
           <Network className="h-5 w-5 flex-shrink-0" />
           {!collapsed && <span>Correlation</span>}
+        </NavLink>
+
+        <NavLink
+          to="/dashboard/adaptive"
+          className={navLinkClass}
+        >
+          <Repeat className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span>Adaptive</span>}
         </NavLink>
 
         <NavLink
