@@ -49,6 +49,36 @@ def _load(model: MLModel) -> IsolationForestDetector:
     return IsolationForestDetector.load(path, expected_sha256=model.artifact_sha256)
 
 
+def _score_per_category(
+    detector: IsolationForestDetector,
+    vectors: list[tuple[float, ...]],
+    labels: list[bool],
+    categories: list[str],
+    threshold: float,
+) -> dict[str, ConfusionMatrix]:
+    """One confusion matrix per attack category.
+
+    V6 §8 measured a candidate losing 0.2026 of one category's recall while
+    aggregate recall moved 0.0232 - less than its own seed noise. Aggregate
+    numbers cannot see that, so the gate needs these.
+
+    Benign samples are counted into **every** category's matrix, because a
+    category's recall is about the malicious samples of that category while its
+    false-positive behaviour is shared. Only recall is gated on, so this keeps
+    the recall denominator per-category and correct.
+    """
+    matrices: dict[str, ConfusionMatrix] = {}
+    for vector, is_malicious, category in zip(vectors, labels, categories, strict=True):
+        if not is_malicious:
+            continue
+        matrix = matrices.setdefault(category, ConfusionMatrix())
+        if detector.anomaly_score(vector) >= threshold:
+            matrix.true_positives += 1
+        else:
+            matrix.false_negatives += 1
+    return matrices
+
+
 def _score(
     detector: IsolationForestDetector,
     vectors: list[tuple[float, ...]],
@@ -130,16 +160,31 @@ def evaluate_candidate(
     extractor = FeatureExtractor()
     vectors: list[tuple[float, ...]] = []
     labels: list[bool] = []
+    categories: list[str] = []
     for sample in ordered:
         vectors.append(extractor.extract(sample.candidate, observe=True).values)
         labels.append(bool(sample.is_malicious))
+        categories.append(str(sample.category))
 
-    candidate_matrix, candidate_latency = _score(_load(candidate), vectors, labels, threshold)
+    candidate_detector = _load(candidate)
+    candidate_matrix, candidate_latency = _score(
+        candidate_detector, vectors, labels, threshold
+    )
+    candidate_per_category = _score_per_category(
+        candidate_detector, vectors, labels, categories, threshold
+    )
 
     baseline_matrix: ConfusionMatrix | None = None
     baseline_latency: float | None = None
+    baseline_per_category: dict[str, ConfusionMatrix] | None = None
     if baseline is not None:
-        baseline_matrix, baseline_latency = _score(_load(baseline), vectors, labels, threshold)
+        baseline_detector = _load(baseline)
+        baseline_matrix, baseline_latency = _score(
+            baseline_detector, vectors, labels, threshold
+        )
+        baseline_per_category = _score_per_category(
+            baseline_detector, vectors, labels, categories, threshold
+        )
 
     if baseline_matrix is None:
         gate_result = gates.GateResult(
@@ -161,10 +206,26 @@ def evaluate_candidate(
             candidate_latency_ms=candidate_latency,
             baseline_dataset_fingerprint=dataset.fingerprint(),
             candidate_dataset_fingerprint=dataset.fingerprint(),
+            baseline_per_category=baseline_per_category,
+            candidate_per_category=candidate_per_category,
             policy=policy,
         )
 
+    per_category_report = {
+        category: {
+            "maliciousSamples": matrix.actual_positives,
+            "candidateRecall": matrix.recall,
+            "baselineRecall": (
+                baseline_per_category.get(category).recall
+                if baseline_per_category and baseline_per_category.get(category)
+                else None
+            ),
+        }
+        for category, matrix in sorted(candidate_per_category.items())
+    }
+
     return {
+        "perCategory": per_category_report,
         "dataset": {
             "name": dataset.name,
             "version": dataset.version,

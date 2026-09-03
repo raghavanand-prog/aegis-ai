@@ -17,12 +17,8 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from app.adaptation.experiments import (
-    feedback_caps,
-    scenarios,
-    seeds,
-    targeted_poisoning,
-)
+from app.adaptation.experiments import scenarios, seeds, targeted_poisoning
+from app.adaptation.feedback import caps as feedback_caps
 from app.evaluation.metrics.ranking import bootstrap_interval, cohens_d
 from app.evaluation.reports.store import write_report
 from app.evaluation.watchdog import add_argument as add_timeout_argument

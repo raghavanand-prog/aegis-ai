@@ -153,3 +153,70 @@ class TestNoTrainingOverHttp:
             if "candidate" in path and "train" in path
         ]
         assert offenders == []
+
+
+class TestPerCategoryEvaluation:
+    """The gate added in V6 §10 is only useful if the evaluator supplies it."""
+
+    def test_candidate_evaluation_reports_per_category_recall(
+        self, db, tmp_path_factory
+    ) -> None:
+        from app.adaptation.candidates import evaluation, training
+        from app.ml.registry import registry
+        from app.models.enums import MLModelStatus
+
+        directory = tmp_path_factory.mktemp("percat")
+        incumbent = training.train_candidate(
+            db, samples=600, seed=1337, directory=directory, created_by="test"
+        )
+        # Approved first: activate_model refuses anything else, which is the
+        # invariant this suite must not route around.
+        incumbent.status = MLModelStatus.APPROVED.value
+        db.flush()
+        registry.activate_model(db, incumbent)
+        db.flush()
+        candidate = training.train_candidate(
+            db, samples=600, seed=4242, directory=directory, created_by="test"
+        )
+
+        report = evaluation.evaluate_candidate(
+            db, candidate=candidate, samples_per_class=40
+        )
+        per_category = report["perCategory"]
+        assert per_category, "per-category recall must be reported"
+        for entry in per_category.values():
+            assert "baselineRecall" in entry
+            assert "candidateRecall" in entry
+            assert "maliciousSamples" in entry
+
+    def test_the_per_category_gate_is_no_longer_advisory_after_evaluation(
+        self, db, tmp_path_factory
+    ) -> None:
+        """Once real per-category data exists the gate must actually bind,
+        rather than remaining the advisory placeholder."""
+        from app.adaptation.candidates import evaluation, training
+        from app.ml.registry import registry
+        from app.models.enums import MLModelStatus
+
+        directory = tmp_path_factory.mktemp("percat2")
+        incumbent = training.train_candidate(
+            db, samples=600, seed=1337, directory=directory, created_by="test"
+        )
+        # Approved first: activate_model refuses anything else, which is the
+        # invariant this suite must not route around.
+        incumbent.status = MLModelStatus.APPROVED.value
+        db.flush()
+        registry.activate_model(db, incumbent)
+        db.flush()
+        candidate = training.train_candidate(
+            db, samples=600, seed=4242, directory=directory, created_by="test"
+        )
+
+        report = evaluation.evaluate_candidate(
+            db, candidate=candidate, samples_per_class=40
+        )
+        check = next(
+            c for c in report["gates"]["checks"] if c["name"] == "per_category_recall"
+        )
+        assert not check["advisory"]
+        assert check["status"] in {"ok", "failed"}
