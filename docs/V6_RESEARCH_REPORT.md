@@ -780,7 +780,102 @@ bias, being the binding variable for those two.
    an existence proof that a threshold exists, not a transferable constant.
 5. Nothing is deployed.
 
-## 8. Reproducing
+## 8. Targeted poisoning — the recall floor is not enough **[MEASURED]**
+
+§6.4 and §7.5 both flagged this as the most important untested case. §7 measured
+*diffuse* poisoning and concluded that recall was the one aggregate metric that
+exposed it. This tests whether that holds against an adversary who concentrates.
+
+### 8.1 Threat model
+
+A **compromised, coerced or simply careless analyst with ordinary feedback
+permissions**. No privileged access, no code execution, nothing RBAC would
+refuse. They label events of one chosen attack category benign and let the
+adaptation pipeline carry it into the fit set.
+
+**Every existing control is respected.** Only benign-projecting labels are
+admitted; the feedback cap holds; deployment still requires an approved
+proposal. The question is not whether the controls run — it is whether they are
+*sufficient*.
+
+```bash
+python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --max-seconds 5400
+```
+
+Artifact: `app/evaluation/reports/v6-targeted-poisoning-20260903T090030Z.json`.
+
+### 8.2 Result — the aggregate hides it beneath its own noise
+
+| Target | poisoned rows | Δ target recall | Δ aggregate recall | attenuation |
+| --- | --- | --- | --- | --- |
+| **MALWARE** | 22.0 | **−0.2026** | −0.0232 | **8.7×** |
+| PORT_SCAN | 22.5 | −0.0706 | −0.0144 | 4.9× |
+| BRUTE_FORCE | 25.4 | −0.0007 | −0.0024 | n/a |
+| RANSOMWARE | 23.6 | 0.0000 | −0.0080 | n/a |
+| SUSPICIOUS_DNS | 23.8 | 0.0000 | +0.0088 | n/a |
+
+For MALWARE, over 8 seeds:
+
+| | baseline | poisoned | Cohen's d |
+| --- | --- | --- | --- |
+| **Target recall** | 0.8079 [0.703, 0.912] | **0.6052** [0.334, 0.836] | −0.67 |
+| Aggregate recall | 0.6795 [0.652, 0.711] | 0.6563 [0.621, 0.691] | −0.46 |
+
+**The aggregate recall intervals overlap.** And the decisive number:
+
+> Aggregate recall's **seed-to-seed standard deviation is 0.0426**. The attack
+> moves aggregate recall by **−0.0232** — **less than half the noise floor.**
+
+**An aggregate recall floor cannot detect this attack.** To catch a 20-point
+collapse in one category it would have to trigger on a 2-point aggregate move,
+which is well inside normal seed variance and would fire constantly on nothing.
+The mitigation §7.3 recommended is **insufficient as stated**, and this section
+supersedes it.
+
+Note also that **ΔFPR is negative in four of five targets** — the attack
+continues to look like an improvement on the metric the arm exists to optimise.
+
+### 8.3 Why the cap does not help
+
+The feedback cap bounds **volume**. Targeted poisoning is a **concentration**
+attack: it needed only **22 rows** — 0.34% of the fit set, far inside a cap set
+at 20%. A volume control cannot bound concentration, and no setting of
+`max_feedback_fraction` short of zero would have stopped this.
+
+**[INFERENCE]** The natural defence is a **per-category (or per-analyst) cap**
+rather than a global one, plus per-category recall tracking. Neither is
+implemented; both are recommendations, not results.
+
+### 8.4 What limits the attack
+
+Reported because they are genuine mitigating factors, not to soften the finding:
+
+1. **It only works on categories the detector already detects well.** MALWARE
+   (baseline recall 0.81) and PORT_SCAN (0.45) are damaged; RANSOMWARE (1.00,
+   strongly separated) is untouched, and SUSPICIOUS_DNS (0.05) and BRUTE_FORCE
+   (0.01) have no recall left to remove. **[INFERENCE]** An adversary must
+   therefore attack the categories the SOC is *best* at, which is where a
+   defender is most likely to notice operationally.
+2. **It needs high reach over its target.** A reach sweep on MALWARE: at 0.25
+   reach (6 rows) target recall is 0.834 and at 0.5 (12 rows) it is 0.857 —
+   both at or above the 0.808 baseline, i.e. no damage. Only full reach (22
+   rows) bites, at 0.605. The attack is not cheap; a partial adversary achieves
+   nothing.
+
+### 8.5 Limitations **[LIMITATION]**
+
+1. Per-category recall is measured over a few dozen held-out samples, so its
+   intervals are wide ([0.334, 0.836] for poisoned MALWARE). **The attenuation
+   ratio and the noise-floor comparison are the robust parts of this result; the
+   per-category point estimates are not.**
+2. Only five categories were targeted, at one reach value for the main sweep.
+3. The adversary is modelled as labelling one category. A patient adversary
+   spreading a small attack across several categories, or across time, is not
+   modelled.
+4. Feedback is simulated; both corpora are synthetic.
+5. Nothing is deployed, and no defence is implemented.
+
+## 9. Reproducing
 
 ```bash
 cd backend
@@ -806,6 +901,9 @@ python -m app.adaptation.experiments.run_arm2_eval --seeds 10 --max-seconds 3600
 
 # section 7
 python -m app.adaptation.experiments.run_feedback_quality_eval --seeds 10 --max-seconds 5400
+
+# section 8
+python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --max-seconds 5400
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
