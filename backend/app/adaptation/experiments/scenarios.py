@@ -161,9 +161,10 @@ def run_condition(
 ) -> ScenarioResult:
     """Run one condition end to end and measure it.
 
-    The split is chronological: the model is fitted and adapted on the earlier
-    portion and measured on the later one, so no condition is scored on data it
-    was tuned against.
+    The split is **stratified and group-aware**, not chronological - a naive time
+    cut puts zero malicious samples in the held-out portion (V5 measured this).
+    Feedback and threshold selection read only the fit set and scoring reads only
+    the test set, so no condition is scored on data it was tuned against.
     """
     fit_vectors = corpus.fit_vectors
     fit_labels = corpus.fit_labels
@@ -282,9 +283,15 @@ def run_new_behaviour(
     """Scenario 4 + §33: does adapting to new behaviour cost old behaviour?
 
     One attack category is withheld from the fit set entirely, so the model has
-    never seen it. Adaptation then happens on feedback that includes it. The
-    result is scored **twice**: on the new category, and on the historical
-    categories the model already handled.
+    never seen it. The result is scored **twice**: on the new category, and on
+    the historical categories the model already handled.
+
+    **This harness draws feedback from the fit set the category was just removed
+    from, so no verdict about the withheld category ever reaches the loop.** V6
+    Track 3 measured that; it is reported here as ``verdictsAboutWithheld`` and
+    is structurally zero. The behaviour is preserved unchanged because
+    docs/V5_RESEARCH_REPORT.md section 3 refers to it - see
+    ``run_novel_behaviour_controlled`` for the comparison that varies it.
 
     Reporting only the first number is the error §33 exists to prevent - a model
     that learns the new thing while quietly losing the old one looks like
@@ -353,9 +360,16 @@ def run_new_behaviour(
             max_step=MAX_THRESHOLD_STEP,
         )
 
+    # Measured rather than asserted: `seen` excludes the withheld category, so
+    # no index in `believed` can refer to one. Reporting it makes the confound
+    # visible in the artifact instead of only in the code.
+    withheld_indices = {i for i, s in enumerate(seen) if s.category == withheld_category}
+    verdicts_about_withheld = len(withheld_indices & set(believed))
+
     return {
         "withheldCategory": withheld_category,
         "seed": seed,
+        "verdictsAboutWithheld": verdicts_about_withheld,
         "fitSamples": len(fit_vectors),
         "newBehaviourSamples": len(new_test),
         "historicalSamples": len(historical_test),
@@ -371,4 +385,158 @@ def run_new_behaviour(
             "A gain on the withheld category paid for by a loss on the "
             "historical categories is catastrophic forgetting, not adaptation."
         ),
+    }
+
+
+def run_novel_behaviour_controlled(
+    *,
+    seed: int,
+    withheld_category: str,
+    feedback_includes_withheld: bool,
+    adaptation_window_fraction: float = 0.5,
+    noise_rate: float = 0.05,
+    coverage: float = 0.5,
+    samples_per_class: int | None = None,
+) -> dict[str, Any]:
+    """V6 Track 3: isolate the confound in ``run_new_behaviour``.
+
+    The V5 harness withholds a category from the fit set and then draws feedback
+    from that same fit set, so the loop is never told the category exists. Its
+    measured result therefore cannot separate two very different explanations:
+    that curation cannot teach an unseen pattern, or that nobody mentioned the
+    pattern.
+
+    This runs the same dataset, seed and adaptation configuration with **one
+    variable changed**: whether the analyst ever labelled an instance of the
+    withheld category.
+
+    **Leakage control.** The corrected arm cannot simply label the test set, or a
+    gain would only mean the labels leaked. Held-out samples of the withheld
+    category are partitioned into an *adaptation window* the analyst may label
+    and a *scoring set* that is never labelled by either arm. Both arms score on
+    the identical scoring set.
+
+    **What the arms can mechanically do.** Curation only removes rows from the
+    fit set, and the withheld category is not in it, so curation cannot act on
+    novel behaviour at all. The only channel is threshold selection, clamped to
+    ``MAX_THRESHOLD_STEP``. ``reachableThresholdFloor`` and ``novelScores``
+    report whether the novel events score above the most permissive operating
+    point the loop can ever reach - if they do not, the failure is one of
+    representation and no feedback can repair it.
+    """
+    dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
+    ordered = sorted(dataset.samples, key=lambda sample: sample.timestamp)
+
+    extractor = FeatureExtractor()
+    features = {
+        sample.id: extractor.extract(sample.candidate, observe=True).values
+        for sample in ordered
+    }
+
+    plan = build_split(dataset, strategy=STRATIFIED_GROUP, seed=seed)
+    fit_samples = sorted(
+        list(plan.train.samples) + list(plan.validation.samples),
+        key=lambda sample: sample.timestamp,
+    )
+    test_samples = sorted(plan.test.samples, key=lambda sample: sample.timestamp)
+
+    seen = [s for s in fit_samples if s.category != withheld_category]
+    if not seen:
+        raise ValueError(f"withholding {withheld_category!r} emptied the fit set")
+
+    novel_test = [s for s in test_samples if s.category == withheld_category]
+    if not novel_test:
+        raise ValueError(
+            f"no held-out samples of {withheld_category!r}; the scenario cannot "
+            "measure performance on unseen behaviour"
+        )
+
+    # Deterministic partition, identical in both arms so the comparison holds.
+    window_size = int(len(novel_test) * adaptation_window_fraction)
+    window = novel_test[:window_size]
+    scoring = novel_test[window_size:]
+    if not scoring:
+        raise ValueError(
+            "the adaptation window consumed every held-out sample; nothing is "
+            "left to score, and a result measured on labelled data is not a result"
+        )
+    historical_test = [s for s in test_samples if s.category != withheld_category]
+
+    fit_vectors = [features[s.id] for s in seen]
+
+    # The feedback pool. The fit set always; the adaptation window only in the
+    # corrected arm. This one line is the variable under test.
+    pool = list(seen) + (list(window) if feedback_includes_withheld else [])
+    pool_vectors = [features[s.id] for s in pool]
+    pool_labels = [bool(s.is_malicious) for s in pool]
+
+    static = _fit(fit_vectors, tuple(FEATURE_NAMES), seed)
+
+    verdicts = simulation.simulate_feedback(
+        pool_labels, seed=seed, noise_rate=noise_rate, coverage=coverage
+    )
+    believed = {
+        v.index: v.label.binary_label
+        for v in verdicts
+        if v.label.is_training_eligible and v.label.binary_label is not None
+    }
+    withheld_indices = {
+        index for index, sample in enumerate(pool) if sample.category == withheld_category
+    }
+    verdicts_about_withheld = len(withheld_indices & set(believed))
+
+    # Arm 2. Curation can only drop rows from the fit set, so it is applied to
+    # the fit set alone - the window is not fitting data and adding malicious
+    # events to an Isolation Forest's fit set would contaminate it.
+    curated = simulation.curate_fit_set(
+        fit_vectors, {i: v for i, v in believed.items() if i < len(fit_vectors)}
+    )
+    adapted = _fit(curated, tuple(FEATURE_NAMES), seed + 1)
+
+    # Arm 1. Threshold selection is the only channel novel-behaviour feedback
+    # can reach, which is why the corrected arm can differ at all.
+    threshold = DEFAULT_THRESHOLD
+    labelled = sorted(believed)
+    if labelled:
+        threshold = simulation.choose_threshold(
+            [adapted.anomaly_score(pool_vectors[i]) for i in labelled],
+            [believed[i] for i in labelled],
+            current=DEFAULT_THRESHOLD,
+            max_step=MAX_THRESHOLD_STEP,
+        )
+
+    def measure(detector, samples, at_threshold):
+        vectors = [features[s.id] for s in samples]
+        labels = [bool(s.is_malicious) for s in samples]
+        scores = [detector.anomaly_score(v) for v in vectors]
+        return _metrics(_matrix(scores, labels, at_threshold), at_threshold)
+
+    floor = DEFAULT_THRESHOLD - MAX_THRESHOLD_STEP
+    novel_scores = sorted(adapted.anomaly_score(features[s.id]) for s in scoring)
+
+    return {
+        "withheldCategory": withheld_category,
+        "seed": seed,
+        "feedbackIncludesWithheld": feedback_includes_withheld,
+        "adaptationWindowIds": [s.id for s in window],
+        "scoringIds": [s.id for s in scoring],
+        "verdictsAboutWithheld": verdicts_about_withheld,
+        "fitSamples": len(fit_vectors),
+        "threshold": threshold,
+        "reachableThresholdFloor": floor,
+        # The representation question, measured rather than argued.
+        "novelScores": {
+            "count": len(novel_scores),
+            "median": novel_scores[len(novel_scores) // 2],
+            "max": max(novel_scores),
+            "aboveFloor": sum(1 for score in novel_scores if score >= floor),
+        },
+        "static": {
+            "newBehaviour": measure(static, scoring, DEFAULT_THRESHOLD),
+            "historical": measure(static, historical_test, DEFAULT_THRESHOLD),
+        },
+        "adapted": {
+            "newBehaviour": measure(adapted, scoring, threshold),
+            "historical": measure(adapted, historical_test, threshold),
+        },
     }
