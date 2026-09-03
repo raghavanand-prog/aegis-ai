@@ -17,7 +17,12 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from app.adaptation.experiments import scenarios, seeds, targeted_poisoning
+from app.adaptation.experiments import (
+    feedback_caps,
+    scenarios,
+    seeds,
+    targeted_poisoning,
+)
 from app.evaluation.metrics.ranking import bootstrap_interval, cohens_d
 from app.evaluation.reports.store import write_report
 from app.evaluation.watchdog import add_argument as add_timeout_argument
@@ -43,6 +48,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seeds", type=int, default=8)
     parser.add_argument("--targets", nargs="+", default=list(DEFAULT_TARGETS))
     parser.add_argument("--reach", type=float, nargs="+", default=[1.0])
+    parser.add_argument(
+        "--cap-policy", choices=list(feedback_caps.POLICIES),
+        default=feedback_caps.POLICY_GLOBAL,
+    )
+    parser.add_argument("--per-group-ceiling", type=int, default=25)
+    parser.add_argument(
+        "--baseline-seeds", type=int, nargs="+", default=[2024, 7, 819369],
+        help="honest seeds the per-group baseline is learned from; must exclude "
+             "the seeds under attack, or the baseline learns the attack as normal",
+    )
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     add_timeout_argument(parser)
@@ -52,12 +67,23 @@ def main(argv: list[str] | None = None) -> int:
     seed_plan = seeds.build_seeds(args.seeds)
 
     try:
+        baseline_rates = (
+            targeted_poisoning.honest_baseline_rates(seeds=tuple(args.baseline_seeds))
+            if args.cap_policy == feedback_caps.POLICY_BASELINE_RELATIVE
+            else None
+        )
+
         results: list[dict[str, Any]] = []
         for target in args.targets:
             for reach in args.reach:
                 runs = [
                     targeted_poisoning.measure(
-                        seed=seed, target_category=target, adversary_reach=reach
+                        seed=seed,
+                        target_category=target,
+                        adversary_reach=reach,
+                        cap_policy=args.cap_policy,
+                        per_group_ceiling=args.per_group_ceiling,
+                        baseline_rates=baseline_rates,
                     )
                     for seed in seed_plan
                 ]
@@ -155,6 +181,10 @@ def main(argv: list[str] | None = None) -> int:
                 "seeds": seed_plan,
                 "threshold": scenarios.DEFAULT_THRESHOLD,
                 "maxFeedbackFraction": targeted_poisoning.arm2.DEFAULT_MAX_FEEDBACK_FRACTION,
+                "capPolicy": args.cap_policy,
+                "groupField": targeted_poisoning.GROUP_FIELD,
+                "baselineSeeds": args.baseline_seeds if baseline_rates else None,
+                "baselineRates": baseline_rates,
             },
             "environment": {
                 "python": platform.python_version(),

@@ -88,3 +88,32 @@ class TestTargetedPoisoningRunner:
         assert row["targetRecall"]["delta"] is not None
         assert row["aggregateRecall"]["seedStdev"] is not None
         assert report["threatModel"]
+
+
+class TestCapPoliciesAgainstTheAttack:
+    """§8 measured that the global cap cannot stop this. These assert what the
+    per-group policies do about it, and what they cost."""
+
+    def test_a_baseline_relative_cap_admits_far_fewer_poisoned_rows(self) -> None:
+        from app.adaptation.experiments import feedback_caps
+
+        rates = tp.honest_baseline_rates(seeds=(4242, 99))
+        unguarded = tp.measure(seed=1337, target_category="MALWARE")
+        guarded = tp.measure(
+            seed=1337,
+            target_category="MALWARE",
+            cap_policy=feedback_caps.POLICY_BASELINE_RELATIVE,
+            baseline_rates=rates,
+        )
+        assert guarded["poisonedRows"] < unguarded["poisonedRows"]
+
+    def test_the_baseline_is_learned_from_honest_feedback_only(self) -> None:
+        """If the baseline were computed from the attacked stream it would learn
+        the attack as normal."""
+        rates = tp.honest_baseline_rates(seeds=(4242, 99))
+        assert rates["malware_detected"] < 5.0
+        assert rates["auth_success"] > 50.0
+
+    def test_grouping_uses_an_observable_field_not_the_label(self) -> None:
+        """A defence keyed on ground-truth category could not ship."""
+        assert tp.GROUP_FIELD == "event_type"
