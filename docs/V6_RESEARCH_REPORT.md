@@ -249,7 +249,117 @@ reading. The noise-sensitivity finding stands unchanged.
    but the detector does meet vectors in test that it fitted on. Pinned by test
    as a known corpus property.
 
-## 3. Reproducing
+## 3. Hypothesis 5 — detector class versus feature space **[MEASURED]**
+
+Track 3 left one question open: nine of thirteen withheld categories are
+unreachable under the production Isolation Forest. Is that a fact about
+**Isolation Forest** (hypothesis 5) or about the **feature space** (hypothesis
+2)? They imply different work — swap the detector, or engineer features.
+
+### 3.1 Design
+
+Corpus, split, seed and withheld category held fixed; **only the detector
+varies**. Separability is **ROC-AUC**, not recall: §2.3 showed recall here is
+dominated by the threshold clamp, which would confound a detector comparison
+with an operating-point artefact. AUC is also rank-based, so the detectors'
+scores never need a common scale.
+
+```bash
+python -m app.adaptation.experiments.run_detector_comparison --seeds 10 --max-seconds 5400
+```
+
+13 categories × 4 detectors × 10 seeds. Artifact:
+`app/evaluation/reports/v6-detector-comparison-20260903T080411Z.json`.
+
+**[LIMITATION]** This uses an enlarged corpus (160 samples per attack class),
+because V4's `roc_auc` refuses to report below `MIN_PER_CLASS` = 20 a side and
+the Track 1 corpus leaves only ~15 held-out samples per category. The guard is
+right, so the corpus was enlarged rather than the guard weakened. Different
+dataset fingerprint from §1; **not comparable row-for-row.**
+
+**Nothing in this experiment is deployed, proposed or registered.** The registry
+is never imported — asserted against the parsed module, not its prose. The
+supervised entry is marked `deployable=False` and `requires_labels=True`; a test
+enforces that anything requiring labels is not deployable.
+
+### 3.2 Result — hypothesis 5 is confirmed
+
+Novel-category ROC-AUC, means over 10 seeds. 0.5 is indistinguishable from
+benign; **below 0.5 means the detector ranks novel attacks *beneath* benign
+traffic.**
+
+| Withheld category | Isolation Forest | LOF | One-Class SVM | Supervised ceiling |
+| --- | --- | --- | --- | --- |
+| LATERAL_MOVEMENT | **0.083** | 0.999 | 0.010 | 1.000 |
+| PRIVILEGE_ESCALATION | **0.288** | 1.000 | 0.987 | 1.000 |
+| SUSPICIOUS_DOWNLOAD | **0.403** | 0.927 | 0.555 | 1.000 |
+| LOLBIN_EXECUTION | **0.428** | 0.934 | 0.405 | 1.000 |
+| CREDENTIAL_ACCESS | **0.475** | 0.999 | 0.580 | 1.000 |
+| RANSOMWARE | 0.504 | 0.996 | 0.999 | 1.000 |
+| ANOMALOUS_SIGNIN | 0.613 | 0.974 | 0.021 | 1.000 |
+| MALWARE | 0.626 | 1.000 | 0.389 | 1.000 |
+| DATA_EXFILTRATION | 0.823 | 1.000 | 1.000 | 1.000 |
+| SUSPICIOUS_POWERSHELL | 0.874 | 0.999 | 0.999 | 1.000 |
+| SUSPICIOUS_DNS | 0.995 | 0.980 | 1.000 | 1.000 |
+| BRUTE_FORCE | 0.996 | 0.995 | 1.000 | 1.000 |
+| PORT_SCAN | 0.997 | 0.980 | 1.000 | 1.000 |
+| **mean** | **0.623** | **0.983** | 0.688 | 1.000 |
+| **categories below 0.5** | **5 of 13** | **0 of 13** | 4 of 13 | 0 of 13 |
+
+**The information is in the features.** The supervised ceiling reaches AUC 1.000
+on every withheld category, having never seen any of them. **Hypothesis 2 is
+rejected: the feature space is not the limit.**
+
+**Isolation Forest cannot extract it.** Mean AUC 0.623, and on five categories it
+is *systematically inverted* — LATERAL_MOVEMENT at 0.083 means it reliably ranks
+novel attacks as more normal than normal traffic. That is worse than useless.
+
+**A different unsupervised detector can.** LOF reaches 0.983 mean on identical
+features with identical labels-free fitting. Checked for degeneracy at a real
+operating point: on LATERAL_MOVEMENT at a 5% false-positive threshold, **LOF
+recall is 1.000 where Isolation Forest's is 0.000.**
+
+**Hypothesis 5 is confirmed. The detector class is the binding constraint.**
+
+### 3.3 But no candidate here is a deployable replacement **[LIMITATION]**
+
+Two findings cut against reading the table as "switch to LOF".
+
+**LOF is good at unseen categories and poor at seen ones.** Its *historical* AUC
+— attacks that were in its fit set — is only **0.592**, against 1.000 for the
+supervised ceiling. The pattern is close to tautological for a density-based
+detector: a category excluded from the fit set looks like low-density novelty; a
+category included in it has been learned as normal. High novel AUC is partly a
+restatement of what was withheld.
+
+**The fit set is 40% malicious.** Measured: 1,664 of 4,160 fit samples — and the
+same 40% holds in the Track 1 corpus (624 of 1,560). The production Isolation
+Forest is configured `contamination=0.08`. **The corpus violates the detector's
+central assumption by a factor of 5.**
+
+That reframes several earlier results:
+
+- It explains why Isolation Forest's historical AUC is 0.526, barely above
+  chance, on attacks it *did* fit.
+- It explains why V5's Arm 2 (curation) helped at all — purifying a fit set that
+  is 40% malicious is a large correction, not a marginal one.
+- It means **no detector comparison on this corpus is a clean statement about
+  production behaviour**, because in production the fitting data would be
+  overwhelmingly benign.
+
+**[INFERENCE]** The honest conclusion is narrower than the headline table:
+Isolation Forest is demonstrably the wrong detector *for this corpus*, the
+features carry the signal, and the most promising direction is curation combined
+with a density-based detector — not a like-for-like swap. Establishing that
+requires a fit set whose contamination resembles production, which this corpus
+does not provide.
+
+### 3.4 Impact on Track 2
+
+None. This is a read-only comparison; the production detector, the registry and
+the adaptation loop are untouched. Track 2 remains safe to proceed.
+
+## 4. Reproducing
 
 ```bash
 cd backend
@@ -260,6 +370,9 @@ python -m app.adaptation.experiments.run_adaptation_eval --seeds 50 --max-second
 
 # section 2
 python -m app.adaptation.experiments.run_novel_behaviour_eval --seeds 10 --max-seconds 3600
+
+# section 3
+python -m app.adaptation.experiments.run_detector_comparison --seeds 10 --max-seconds 5400
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
