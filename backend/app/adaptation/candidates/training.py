@@ -17,10 +17,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.adaptation.feedback import augmentation as feedback_augmentation
+from app.adaptation.feedback import caps
 from app.core.config import settings
 from app.ml.models.isolation_forest import IsolationForestDetector
 from app.ml.registry import registry
 from app.ml.training.corpus import build_corpus
+from app.models.adaptation import FeedbackDataset
 from app.models.enums import MLModelStatus
 from app.models.ml import MLModel
 
@@ -48,12 +51,28 @@ def train_candidate(
     created_by: str = "cli",
     notes: str | None = None,
     feedback_dataset_id: int | None = None,
+    cap_policy: str = caps.POLICY_GLOBAL,
+    baseline_rates: dict[str, float] | None = None,
+    per_group_ceiling: int | None = None,
 ) -> MLModel:
     """Train one candidate and register it as inert.
 
     Returns a model in ``candidate`` status. Nothing about this call activates
     it, and ``registry.activate_model`` will refuse it until it has been
     evaluated and approved.
+
+    **Feedback augmentation (V6).** With ``feedback_dataset_id`` the fit set is
+    the telemetry corpus **plus** the dataset's analyst-verified benign events -
+    the redesigned Arm 2 from V6 §6, which measured a 23% relative reduction in
+    false positives. Before V6 this argument was recorded as metadata and
+    changed nothing.
+
+    ``cap_policy`` bounds what feedback may contribute. It defaults to
+    ``global``, which preserves pre-V6 behaviour; V6 §9 measured that
+    ``baseline_relative`` is the policy that actually stops a targeted
+    poisoning attack, and callers admitting real analyst feedback should pass
+    it with ``baseline_rates`` from
+    ``feedback_augmentation.baseline_rates(db, exclude_dataset_id=...)``.
     """
     contamination = contamination if contamination is not None else settings.ml_contamination
     random_state = random_state if random_state is not None else settings.ml_random_state
@@ -71,8 +90,33 @@ def train_candidate(
     # distribution is comparable with the incumbent's rather than being computed
     # over a different amount of data.
     split = int(corpus.size * (1 - HOLDOUT_FRACTION))
-    fit_vectors = corpus.vectors[:split]
+    fit_vectors = list(corpus.vectors[:split])
     holdout = corpus.vectors[split:]
+
+    # --- Feedback augmentation (V6 §6, capped per V6 §9) -------------------
+    augmentation_report: dict[str, Any] | None = None
+    if feedback_dataset_id is not None:
+        dataset = db.get(FeedbackDataset, feedback_dataset_id)
+        if dataset is None:
+            raise ValueError(
+                f"No feedback dataset with id {feedback_dataset_id}. Training on "
+                "an unresolvable dataset id would make the candidate's "
+                "provenance a guess."
+            )
+        result = feedback_augmentation.build(
+            db,
+            dataset=dataset,
+            feature_names=corpus.feature_names,
+            telemetry_rows=len(fit_vectors),
+            cap_policy=cap_policy,
+            baseline_rates=baseline_rates,
+            per_group_ceiling=per_group_ceiling,
+        )
+        # Appended, never substituted: the telemetry corpus remains the bulk of
+        # the fit set and feedback is bounded above by the cap.
+        fit_vectors.extend(result.vectors)
+        augmentation_report = result.as_dict()
+        augmentation_report["datasetFingerprint"] = dataset.fingerprint
 
     detector = IsolationForestDetector(
         feature_names=corpus.feature_names,
@@ -117,6 +161,9 @@ def train_candidate(
             # Recorded even when absent: "trained without analyst feedback" is
             # a fact about the model, not a missing field.
             "feedbackDatasetId": feedback_dataset_id,
+            # What feedback contributed, and what was refused. An approver needs
+            # to see which cap was in force, not infer it.
+            "augmentation": augmentation_report,
         },
         metrics={
             "holdoutSamples": len(holdout),
