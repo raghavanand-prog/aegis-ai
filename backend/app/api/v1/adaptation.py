@@ -19,6 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adaptation.active_learning import selectors
+from app.adaptation.active_learning import service as active_learning
 from app.adaptation.drift import monitor as drift_monitor
 from app.adaptation.feedback import datasets, targets
 from app.adaptation.feedback import service as feedback_service
@@ -36,6 +38,8 @@ from app.schemas.adaptation import (
     FeedbackDatasetRead,
     FeedbackRead,
     FeedbackSubmit,
+    ReviewCandidateRead,
+    ReviewQueueResponse,
 )
 from app.schemas.common import Message
 from app.services import audit_service
@@ -335,3 +339,51 @@ def drift_history(
         DriftMeasurementRead.model_validate(reading, from_attributes=True)
         for reading in drift_monitor.history(db, feature=feature, limit=limit)
     ]
+
+
+REVIEW_QUEUE_INTERPRETATION = (
+    "These events are recommended for analyst review because a verdict on them "
+    "would be informative - the rules and the model disagree, the score sits near "
+    "the threshold, or the behaviour is rarely seen. The ranking says nothing "
+    "about whether any of them is malicious, and nothing here is added to a "
+    "training set. Only an analyst's own feedback enters a dataset, and only "
+    "after they give it."
+)
+
+
+@router.get(
+    "/review-queue",
+    response_model=ReviewQueueResponse,
+    summary="Events recommended for analyst review",
+    description=(
+        "Ranked by how much an analyst's verdict would be worth, with the reason "
+        "for each. Events that already carry feedback are excluded.\n\n"
+        "Read-only by design: this endpoint recommends where to spend attention. "
+        "It cannot label anything and cannot add a sample to training."
+    ),
+)
+def review_queue(
+    limit: int = Query(default=25, ge=1, le=200),
+    _: User = Depends(require(Permission.FEEDBACK_READ)),
+    db: Session = Depends(get_db),
+) -> ReviewQueueResponse:
+    candidates = active_learning.select_candidates(db, limit=limit)
+    return ReviewQueueResponse(
+        candidates=[
+            ReviewCandidateRead(
+                event_id=candidate.public_id,
+                title=candidate.title,
+                priority=round(candidate.priority, 4),
+                reason=candidate.reason,
+                signals={name: round(value, 4) for name, value in candidate.signals.items()},
+                anomaly_score=candidate.anomaly_score,
+                threshold=candidate.threshold,
+                rule_hit=candidate.rule_hit,
+                ml_flagged=candidate.ml_flagged,
+                risk_score=candidate.risk_score,
+            )
+            for candidate in candidates
+        ],
+        weights=dict(selectors.DEFAULT_WEIGHTS),
+        interpretation=REVIEW_QUEUE_INTERPRETATION,
+    )

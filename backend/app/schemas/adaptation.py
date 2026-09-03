@@ -105,3 +105,32 @@ class DriftStatusResponse(CamelModel):
     features: list[DriftMeasurementRead]
     counts_by_status: dict[str, int]
     interpretation: str
+
+
+class ReviewCandidateRead(CamelModel):
+    """One event recommended for analyst review, with the reason it was chosen."""
+
+    event_id: str
+    title: str
+    priority: float
+    reason: str
+    signals: dict[str, float]
+    anomaly_score: float | None
+    threshold: float | None
+    rule_hit: bool
+    ml_flagged: bool
+    risk_score: int
+
+
+class ReviewQueueResponse(CamelModel):
+    """The active-learning review queue.
+
+    ``interpretation`` is part of the contract. A ranked list of events looks
+    like a worklist of confirmed findings unless it says otherwise, and these
+    are recommendations about where attention is worth spending - not claims
+    about what any of them are.
+    """
+
+    candidates: list[ReviewCandidateRead]
+    weights: dict[str, float]
+    interpretation: str
