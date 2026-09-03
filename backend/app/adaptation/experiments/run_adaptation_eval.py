@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.adaptation.experiments import scenarios, seeds
+from app.evaluation.metrics.ranking import bootstrap_interval, cohens_d
 from app.evaluation.reports.store import write_report
 from app.evaluation.watchdog import add_argument as add_timeout_argument
 from app.evaluation.watchdog import start as start_watchdog
@@ -56,18 +57,107 @@ NOISE_RATES = (0.0, 0.05, 0.15)
 NOISE_INVARIANT = {"static_v4", "no_feedback_retrain", "random_feedback"}
 
 
+#: Metrics carried through aggregation, per-seed rows and comparisons.
+METRICS = (
+    "precision",
+    "recall",
+    "f1",
+    "falsePositiveRate",
+    "falseNegativeRate",
+    "alertVolume",
+    "threshold",
+)
+
+#: Comparisons computed into the artifact rather than by hand afterwards. V5
+#: derived its 34%/66% mechanism-versus-content split from console output, so
+#: the split could not be recomputed from the committed report. The control
+#: comparison is the one that decides what the project may claim, so it is
+#: evidence, not commentary.
+COMPARISONS = (
+    ("both_arms", "random_feedback"),
+    ("both_arms", "static_v4"),
+    ("random_feedback", "static_v4"),
+)
+
+
 def _aggregate(values: list[float | None]) -> dict[str, Any]:
-    """Mean and spread, or an explicit null where the metric was undefined."""
+    """Mean, spread and a percentile bootstrap interval.
+
+    The interval reuses V4's ``bootstrap_interval`` rather than introducing a
+    second statistics implementation, and inherits its refusal to decorate
+    fewer than three observations - which is why the V5 three-seed runs report
+    the interval as unavailable rather than inventing one.
+    """
     present = [value for value in values if value is not None]
+    interval = bootstrap_interval(present)
     if not present:
-        return {"mean": None, "min": None, "max": None, "stdev": None, "runs": len(values)}
+        return {
+            "mean": None,
+            "min": None,
+            "max": None,
+            "stdev": None,
+            "runs": len(values),
+            "ci95": interval,
+        }
     return {
         "mean": round(statistics.fmean(present), 6),
         "min": round(min(present), 6),
         "max": round(max(present), 6),
         "stdev": round(statistics.pstdev(present), 6) if len(present) > 1 else 0.0,
         "runs": len(present),
+        "ci95": interval,
     }
+
+
+def _compare(
+    per_seed: dict[tuple[str, float], list[dict[str, Any]]],
+    seed_plan: list[int],
+) -> list[dict[str, Any]]:
+    """Treatment-versus-control effect sizes, seed-paired where both ran.
+
+    Reported for every metric and every pair, whichever direction the numbers
+    go. A comparison table that only appeared when it favoured adaptation would
+    be worth nothing.
+    """
+    rows: list[dict[str, Any]] = []
+    for treatment, control in COMPARISONS:
+        treatment_cells = sorted(k for k in per_seed if k[0] == treatment)
+        control_cells = sorted(k for k in per_seed if k[0] == control)
+        if not treatment_cells or not control_cells:
+            continue
+        for treatment_key in treatment_cells:
+            # A noise-invariant control has one cell, compared against every
+            # noise rate of the treatment.
+            control_key = (
+                (control, treatment_key[1])
+                if (control, treatment_key[1]) in per_seed
+                else control_cells[0]
+            )
+            for metric in METRICS:
+                left = [row["metrics"].get(metric) for row in per_seed[treatment_key]]
+                right = [row["metrics"].get(metric) for row in per_seed[control_key]]
+                usable_left = [value for value in left if value is not None]
+                usable_right = [value for value in right if value is not None]
+                difference = (
+                    round(
+                        statistics.fmean(usable_left) - statistics.fmean(usable_right), 6
+                    )
+                    if usable_left and usable_right
+                    else None
+                )
+                rows.append(
+                    {
+                        "treatment": treatment,
+                        "control": control,
+                        "noiseRate": treatment_key[1],
+                        "controlNoiseRate": control_key[1],
+                        "metric": metric,
+                        "meanDifference": difference,
+                        "cohensD": cohens_d(left, right),
+                        "seeds": len(seed_plan),
+                    }
+                )
+    return rows
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         corpus = scenarios.prepare_corpus()
         results: list[dict[str, Any]] = []
+        per_seed: dict[tuple[str, float], list[dict[str, Any]]] = {}
 
         for condition in CONDITIONS:
             rates = (0.05,) if condition in NOISE_INVARIANT else NOISE_RATES
@@ -112,22 +203,29 @@ def main(argv: list[str] | None = None) -> int:
                         flush=True,
                     )
 
+                seed_rows = [
+                    {
+                        "seed": run.seed,
+                        "metrics": {
+                            metric: run.metrics.get(metric) for metric in METRICS
+                        },
+                    }
+                    for run in runs
+                ]
+                per_seed[(condition, noise)] = seed_rows
+
                 results.append(
                     {
                         "condition": condition,
                         "requestedNoiseRate": noise,
                         "seeds": seed_plan,
+                        # Per-seed values, not only their summary. V5 published a
+                        # 0.117-0.333 spread that its own artifact could not
+                        # reproduce, because aggregation discarded the runs.
+                        "perSeed": seed_rows,
                         "metrics": {
                             metric: _aggregate([run.metrics[metric] for run in runs])
-                            for metric in (
-                                "precision",
-                                "recall",
-                                "f1",
-                                "falsePositiveRate",
-                                "falseNegativeRate",
-                                "alertVolume",
-                                "threshold",
-                            )
+                            for metric in METRICS
                         },
                         "timings": {
                             key: _aggregate([run.timings.get(key) for run in runs])
@@ -170,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
                 "platform": platform.platform(),
             },
             "results": results,
+            "comparisons": _compare(per_seed, seed_plan),
             "caveats": [
                 "Feedback is simulated. There is no analyst population, and the "
                 "simulator is a model of an analyst rather than an analyst.",
