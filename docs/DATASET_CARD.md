@@ -214,3 +214,45 @@ dataset fingerprints differ, returning them with a warning instead of a verdict.
 
 Neither corpus is production traffic from a real organisation. **No claim of
 real-world detection accuracy is made anywhere in AEGISX.**
+
+
+---
+
+# Feedback datasets (V5)
+
+A third dataset family, produced by the platform rather than fetched or
+generated: immutable snapshots of analyst feedback, used to adapt a model.
+
+## Identity
+
+`(name, version, fingerprint)`, the same rule `evaluation_datasets` uses. The
+fingerprint is a SHA-256 over the ordered `(feedback id, label)` membership,
+truncated to 16 hex characters. Two snapshots sharing a name and version but not
+a fingerprint are different data and their results must never be pooled.
+
+## What a snapshot contains
+
+Only **training-eligible** feedback: `true_positive`, `false_positive`, `benign`
+and `confirmed_malicious`. `suspicious` and `uncertain` describe a state of
+investigation rather than a class and are excluded by construction. Superseded
+claims are excluded — a snapshot of current opinion must not contain a label the
+analyst already withdrew.
+
+Membership is **materialised**, not queried. Labels and their binary projections
+are copied into `feedback_dataset_members` at build time, so correcting a label
+afterwards cannot change what an already-trained model was trained on.
+
+## What these datasets cannot evaluate **[LIMITATION]**
+
+- **They are not ground truth.** Each row is a claim by a named analyst at a
+  point in time. Analysts are wrong; the schema records who and when precisely
+  so that later disagreement is legible.
+- **All published V5 results use simulated feedback.** There is no analyst
+  population. The simulator models label noise, partial coverage, abstention and
+  a bias toward over-reporting false positives — it is a model of an analyst,
+  not an analyst.
+- **A snapshot cannot span feature schema versions.** Building one across a
+  schema change is refused: a label is a claim about the features the analyst
+  was shown, and pooling would train on inputs that never coexisted.
+- **Coverage is not random.** Feedback arrives on events analysts chose to
+  review, which is a biased sample of traffic by construction.

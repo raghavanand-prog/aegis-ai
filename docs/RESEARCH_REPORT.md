@@ -31,12 +31,22 @@ something was not measured, this report says so.
 | | Samples | Malicious | Distinct groups |
 | --- | --- | --- | --- |
 | Total | 200,526 | 22,325 (11.13%) | 136,075 |
-| Train | 120,663 | 13,614 (11.28%) | 81,645 |
-| Validation | 39,797 | 4,336 (10.90%) | 27,215 |
-| Test | 40,066 | 4,375 (10.92%) | 27,215 |
+| Train | 120,452 | 13,414 (11.14%) | 81,645 |
+| Validation | 40,423 | 4,454 (11.02%) | 27,215 |
+| Test | 39,651 | 4,457 (11.24%) | 27,215 |
 
-Dataset fingerprint `f24e4a1e47b7753e` · split fingerprint `5cfefd1cdc832a81` ·
+Dataset fingerprint `f24e4a1e47b7753e` · split fingerprint `a74749098152ca3c` ·
 ruleset fingerprint `da203c91430a47a1` · feature schema `1.0`.
+
+> **Provenance correction (V5 Phase A, 2026-09-03).** As first published, the
+> split sizes and split fingerprint in this table came from a *different run*
+> than the results in §2 — §2's own confusion matrices sum to 39,651 test
+> samples against the 40,066 originally stated here, an internal contradiction
+> on one page. The regenerated run reproduces every detector result in §2 and §4
+> exactly, digit for digit, and the split figures above are now the ones that
+> actually produced them. **No measured result changed**; only the provenance
+> attached to it was corrected. Artifact:
+> `v4-experiments-unsw-nb15-stratified_group-source-20260903T033255Z.json`.
 
 ---
 
@@ -107,8 +117,12 @@ Every report carries a measured leakage audit. On this run it fired:
 
 | Split | Samples sharing an exact training feature vector |
 | --- | --- |
-| Validation | 20,217 / 39,797 (**50.80%**) |
-| Test | 20,440 / 40,066 (**51.02%**) |
+| Validation | 20,011 / 40,423 (**49.50%**) |
+| Test | 20,541 / 39,651 (**51.80%**) |
+
+*(Corrected in V5 Phase A along with the split table in §1; the conclusion —
+roughly half the test split is potentially answerable from memory — is
+unchanged.)*
 
 Group keys stop the *dataset's* duplicates. They cannot stop AEGISX's feature
 extractor from mapping two genuinely distinct flows onto one point — and the
