@@ -4,6 +4,7 @@ Importing this package registers every mapper on ``Base.metadata`` which is
 what Alembic autogeneration and ``create_all`` rely on.
 """
 
+from app.models.adaptation import AnalystFeedback
 from app.models.ai_analysis import AIAnalysis
 from app.models.audit import AuditLog
 from app.models.base import Base, JSONType, TimestampMixin, utcnow
@@ -23,6 +24,7 @@ from app.models.user import User
 
 __all__ = [
     "AIAnalysis",
+    "AnalystFeedback",
     "AuditLog",
     "Base",
     "EvaluationDatasetRecord",
