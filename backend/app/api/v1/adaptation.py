@@ -19,8 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adaptation.feedback import datasets, targets
 from app.adaptation.feedback import service as feedback_service
-from app.adaptation.feedback import targets
 from app.adaptation.feedback.labels import FeedbackLabel, FeedbackTargetType
 from app.api.deps import client_ip, require
 from app.core.database import get_db
@@ -28,7 +28,12 @@ from app.core.rbac import Permission
 from app.models.adaptation import AnalystFeedback
 from app.models.enums import AuditAction
 from app.models.user import User
-from app.schemas.adaptation import FeedbackCorrect, FeedbackRead, FeedbackSubmit
+from app.schemas.adaptation import (
+    FeedbackCorrect,
+    FeedbackDatasetRead,
+    FeedbackRead,
+    FeedbackSubmit,
+)
 from app.schemas.common import Message
 from app.services import audit_service
 
@@ -227,3 +232,45 @@ def get_feedback(
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feedback not found")
     return _read(db, record)
+
+
+@router.get(
+    "/datasets",
+    response_model=list[FeedbackDatasetRead],
+    summary="List feedback datasets",
+    description=(
+        "Immutable snapshots of analyst feedback, newest first. Each carries the "
+        "fingerprint of its membership: two snapshots that share a name and "
+        "version but not a fingerprint are different data and their results must "
+        "never be pooled.\n\n"
+        "**There is no endpoint that builds a dataset.** Fixing what a model will "
+        "be trained on is an operator decision recorded against a named operator "
+        "on the CLI, not something any authenticated session should do."
+    ),
+)
+def list_feedback_datasets(
+    limit: int = Query(default=100, ge=1, le=500),
+    _: User = Depends(require(Permission.FEEDBACK_READ)),
+    db: Session = Depends(get_db),
+) -> list[FeedbackDatasetRead]:
+    return [
+        FeedbackDatasetRead.model_validate(dataset, from_attributes=True)
+        for dataset in datasets.list_datasets(db, limit=limit)
+    ]
+
+
+@router.get(
+    "/datasets/{dataset_id}",
+    response_model=FeedbackDatasetRead,
+    summary="Inspect one feedback dataset",
+    responses={404: {"model": Message, "description": "Unknown dataset"}},
+)
+def get_feedback_dataset(
+    dataset_id: int,
+    _: User = Depends(require(Permission.FEEDBACK_READ)),
+    db: Session = Depends(get_db),
+) -> FeedbackDatasetRead:
+    dataset = datasets.get(db, dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    return FeedbackDatasetRead.model_validate(dataset, from_attributes=True)

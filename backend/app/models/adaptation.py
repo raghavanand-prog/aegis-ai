@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -24,6 +25,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -104,3 +106,93 @@ class AnalystFeedback(Base):
             f"<AnalystFeedback {self.id} {self.target_type}:{self.target_id} "
             f"{self.label} by {self.analyst}>"
         )
+
+
+class FeedbackDataset(Base):
+    """An immutable snapshot of analyst feedback, used to train or evaluate.
+
+    Identity is ``(name, version, fingerprint)``, exactly as ``evaluation_datasets``
+    is. Two snapshots that share a name and version but hash differently are not
+    the same data, and a model trained on one must never be compared against a
+    result produced on the other.
+
+    Membership is materialised into ``feedback_dataset_members`` rather than
+    recomputed from a query. A query would return whatever the feedback table
+    says *today*: correct one label and the "training data" of an already-trained
+    model silently changes underneath it. The snapshot is the whole point.
+    """
+
+    __tablename__ = "feedback_datasets"
+    __table_args__ = (
+        UniqueConstraint(
+            "name", "version", "fingerprint", name="uq_feedback_dataset_identity"
+        ),
+        CheckConstraint("sample_count >= 0", name="ck_feedback_dataset_sample_count"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    version: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: SHA-256 over the ordered membership, truncated to 16 hex characters -
+    #: the same convention V4 uses for evaluation datasets.
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    sample_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: Counts per label at build time, so the balance of a training set is
+    #: recoverable without rejoining the members.
+    label_distribution: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    feature_schema_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: The filters that produced this membership. Without them a snapshot says
+    #: what it contains but not what it was asked for.
+    selection: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+
+    created_by: Mapped[str] = mapped_column(String(255), default="system", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    members: Mapped[list[FeedbackDatasetMember]] = relationship(
+        "FeedbackDatasetMember",
+        back_populates="dataset",
+        cascade="all, delete-orphan",
+        order_by="FeedbackDatasetMember.feedback_id",
+    )
+
+    @property
+    def identity(self) -> str:
+        return f"{self.name}@{self.version}[{self.fingerprint}]"
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<FeedbackDataset {self.identity} n={self.sample_count}>"
+
+
+class FeedbackDatasetMember(Base):
+    """One feedback row as it stood when the snapshot was taken.
+
+    ``label`` and ``binary_label`` are copied rather than joined. The feedback
+    row they came from may later be superseded; this table must still say what
+    the model was actually trained on.
+    """
+
+    __tablename__ = "feedback_dataset_members"
+    __table_args__ = (
+        UniqueConstraint("dataset_id", "feedback_id", name="uq_feedback_member_unique"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dataset_id: Mapped[int] = mapped_column(
+        ForeignKey("feedback_datasets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    feedback_id: Mapped[int] = mapped_column(
+        ForeignKey("analyst_feedback.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    target_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    label: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: The malicious/benign projection at build time. Never None here: rows
+    #: without a projection are not training-eligible and never become members.
+    binary_label: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+    dataset: Mapped[FeedbackDataset] = relationship("FeedbackDataset", back_populates="members")
