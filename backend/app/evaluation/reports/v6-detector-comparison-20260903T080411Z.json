@@ -1,0 +1,3238 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-03T08:04:11.244233+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_detector_comparison.py --seeds 10 --max-seconds 5400",
+  "question": "Is the detector class the limit on novel-behaviour detection, or is it the feature space?",
+  "metric": "ROC-AUC of the withheld category against benign held-out traffic. Threshold-free, so the MAX_THRESHOLD_STEP clamp cannot confound it. 0.5 is indistinguishable from benign.",
+  "dataset": {
+    "name": "aegisx-detection-eval",
+    "fingerprint": "689d075e87726498",
+    "splitFingerprint": "735fb00170f63d57",
+    "samplesPerClass": 160,
+    "note": "Enlarged from the Track 1 corpus so every category clears V4's MIN_PER_CLASS = 20 guard for ROC-AUC. A different fingerprint from section 1; not comparable row-for-row."
+  },
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395,
+      163476,
+      674128
+    ]
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "results": [
+    {
+      "withheldCategory": "ANOMALOUS_SIGNIN",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.612627,
+          "historicalAuc": 0.526627,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.6241758241758242,
+              "historicalAuc": 0.4926517598761693
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.7065527065527065,
+              "historicalAuc": 0.5015201700613011
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.6354166666666666,
+              "historicalAuc": 0.5522168803418803
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.5825936883629191,
+              "historicalAuc": 0.4830333662064431
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.5770032051282051,
+              "historicalAuc": 0.5417092880523732
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.7302350427350427,
+              "historicalAuc": 0.49137746358183376
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.4608664185277089,
+              "historicalAuc": 0.5114219114219114
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.5867888621794872,
+              "historicalAuc": 0.5389706864316239
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.6900303643724697,
+              "historicalAuc": 0.5754985754985755
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.5326038903625111,
+              "historicalAuc": 0.5778713642085735
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.973925,
+          "historicalAuc": 0.596469,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9850732600732601,
+              "historicalAuc": 0.6084191399152029
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9614791073124407,
+              "historicalAuc": 0.5994743260167424
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9898337339743589,
+              "historicalAuc": 0.5935955862713675
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9766395463510849,
+              "historicalAuc": 0.5782544378698224
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9756810897435897,
+              "historicalAuc": 0.5691489361702128
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9605887939221273,
+              "historicalAuc": 0.60976122206842
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9676385442514475,
+              "historicalAuc": 0.6164793539793539
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9585837339743589,
+              "historicalAuc": 0.5933952657585471
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9806427125506073,
+              "historicalAuc": 0.5801324447157781
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9830901856763926,
+              "historicalAuc": 0.6160264692241436
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.020564,
+          "historicalAuc": 0.595277,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.015705128205128205,
+              "historicalAuc": 0.5783279493909416
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.020180436847103515,
+              "historicalAuc": 0.6055344077516314
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.045022035256410256,
+              "historicalAuc": 0.6022344083867521
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.014916173570019724,
+              "historicalAuc": 0.6074868507560816
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.009415064102564102,
+              "historicalAuc": 0.5700738202400436
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.016915954415954417,
+              "historicalAuc": 0.5925367477424033
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.022797766749379653,
+              "historicalAuc": 0.6161213786213786
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.018479567307692308,
+              "historicalAuc": 0.5939920539529915
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.0240806342780027,
+              "historicalAuc": 0.5931564577397911
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.018125552608311227,
+              "historicalAuc": 0.5933089842973563
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "BRUTE_FORCE",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.995863,
+          "historicalAuc": 0.468092,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9971688034188034,
+              "historicalAuc": 0.40360535405872194
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9963768115942029,
+              "historicalAuc": 0.49243165655379395
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9997710622710623,
+              "historicalAuc": 0.4820083267248216
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9946862348178138,
+              "historicalAuc": 0.4146486229819563
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9947209653092006,
+              "historicalAuc": 0.5040567525842395
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9961538461538462,
+              "historicalAuc": 0.403880250954719
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9954212454212454,
+              "historicalAuc": 0.4645248670839222
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9923433048433048,
+              "historicalAuc": 0.5113456594819062
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9948970985155196,
+              "historicalAuc": 0.5114214489214489
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.997086247086247,
+              "historicalAuc": 0.4929997656825333
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.994544,
+          "historicalAuc": 0.597461,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9925747863247864,
+              "historicalAuc": 0.606433506044905
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9967948717948718,
+              "historicalAuc": 0.6005741501924708
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9975961538461539,
+              "historicalAuc": 0.5923828641289981
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9967948717948718,
+              "historicalAuc": 0.5893196309862977
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9944381598793364,
+              "historicalAuc": 0.5698373942811116
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9983974358974359,
+              "historicalAuc": 0.6192674236224768
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9941849816849817,
+              "historicalAuc": 0.6100721784776902
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9957264957264957,
+              "historicalAuc": 0.590369784457188
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9851973684210527,
+              "historicalAuc": 0.5781440781440782
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9937354312354313,
+              "historicalAuc": 0.6182047934658901
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 1.0,
+          "historicalAuc": 0.545371,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5273598379168327
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5623042669798395
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.560352233676976
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.567757088590422
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5056760974627467
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5418499386252046
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5572422437579918
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5491851229319096
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5314238230904897
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5505581776795876
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "CREDENTIAL_ACCESS",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.475238,
+          "historicalAuc": 0.553545,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.3835915242165242,
+              "historicalAuc": 0.4813933873144399
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.2838541666666667,
+              "historicalAuc": 0.5467482666143381
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.5601258309591642,
+              "historicalAuc": 0.5489461802122471
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.5006325910931174,
+              "historicalAuc": 0.5427689594356261
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.5092592592592593,
+              "historicalAuc": 0.5990417573001121
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.4517227564102564,
+              "historicalAuc": 0.5334705741953082
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.5632591093117408,
+              "historicalAuc": 0.5345865554198888
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.5064102564102564,
+              "historicalAuc": 0.5454073776528084
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.5172039969834088,
+              "historicalAuc": 0.6118816284064975
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.47631766381766383,
+              "historicalAuc": 0.5912060839760068
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999456,
+          "historicalAuc": 0.594563,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9996883903133903,
+              "historicalAuc": 0.5958080296896087
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9989983974358975,
+              "historicalAuc": 0.6006426609105181
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.593822094786105
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5914139872473205
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9965574548907882,
+              "historicalAuc": 0.5516322259574188
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9993189102564103,
+              "historicalAuc": 0.6195529869067103
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.600880986297653
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5908817031532436
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.579364679822795
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6216259640102828
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.580209,
+          "historicalAuc": 0.600512,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.6237090455840456,
+              "historicalAuc": 0.5731401821862349
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.6511084401709402,
+              "historicalAuc": 0.6086636577708007
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.5788224121557455,
+              "historicalAuc": 0.611330828554479
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.5272435897435898,
+              "historicalAuc": 0.6298967236467237
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.5102682811016145,
+              "historicalAuc": 0.5714768307955969
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.5560496794871795,
+              "historicalAuc": 0.6118257296781233
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.6539726720647774,
+              "historicalAuc": 0.6178605345272012
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.5332653457653458,
+              "historicalAuc": 0.5920951328914775
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.6122737556561086,
+              "historicalAuc": 0.590267988991811
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.5553774928774928,
+              "historicalAuc": 0.5985638718607871
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "DATA_EXFILTRATION",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.823494,
+          "historicalAuc": 0.504093,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.8569386694386695,
+              "historicalAuc": 0.437821358500778
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.8468258891645989,
+              "historicalAuc": 0.4964035964035964
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.7065199055330634,
+              "historicalAuc": 0.504612671279338
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.7999557913351016,
+              "historicalAuc": 0.4682841383422779
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.8960707502374169,
+              "historicalAuc": 0.5286030914244282
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.8768399810066477,
+              "historicalAuc": 0.4465056687100389
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.8583333333333333,
+              "historicalAuc": 0.4987793941809486
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.7206682206682207,
+              "historicalAuc": 0.5170256744995648
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.871015246015246,
+              "historicalAuc": 0.5543349570394426
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.8017751479289941,
+              "historicalAuc": 0.5885601577909271
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999982,
+          "historicalAuc": 0.592044,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5917055679588661
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6031926406926407
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5799501424501424
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5834161531835951
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9998812915479582,
+              "historicalAuc": 0.5664507942785578
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9999406457739791,
+              "historicalAuc": 0.6285759013908114
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6057111066826093
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5784796143803976
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5735826398755158
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6093770545693623
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 1.0,
+          "historicalAuc": 0.585073,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5707073269738178
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6162462537462537
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5995709537376204
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5971228384019082
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.559022971458704
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5821303803308945
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6073800983127408
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5776511347660173
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5624323455787835
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5784681130834977
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "LATERAL_MOVEMENT",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.082875,
+          "historicalAuc": 0.588885,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.0286235754985755,
+              "historicalAuc": 0.531865721997301
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.01782051282051282,
+              "historicalAuc": 0.6066955210177717
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.03840811965811966,
+              "historicalAuc": 0.5626536136574997
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.11016144349477683,
+              "historicalAuc": 0.5556448157669237
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.13616938616938618,
+              "historicalAuc": 0.5693244962174466
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.0722340930674264,
+              "historicalAuc": 0.5444927822819854
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.10312151616499443,
+              "historicalAuc": 0.5943066157760815
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.04581447963800905,
+              "historicalAuc": 0.6211278359511344
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.09364983974358974,
+              "historicalAuc": 0.6552984775641025
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.18274400330851945,
+              "historicalAuc": 0.6474400599400599
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.998655,
+          "historicalAuc": 0.584412,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9982638888888888,
+              "historicalAuc": 0.591316632928475
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9980769230769231,
+              "historicalAuc": 0.5991622401468949
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9995726495726496,
+              "historicalAuc": 0.5753080576590939
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.999465811965812,
+              "historicalAuc": 0.5754317447762178
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9962606837606838,
+              "historicalAuc": 0.5573073575684542
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9979226020892688,
+              "historicalAuc": 0.6041913848790456
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9983277591973244,
+              "historicalAuc": 0.5943473934886149
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5810050006712311
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5651542467948718
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9986559139784946,
+              "historicalAuc": 0.6008991008991009
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.010412,
+          "historicalAuc": 0.594807,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.0004896723646723647,
+              "historicalAuc": 0.5823802294197031
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.0001282051282051282,
+              "historicalAuc": 0.6058675978752706
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.03221153846153846,
+              "historicalAuc": 0.6003512355520128
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.03662155745489079,
+              "historicalAuc": 0.6074171115944895
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.03108003108003108,
+              "historicalAuc": 0.5576713864899243
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.0011870845204178537,
+              "historicalAuc": 0.5975174675367477
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.00013935340022296544,
+              "historicalAuc": 0.6086889149866249
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.0014611613876319759,
+              "historicalAuc": 0.6005797758088334
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.0006510416666666666,
+              "historicalAuc": 0.5885834001068376
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.00015508684863523573,
+              "historicalAuc": 0.5990134865134865
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "LOLBIN_EXECUTION",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.428473,
+          "historicalAuc": 0.559055,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.3267162944582299,
+              "historicalAuc": 0.4969405594405594
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.32042378917378916,
+              "historicalAuc": 0.5768724696356275
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.46923967236467234,
+              "historicalAuc": 0.5320681511470985
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.32532051282051283,
+              "historicalAuc": 0.5388194715605883
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.6719640313390314,
+              "historicalAuc": 0.5725160256410257
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.3381868131868132,
+              "historicalAuc": 0.5295654149000606
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.48388009049773756,
+              "historicalAuc": 0.5688095717545979
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.3232051282051282,
+              "historicalAuc": 0.5491958489081251
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.36538461538461536,
+              "historicalAuc": 0.6150070479258961
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.6604114971050455,
+              "historicalAuc": 0.6107600732600733
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.934371,
+          "historicalAuc": 0.587446,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9044665012406948,
+              "historicalAuc": 0.5961247086247087
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9488960113960114,
+              "historicalAuc": 0.5908527327935222
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9194266381766382,
+              "historicalAuc": 0.5881368083670715
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9141171328671329,
+              "historicalAuc": 0.5804902056488351
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9332710113960114,
+              "historicalAuc": 0.5570681511470985
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9359432234432234,
+              "historicalAuc": 0.6099838481728246
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9146398944193062,
+              "historicalAuc": 0.596212578869647
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9653205128205128,
+              "historicalAuc": 0.5835997442455243
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9593231523378583,
+              "historicalAuc": 0.5619504295878641
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9483043837882548,
+              "historicalAuc": 0.6100399600399601
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.404575,
+          "historicalAuc": 0.57273,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.3711228287841191,
+              "historicalAuc": 0.5527347652347653
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.4231659544159544,
+              "historicalAuc": 0.5921600877192983
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.39770299145299143,
+              "historicalAuc": 0.5836243252361674
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.36210664335664333,
+              "historicalAuc": 0.5909638162176233
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.43309294871794873,
+              "historicalAuc": 0.5300101214574898
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.40141941391941394,
+              "historicalAuc": 0.5795771922740427
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.4554110105580694,
+              "historicalAuc": 0.5990149684521412
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.3778205128205128,
+              "historicalAuc": 0.5648157256213522
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.37787518853695323,
+              "historicalAuc": 0.5626510269834877
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.446029776674938,
+              "historicalAuc": 0.5717449217449218
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "MALWARE",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.62586,
+          "historicalAuc": 0.552267,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.6861721611721612,
+              "historicalAuc": 0.49753937007874016
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.4645432692307692,
+              "historicalAuc": 0.5453022708674304
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.5977564102564102,
+              "historicalAuc": 0.5418248418248418
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.6231546231546231,
+              "historicalAuc": 0.5615962040570396
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.6821581196581197,
+              "historicalAuc": 0.5803357911518533
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.4716880341880342,
+              "historicalAuc": 0.5171621533228676
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.638014763014763,
+              "historicalAuc": 0.551905503113075
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.7533119658119658,
+              "historicalAuc": 0.5436262787299057
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.5603205128205129,
+              "historicalAuc": 0.586886845039019
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.7814789377289377,
+              "historicalAuc": 0.5964884020618557
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.99998,
+          "historicalAuc": 0.587578,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9999542124542125,
+              "historicalAuc": 0.5846793189312874
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5931447763229678
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5832334332334332
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9999514374514374,
+              "historicalAuc": 0.5876723907076388
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9998931623931624,
+              "historicalAuc": 0.5551722133652185
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6182381606488749
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5918608154247841
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5765328151986183
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.581792248672044
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.603452121332276
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.389004,
+          "historicalAuc": 0.568498,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.37335164835164836,
+              "historicalAuc": 0.5514040312268659
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.3842948717948718,
+              "historicalAuc": 0.5916956492089471
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.3737593052109181,
+              "historicalAuc": 0.5791375291375291
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.45580808080808083,
+              "historicalAuc": 0.5804671286068153
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.3313568376068376,
+              "historicalAuc": 0.5351650724060051
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.4518563034188034,
+              "historicalAuc": 0.5668906985871272
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.38476107226107226,
+              "historicalAuc": 0.5879401820981456
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.36036324786324786,
+              "historicalAuc": 0.5690306563039723
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.3616025641025641,
+              "historicalAuc": 0.5561799134369467
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.4128891941391941,
+              "historicalAuc": 0.5670722640761301
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "PORT_SCAN",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.997316,
+          "historicalAuc": 0.457736,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9958333333333333,
+              "historicalAuc": 0.4000713161518788
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9969322344322344,
+              "historicalAuc": 0.47469126455346927
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9996968121968122,
+              "historicalAuc": 0.42066673432108787
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9983440170940171,
+              "historicalAuc": 0.4520642354191577
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.997904339250493,
+              "historicalAuc": 0.5061431623931624
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.996978021978022,
+              "historicalAuc": 0.405982905982906
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9955621301775148,
+              "historicalAuc": 0.43939842209072977
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9973290598290598,
+              "historicalAuc": 0.4728934170320181
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9978318250377074,
+              "historicalAuc": 0.5203634716069271
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9967447916666666,
+              "historicalAuc": 0.4850802951388889
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.98024,
+          "historicalAuc": 0.597566,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9742948717948718,
+              "historicalAuc": 0.6033592366712571
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9847527472527473,
+              "historicalAuc": 0.6124949525540077
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9753984753984754,
+              "historicalAuc": 0.5872403761585819
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9889423076923077,
+              "historicalAuc": 0.5886973561844028
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9578402366863905,
+              "historicalAuc": 0.5620767587113741
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.988507326007326,
+              "historicalAuc": 0.6203857931220136
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9867480276134122,
+              "historicalAuc": 0.6036612426035503
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9899038461538462,
+              "historicalAuc": 0.6018624618041717
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9827017345399698,
+              "historicalAuc": 0.5779005571217614
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9733072916666666,
+              "historicalAuc": 0.6179804353632479
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 1.0,
+          "historicalAuc": 0.531658,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5209030100334449
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5401187832290194
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5445927203842771
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5526479673176564
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.4979700854700855
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.537536173362945
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5479454306377384
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.523527799920287
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.515480265807491
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5358531984508547
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "PRIVILEGE_ESCALATION",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.287695,
+          "historicalAuc": 0.542882,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.32277526395173456,
+              "historicalAuc": 0.49561602228487045
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.24564302884615385,
+              "historicalAuc": 0.5211087740384616
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.22859801488833748,
+              "historicalAuc": 0.5301365301365302
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.26126802884615385,
+              "historicalAuc": 0.5254866119123932
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.43115138067061143,
+              "historicalAuc": 0.5735412557527942
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.18830128205128205,
+              "historicalAuc": 0.49291173570019725
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.1971153846153846,
+              "historicalAuc": 0.5260941065914888
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.2102220695970696,
+              "historicalAuc": 0.5599061591329633
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.46137820512820515,
+              "historicalAuc": 0.5972332934768168
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.33050213675213674,
+              "historicalAuc": 0.6067864022851069
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999988,
+          "historicalAuc": 0.589939,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5940814203248759
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5982739049145299
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.579012654012654
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5903570713141025
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9998767258382643,
+              "historicalAuc": 0.5644847140039447
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6127958579881657
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5965146328366223
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5881781985196933
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5652152251893184
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.610473130065099
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.986767,
+          "historicalAuc": 0.5425,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9871323529411765,
+              "historicalAuc": 0.5128792455363136
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9847756410256411,
+              "historicalAuc": 0.5608097956730769
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9900227460711332,
+              "historicalAuc": 0.5497169497169497
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9940905448717948,
+              "historicalAuc": 0.56103515625
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9840976331360947,
+              "historicalAuc": 0.5127999671268902
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9793515779092702,
+              "historicalAuc": 0.5472098948060486
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9826546003016591,
+              "historicalAuc": 0.5645892066049134
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9879807692307693,
+              "historicalAuc": 0.5411255947660587
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9909188034188035,
+              "historicalAuc": 0.5323169921615517
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9866452991452992,
+              "historicalAuc": 0.5425219210840972
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "RANSOMWARE",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.503675,
+          "historicalAuc": 0.523025,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.32814102564102565,
+              "historicalAuc": 0.4835276083677618
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.5458430458430459,
+              "historicalAuc": 0.47951814286670685
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.37033799533799533,
+              "historicalAuc": 0.5212517573810002
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.5565476190476191,
+              "historicalAuc": 0.5086075865715041
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.5509852801519468,
+              "historicalAuc": 0.5683252587172896
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.5274864024864024,
+              "historicalAuc": 0.5202935663118431
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.40872352285395763,
+              "historicalAuc": 0.5327485809356038
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.4931258434547908,
+              "historicalAuc": 0.5180945597612264
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.7261008918617614,
+              "historicalAuc": 0.5458015267175572
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.5294625246548323,
+              "historicalAuc": 0.552085458749915
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.995543,
+          "historicalAuc": 0.595075,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9937179487179487,
+              "historicalAuc": 0.605785625286904
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9967948717948718,
+              "historicalAuc": 0.6006142465019749
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9991258741258742,
+              "historicalAuc": 0.5915135234652206
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9967948717948718,
+              "historicalAuc": 0.5853406687813905
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9887820512820513,
+              "historicalAuc": 0.5566211851558895
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9983974358974359,
+              "historicalAuc": 0.6217865033139185
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9990245261984393,
+              "historicalAuc": 0.6016873817446337
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9956140350877193,
+              "historicalAuc": 0.5842914801248135
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9912904124860646,
+              "historicalAuc": 0.5832844000782932
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9958908612754767,
+              "historicalAuc": 0.6198267360402638
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999297,
+          "historicalAuc": 0.574603,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9987820512820513,
+              "historicalAuc": 0.5601268935667912
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9997086247086248,
+              "historicalAuc": 0.6002292963781214
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.576973287808797
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9987408424908425,
+              "historicalAuc": 0.5961579764736982
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9994064577397911,
+              "historicalAuc": 0.5430962032825786
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9997571872571872,
+              "historicalAuc": 0.5676800897101159
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9986761426978819,
+              "historicalAuc": 0.6054307757552032
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9982709176788124,
+              "historicalAuc": 0.5722383326549993
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9997909698996655,
+              "historicalAuc": 0.5552905004240882
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9998356344510191,
+              "historicalAuc": 0.568803985581174
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "SUSPICIOUS_DNS",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.994979,
+          "historicalAuc": 0.463123,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9963235294117647,
+              "historicalAuc": 0.4248682709088468
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9963497150997151,
+              "historicalAuc": 0.456503036437247
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9931318681318682,
+              "historicalAuc": 0.43996904233124706
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9928613053613053,
+              "historicalAuc": 0.46341300127200913
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.98941163003663,
+              "historicalAuc": 0.5143074279672217
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9863485280151947,
+              "historicalAuc": 0.4165471953068354
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.44417524732485364
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.4486543549043549
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9965659340659341,
+              "historicalAuc": 0.4899639948852547
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9987980769230769,
+              "historicalAuc": 0.5328316973824786
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.979879,
+          "historicalAuc": 0.59556,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9796851432880844,
+              "historicalAuc": 0.598234662370788
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9802350427350427,
+              "historicalAuc": 0.6108890013495276
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9643315018315018,
+              "historicalAuc": 0.5964314556834241
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9858682983682984,
+              "historicalAuc": 0.5845132891477539
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9768772893772893,
+              "historicalAuc": 0.5633673671689136
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9694325735992403,
+              "historicalAuc": 0.6103050227407554
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9707417582417582,
+              "historicalAuc": 0.6107409650716737
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9965418353576249,
+              "historicalAuc": 0.5911384140550807
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9784340659340659,
+              "historicalAuc": 0.5788453126051551
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9966446314102564,
+              "historicalAuc": 0.6111361511752137
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999943,
+          "historicalAuc": 0.517258,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9997643288084465,
+              "historicalAuc": 0.49460917572828567
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5339912280701754
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5242613904031227
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.9998057498057498,
+              "historicalAuc": 0.5378548235924215
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.48109552603753636
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5195521059916947
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9998626373626374,
+              "historicalAuc": 0.5434122417390134
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5077711640211641
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5028686318056397
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5271642962072649
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "SUSPICIOUS_DOWNLOAD",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.40334,
+          "historicalAuc": 0.562759,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.2824283559577677,
+              "historicalAuc": 0.5256284400590683
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.3856216457960644,
+              "historicalAuc": 0.5636858115075273
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.25854700854700857,
+              "historicalAuc": 0.5438427800269906
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.273110661268556,
+              "historicalAuc": 0.555534357617691
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.6128542510121457,
+              "historicalAuc": 0.5591592049925384
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.36534130284130284,
+              "historicalAuc": 0.546157228874907
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.43054029304029307,
+              "historicalAuc": 0.5489854633555421
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.47544178794178793,
+              "historicalAuc": 0.5686607807320209
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.49759615384615385,
+              "historicalAuc": 0.5940556436690457
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.4519230769230769,
+              "historicalAuc": 0.6218834345479083
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.927211,
+          "historicalAuc": 0.587986,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9667703619909502,
+              "historicalAuc": 0.5998917639951671
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9521094215861657,
+              "historicalAuc": 0.5848327833917646
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.9637642450142451,
+              "historicalAuc": 0.5724401147098516
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.8328272604588394,
+              "historicalAuc": 0.5827143535476869
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.888917004048583,
+              "historicalAuc": 0.5773767127933794
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9568607068607069,
+              "historicalAuc": 0.6012532981530343
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9246336996336997,
+              "historicalAuc": 0.6042928528164748
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9110793485793486,
+              "historicalAuc": 0.5876674446925106
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9257669413919414,
+              "historicalAuc": 0.5651021015067407
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9493856837606838,
+              "historicalAuc": 0.6042931848852902
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.555215,
+          "historicalAuc": 0.552717,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.5419494720965309,
+              "historicalAuc": 0.5310612162706404
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.572376267143709,
+              "historicalAuc": 0.5685020966522307
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.5771901709401709,
+              "historicalAuc": 0.5605263157894737
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.5600118083670715,
+              "historicalAuc": 0.5753459503459504
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.5180921052631579,
+              "historicalAuc": 0.5181242368742369
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.5592515592515592,
+              "historicalAuc": 0.5566817197753873
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.5598443223443224,
+              "historicalAuc": 0.5728598828992529
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.5673510048510049,
+              "historicalAuc": 0.547112847574589
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.5615842490842491,
+              "historicalAuc": 0.5414518900343642
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.5344996438746439,
+              "historicalAuc": 0.5554993252361673
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    },
+    {
+      "withheldCategory": "SUSPICIOUS_POWERSHELL",
+      "measurable": true,
+      "detectors": {
+        "isolation_forest": {
+          "maturity": "production",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.874021,
+          "historicalAuc": 0.532189,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.8447516025641025,
+              "historicalAuc": 0.49327904238618525
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.874793217535153,
+              "historicalAuc": 0.527451714951715
+            },
+            {
+              "seed": 99,
+              "novelAuc": 0.8843968531468531,
+              "historicalAuc": 0.4981981322400104
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.8114697802197802,
+              "historicalAuc": 0.504062114356232
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.8910620629370629,
+              "historicalAuc": 0.5380652054039151
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.792552294197031,
+              "historicalAuc": 0.4910417514584181
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.8852317554240631,
+              "historicalAuc": 0.5532714412024757
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9042080231596361,
+              "historicalAuc": 0.5204378954378954
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 0.9127174908424909,
+              "historicalAuc": 0.5987931205392546
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9390262515262515,
+              "historicalAuc": 0.5972850678733032
+            }
+          ],
+          "notes": "The incumbent, at the deployed configuration. The comparison of record."
+        },
+        "local_outlier_factor": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.99915,
+          "historicalAuc": 0.589336,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9983306623931624,
+              "historicalAuc": 0.5898662349555207
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9981389578163772,
+              "historicalAuc": 0.594409756909757
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5836221202655213
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5837661113396407
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9964670745920746,
+              "historicalAuc": 0.5537806727322856
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 0.9985661268556005,
+              "historicalAuc": 0.624944885361552
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5990529143712168
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5837620712620712
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5729331879460745
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.6072261072261073
+            }
+          ],
+          "notes": "Local density rather than global partitioning. The natural contrast if Isolation Forest's axis-aligned splits are what hide a novel category inside the benign mass."
+        },
+        "one_class_svm": {
+          "maturity": "candidate",
+          "deployable": true,
+          "requiresLabels": false,
+          "novelAuc": 0.999019,
+          "historicalAuc": 0.565545,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 0.9986645299145299,
+              "historicalAuc": 0.5464089481946625
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 0.9996898263027295,
+              "historicalAuc": 0.5823135198135199
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.583760412599245
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 0.998550061050061,
+              "historicalAuc": 0.5776729398052928
+            },
+            {
+              "seed": 7,
+              "novelAuc": 0.9972319347319347,
+              "historicalAuc": 0.5278467052660601
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.564373897707231
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 0.9984796186719264,
+              "historicalAuc": 0.5985555668911107
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 0.9982940446650124,
+              "historicalAuc": 0.5656093906093906
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 0.5451939598202484
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 0.9992750305250305,
+              "historicalAuc": 0.5637126354038119
+            }
+          ],
+          "notes": "A kernel boundary around normality rather than a density estimate."
+        },
+        "supervised_ceiling": {
+          "maturity": "experimental",
+          "deployable": false,
+          "requiresLabels": true,
+          "novelAuc": 1.0,
+          "historicalAuc": 1.0,
+          "perSeed": [
+            {
+              "seed": 1337,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 4242,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 99,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 2024,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 7,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 819369,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 488509,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 283395,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 163476,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            },
+            {
+              "seed": 674128,
+              "novelAuc": 1.0,
+              "historicalAuc": 1.0
+            }
+          ],
+          "notes": "DIAGNOSTIC ONLY, never deployable. Bounds what the feature space can support given every available label. If this cannot separate a withheld category either, the features are the limit and hypothesis 5 is wrong."
+        }
+      }
+    }
+  ],
+  "caveats": [
+    "These detectors are not deployed, not proposed and not registered. They are experimental comparisons only, and the production detector is unchanged.",
+    "supervised_ceiling is a DIAGNOSTIC, not a deployment candidate. It consumes labels the production pipeline does not have, and V5's refusal to substitute a supervised detector still stands.",
+    "The corpus is synthetic. Nothing here is evidence about real attack traffic.",
+    "Results are per category and are not averaged across categories, which differ in whether any detector separates them."
+  ]
+}
