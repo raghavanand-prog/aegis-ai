@@ -24,18 +24,6 @@ from app.evaluation.watchdog import add_argument as add_timeout_argument
 from app.evaluation.watchdog import start as start_watchdog
 
 
-def _baseline_rates_for(db, *, dataset_id: int | None) -> dict[str, float] | None:
-    """Per-group rates from feedback history, excluding the batch being admitted.
-
-    V6 §9 learned its baseline from held-out honest seeds; the production
-    analogue is excluding the dataset under review, or the baseline learns that
-    batch's own spike as normal.
-    """
-    from app.adaptation.feedback import augmentation
-
-    return augmentation.baseline_rates(db, exclude_dataset_id=dataset_id)
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="train_candidate",
@@ -60,12 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cap-policy",
         choices=list(caps.POLICIES),
-        default=caps.POLICY_GLOBAL,
+        default=caps.POLICY_BASELINE_RELATIVE,
         help=(
-            "bound on what analyst feedback may contribute. 'global' caps total "
-            "volume only and V6 §9 measured that it does NOT stop a targeted "
-            "poisoning attack; 'baseline_relative' does, and derives its "
-            "per-group baseline from prior feedback datasets"
+            "bound on what analyst feedback may contribute. Defaults to "
+            "'baseline_relative', which V6 §9 measured stops a targeted "
+            "poisoning attack and which derives its per-group baseline from "
+            "prior feedback datasets. 'global' caps total volume only and "
+            "admits 21.9 of 22 poisoned rows - choose it knowingly, e.g. for a "
+            "first batch with no feedback history to be relative to"
         ),
     )
     parser.add_argument(
@@ -87,11 +77,6 @@ def main(argv: list[str] | None = None) -> int:
     watchdog = start_watchdog(args.max_seconds, label="candidate training")
     try:
         with session_scope() as db:
-            baseline_rates = (
-                _baseline_rates_for(db, dataset_id=args.feedback_dataset_id)
-                if args.cap_policy == caps.POLICY_BASELINE_RELATIVE
-                else None
-            )
             model = training.train_candidate(
                 db,
                 seed=args.seed,
@@ -103,7 +88,9 @@ def main(argv: list[str] | None = None) -> int:
                 notes=args.notes,
                 feedback_dataset_id=args.feedback_dataset_id,
                 cap_policy=args.cap_policy,
-                baseline_rates=baseline_rates,
+                # Deliberately not pre-computed here: train_candidate derives
+                # the rates and refuses a cold start, and passing them in would
+                # bypass that refusal.
                 per_group_ceiling=args.per_group_ceiling,
             )
             report = training.describe(model)

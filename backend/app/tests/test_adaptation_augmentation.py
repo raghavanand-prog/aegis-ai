@@ -268,6 +268,9 @@ class TestTrainCandidateWiring:
             directory=tmp_path_factory.mktemp("aug"),
             created_by="test",
             feedback_dataset_id=dataset.id,
+            # Explicit: this asserts rows reach the fit set, not what the cap
+            # does to them. The default policy would refuse this cold start.
+            cap_policy=caps.POLICY_GLOBAL,
         )
         assert augmented.training_samples > plain.training_samples
         assert augmented.parameters["augmentation"]["admitted"] == 6
@@ -323,12 +326,142 @@ class TestTrainCandidateCli:
         )
         assert parser_choices.cap_policy == caps.POLICY_BASELINE_RELATIVE
 
-    def test_the_baseline_relative_policy_derives_its_rates_from_history(
-        self, db
-    ) -> None:
-        """The CLI must not require an operator to hand-compute baseline rates;
-        deriving them from prior datasets is the whole point of §9's held-out
-        baseline."""
+    def test_the_cli_defaults_to_the_policy_that_stops_the_attack(self) -> None:
+        """An operator who types the minimum gets the safe policy, not the one
+        §9 measured admitting 21.9 of 22 poisoned rows."""
         from app.adaptation.candidates import train_candidate
 
-        assert hasattr(train_candidate, "_baseline_rates_for")
+        args = train_candidate.build_parser().parse_args([])
+        assert args.cap_policy == caps.POLICY_BASELINE_RELATIVE
+
+    def test_the_cli_does_not_precompute_rates_around_the_cold_start_refusal(
+        self,
+    ) -> None:
+        """train_candidate derives the rates itself and refuses a cold start.
+        A CLI that pre-computed them would hand in an empty dict and bypass
+        that refusal silently."""
+        import inspect
+
+        from app.adaptation.candidates import train_candidate
+
+        source = inspect.getsource(train_candidate.main)
+        assert "baseline_rates=" not in source
+
+
+class TestBaselineRelativeIsTheDefault:
+    """V6 §9 measured that `global` does not stop targeted poisoning, so the
+    policy that does is the default.
+
+    Flipping it is not a one-line change. `baseline_relative` needs per-group
+    baseline rates, and with none supplied every group falls to the floor - a
+    measured 6 rows admitted of 220. §7.4 measured that feedback that sparse
+    makes the model *worse* than no feedback at all, so a naive flip would
+    silently gut the arm it is protecting.
+    """
+
+    _next_index = 1000
+
+    def _dataset_with_history(self, db, name: str, count: int = 6):
+        base = TestBaselineRelativeIsTheDefault._next_index
+        TestBaselineRelativeIsTheDefault._next_index += count
+        for index in range(count):
+            event = _event(db, event_type="auth_success", index=base + index)
+            _inference(db, event)
+            _feedback(db, event, FeedbackLabel.BENIGN)
+        return _dataset(db, name)
+
+    def test_the_default_policy_is_baseline_relative(self) -> None:
+        import inspect
+
+        from app.adaptation.candidates import training
+
+        default = inspect.signature(training.train_candidate).parameters[
+            "cap_policy"
+        ].default
+        assert default == caps.POLICY_BASELINE_RELATIVE
+
+    def test_baseline_rates_are_derived_when_not_supplied(
+        self, db, tmp_path_factory
+    ) -> None:
+        """An operator must not have to hand-compute rates to get the safe
+        policy. Deriving them from history is what makes the default usable."""
+        from app.adaptation.candidates import training
+
+        # History: a prior dataset the baseline can be learned from.
+        self._dataset_with_history(db, "hist-prior", count=8)
+        current = self._dataset_with_history(db, "hist-current", count=6)
+
+        model = training.train_candidate(
+            db,
+            samples=600,
+            seed=1337,
+            directory=tmp_path_factory.mktemp("derived"),
+            created_by="test",
+            feedback_dataset_id=current.id,
+        )
+        provenance = model.parameters["augmentation"]
+        assert provenance["capPolicy"] == caps.POLICY_BASELINE_RELATIVE
+        # Derived rates must admit more than the floor-for-everything collapse.
+        assert provenance["admitted"] > 2
+        assert provenance["baselineRatesDerived"] is True
+
+    def test_a_cold_start_is_refused_not_silently_degraded(
+        self, db, tmp_path_factory
+    ) -> None:
+        """With no feedback history there is no baseline to be relative to, and
+        the floor would admit a handful of rows - which §7.4 measured is worse
+        than admitting none. Refused loudly so the operator chooses."""
+        from app.adaptation.candidates import training
+
+        first_ever = self._dataset_with_history(db, "cold-start", count=6)
+
+        with pytest.raises(ValueError, match="no feedback history"):
+            training.train_candidate(
+                db,
+                samples=600,
+                seed=1337,
+                directory=tmp_path_factory.mktemp("cold"),
+                created_by="test",
+                feedback_dataset_id=first_ever.id,
+            )
+
+    def test_global_remains_available_as_an_explicit_opt_out(
+        self, db, tmp_path_factory
+    ) -> None:
+        """A first batch with no history is a legitimate reason to choose the
+        weaker policy knowingly. It must stay reachable."""
+        from app.adaptation.candidates import training
+
+        first_ever = self._dataset_with_history(db, "optout", count=6)
+        model = training.train_candidate(
+            db,
+            samples=600,
+            seed=1337,
+            directory=tmp_path_factory.mktemp("optout"),
+            created_by="test",
+            feedback_dataset_id=first_ever.id,
+            cap_policy=caps.POLICY_GLOBAL,
+        )
+        assert model.parameters["augmentation"]["capPolicy"] == caps.POLICY_GLOBAL
+        assert model.parameters["augmentation"]["admitted"] == 6
+
+    def test_explicit_baseline_rates_are_not_overridden(
+        self, db, tmp_path_factory
+    ) -> None:
+        from app.adaptation.candidates import training
+
+        self._dataset_with_history(db, "explicit-prior", count=8)
+        current = self._dataset_with_history(db, "explicit-current", count=6)
+
+        model = training.train_candidate(
+            db,
+            samples=600,
+            seed=1337,
+            directory=tmp_path_factory.mktemp("explicit"),
+            created_by="test",
+            feedback_dataset_id=current.id,
+            baseline_rates={"auth_success": 1.0},
+        )
+        provenance = model.parameters["augmentation"]
+        assert provenance["baselineRatesDerived"] is False
+        assert provenance["admitted"] <= 3

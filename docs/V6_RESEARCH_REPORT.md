@@ -1013,32 +1013,50 @@ rows a candidate may be fitted on, and `train_candidate` appends them.
 Re-deriving would risk training on a vector that was never the one the analyst's
 verdict referred to, and the mismatch would be silent.
 
-### 10.3 Defaults preserve V5 behaviour
+### 10.3 The safe policy is the default
 
-`cap_policy` defaults to `global`, and with no `feedback_dataset_id` the fit set
-is telemetry alone — asserted by test. **§9 measured that `global` does not stop
-targeted poisoning**, so the CLI exposes `--cap-policy baseline_relative`, which
-derives its per-group baseline from prior feedback datasets *excluding the batch
-being admitted* (`_baseline_rates_for`). That exclusion is the production
-analogue of §9's held-out honest seeds: a baseline computed over the dataset
-under review would learn that batch's own spike as normal.
+`cap_policy` defaults to **`baseline_relative`** — the policy §9 measured stops
+targeted poisoning. `global`, which §9 measured admitting 21.9 of 22 poisoned
+rows, is now an explicit opt-out. With no `feedback_dataset_id` the fit set is
+telemetry alone, unchanged from V5 and asserted by test.
 
 ```bash
-python -m app.adaptation.candidates.train_candidate     --feedback-dataset-id 7 --cap-policy baseline_relative
+python -m app.adaptation.candidates.train_candidate --feedback-dataset-id 7
 ```
+
+**Flipping the default was not a one-line change**, and the reason is worth
+recording. `baseline_relative` needs per-group rates; with none supplied every
+group falls to the floor. Measured: **6 rows admitted of 220**. §7.4 measured
+that feedback that sparse makes the model *worse* than no feedback at all, so a
+naive flip would have silently gutted the arm it protects.
+
+Two things make the default safe:
+
+1. **Rates are derived when not supplied**, from prior feedback datasets
+   *excluding the batch being admitted* — the production analogue of §9's
+   held-out honest seeds. A baseline computed over the dataset under review
+   would learn that batch's own spike as normal. `baselineRatesDerived` is
+   recorded on the model, so an approver knows which happened.
+2. **A cold start is refused, not degraded.** With no feedback history there is
+   nothing to be relative to, and admitting a handful of rows is worse than
+   admitting none. The error names the opt-out rather than leaving the operator
+   to find it.
+
+**[INFERENCE]** A first batch with no history is a legitimate reason to choose
+`global`: there is no established baseline for an attacker to hide beneath
+either. The point is that it is now a decision an operator makes deliberately,
+not one they inherit.
+
 
 ### 10.4 What is still not closed **[LIMITATION]**
 
-1. **`global` remains the default.** Changing a security default silently is
-   worse than documenting a sharp edge, so the safer policy is opt-in. An
-   operator admitting real analyst feedback who does not pass
-   `--cap-policy baseline_relative` gets §8's vulnerability.
-2. **The baseline is only as trustworthy as the history it reads.** §9.3's
+1. **The baseline is only as trustworthy as the history it reads.** §9.3's
    patient adversary — raising the baseline across several datasets — defeats
-   it, and is still untested.
-3. **No live analyst feedback exists**, so the wiring is exercised by tests and
+   it, and is still untested. Making the derived baseline the default makes this
+   **more** load-bearing, not less: it is now consulted on every run.
+2. **No live analyst feedback exists**, so the wiring is exercised by tests and
    synthetic corpora, not by use.
-4. `activate_model` behind an approved proposal remains the only write into
+3. `activate_model` behind an approved proposal remains the only write into
    production detection state. None of this changes that; V5's deployment,
    registry-immutability and proposal suites pass unchanged.
 

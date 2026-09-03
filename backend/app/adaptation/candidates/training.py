@@ -51,7 +51,7 @@ def train_candidate(
     created_by: str = "cli",
     notes: str | None = None,
     feedback_dataset_id: int | None = None,
-    cap_policy: str = caps.POLICY_GLOBAL,
+    cap_policy: str = caps.POLICY_BASELINE_RELATIVE,
     baseline_rates: dict[str, float] | None = None,
     per_group_ceiling: int | None = None,
 ) -> MLModel:
@@ -67,12 +67,19 @@ def train_candidate(
     false positives. Before V6 this argument was recorded as metadata and
     changed nothing.
 
-    ``cap_policy`` bounds what feedback may contribute. It defaults to
-    ``global``, which preserves pre-V6 behaviour; V6 §9 measured that
-    ``baseline_relative`` is the policy that actually stops a targeted
-    poisoning attack, and callers admitting real analyst feedback should pass
-    it with ``baseline_rates`` from
-    ``feedback_augmentation.baseline_rates(db, exclude_dataset_id=...)``.
+    ``cap_policy`` bounds what feedback may contribute, and **defaults to
+    ``baseline_relative``** - the policy V6 §9 measured actually stops a targeted
+    poisoning attack. ``global`` bounds volume only, and §9 measured it admitting
+    21.9 of 22 poisoned rows.
+
+    With no ``baseline_rates`` the rates are **derived from prior feedback
+    datasets**, excluding the one being admitted - the production analogue of
+    §9's held-out honest seeds. Deriving them matters: with no rates at all every
+    group falls to the floor, a measured 6 rows admitted of 220, and §7.4
+    measured that feedback that sparse makes the model *worse* than none. So a
+    cold start with no feedback history is **refused** rather than silently
+    degraded; an operator who wants the first batch admitted anyway can pass
+    ``cap_policy="global"`` knowingly.
     """
     contamination = contamination if contamination is not None else settings.ml_contamination
     random_state = random_state if random_state is not None else settings.ml_random_state
@@ -103,6 +110,23 @@ def train_candidate(
                 "an unresolvable dataset id would make the candidate's "
                 "provenance a guess."
             )
+        derived = False
+        if cap_policy == caps.POLICY_BASELINE_RELATIVE and baseline_rates is None:
+            baseline_rates = feedback_augmentation.baseline_rates(
+                db, exclude_dataset_id=dataset.id
+            )
+            derived = True
+            if not baseline_rates:
+                raise ValueError(
+                    "cap_policy 'baseline_relative' needs per-group rates from "
+                    "prior feedback datasets, and there is no feedback history "
+                    f"outside dataset {dataset.id}. Without a baseline every "
+                    "group falls to the floor, admitting a handful of rows - "
+                    "which V6 §7.4 measured is worse than admitting none. Pass "
+                    "cap_policy='global' to admit this first batch knowingly, or "
+                    "accumulate feedback history first."
+                )
+
         result = feedback_augmentation.build(
             db,
             dataset=dataset,
@@ -117,6 +141,9 @@ def train_candidate(
         fit_vectors.extend(result.vectors)
         augmentation_report = result.as_dict()
         augmentation_report["datasetFingerprint"] = dataset.fingerprint
+        # Whether the baseline was learned from history or supplied by the
+        # caller. An approver reading this needs to know which.
+        augmentation_report["baselineRatesDerived"] = derived
 
     detector = IsolationForestDetector(
         feature_names=corpus.feature_names,
