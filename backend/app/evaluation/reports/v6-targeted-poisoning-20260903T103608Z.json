@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-03T10:36:08.397298+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_targeted_poisoning_eval.py --seeds 8 --targets MALWARE --cap-policy per_group_absolute --max-seconds 3600",
+  "question": "Does the recall floor recommended in \u00a77.3 detect a targeted poisoning attack on one attack category?",
+  "threatModel": "A compromised, coerced or careless analyst with ordinary feedback permissions - no privileged access, no code execution. Every existing control is respected: only benign-projecting labels are admitted, the feedback cap holds, and deployment still requires approval. The question is sufficiency.",
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395
+    ],
+    "threshold": 0.65,
+    "maxFeedbackFraction": 0.2,
+    "capPolicy": "per_group_absolute",
+    "groupField": "event_type",
+    "baselineSeeds": null,
+    "baselineRates": null
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "results": [
+    {
+      "targetCategory": "MALWARE",
+      "adversaryReach": 1.0,
+      "poisonedRows": 21.875,
+      "targetRecall": {
+        "baseline": {
+          "mean": 0.9286,
+          "lower": 0.8363,
+          "upper": 1.0,
+          "stdDev": 0.1214,
+          "samples": 8,
+          "confidence": 0.95,
+          "resamples": 1000,
+          "method": "percentile bootstrap over repeated-seed observations"
+        },
+        "poisoned": {
+          "mean": 0.9015,
+          "lower": 0.7833,
+          "upper": 0.9807,
+          "stdDev": 0.1603,
+          "samples": 8,
+          "confidence": 0.95,
+          "resamples": 1000,
+          "method": "percentile bootstrap over repeated-seed observations"
+        },
+        "delta": -0.027083,
+        "cohensD": -0.1904
+      },
+      "aggregateRecall": {
+        "baseline": {
+          "mean": 0.738,
+          "lower": 0.7027,
+          "upper": 0.77,
+          "stdDev": 0.0512,
+          "samples": 8,
+          "confidence": 0.95,
+          "resamples": 1000,
+          "method": "percentile bootstrap over repeated-seed observations"
+        },
+        "poisoned": {
+          "mean": 0.7228,
+          "lower": 0.6851,
+          "upper": 0.7572,
+          "stdDev": 0.0547,
+          "samples": 8,
+          "confidence": 0.95,
+          "resamples": 1000,
+          "method": "percentile bootstrap over repeated-seed observations"
+        },
+        "delta": -0.015224,
+        "cohensD": -0.2874,
+        "seedStdev": 0.04791
+      },
+      "attenuation": 1.78,
+      "aggregateFprDelta": -0.021368
+    }
+  ],
+  "caveats": [
+    "Per-category recall is measured over a few dozen held-out samples, so its own intervals are wide. The attenuation figure is the robust part of this result, not the per-category point estimate.",
+    "A category the detector already misses cannot be poisoned - there is no recall to remove.",
+    "Feedback is simulated; both corpora are synthetic.",
+    "Nothing is deployed."
+  ]
+}
