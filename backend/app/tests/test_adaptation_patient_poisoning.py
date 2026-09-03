@@ -134,3 +134,62 @@ class TestPatientPoisoningRunner:
         assert set(report["arms"]) == {"honest", "adversary"}
         assert len(report["tolerance"]) == 2
         assert report["damage"][0]["cohensD"] is not None
+
+
+class TestDefaultToleranceContainsTheRatchet:
+    """V6 §11.4 measured tolerance 1.5 containing the patient attack 10x for a
+    0.15% honest-throughput cost. These pin the behaviour, not just the number -
+    a future change to the constant that reopened the ratchet would pass a test
+    that only checked the value."""
+
+    def test_the_default_contains_a_ten_cycle_campaign(self) -> None:
+        campaign = pp.run_campaign(
+            seed=1337, target_category="MALWARE", cycles=10, adversary_reach=1.0
+        )
+        final = campaign["cycles"][-1]
+        assert final["poisonLanded"] <= 5, (
+            "the default tolerance must not let a patient campaign reach the "
+            "~22 rows V6 §8 measured as damaging"
+        )
+
+    def test_the_allowance_does_not_ratchet_at_the_default(self) -> None:
+        campaign = pp.run_campaign(
+            seed=1337, target_category="MALWARE", cycles=10, adversary_reach=1.0
+        )
+        allowances = [cycle["targetAllowance"] for cycle in campaign["cycles"]]
+        assert allowances[-1] < 2 * allowances[0], (
+            "the ceiling must not run away from where it started"
+        )
+
+    def test_a_loose_tolerance_still_ratchets(self) -> None:
+        """The control for the control: 3.0 must still reproduce §11.2, or the
+        containment above is measuring something other than the fix."""
+        campaign = pp.run_campaign(
+            seed=1337,
+            target_category="MALWARE",
+            cycles=10,
+            adversary_reach=1.0,
+            tolerance=3.0,
+        )
+        allowances = [cycle["targetAllowance"] for cycle in campaign["cycles"]]
+        assert allowances[-1] > 4 * allowances[0]
+
+    def test_honest_throughput_survives_the_tighter_default(self) -> None:
+        """A cap that contained the attack by strangling honest feedback would
+        be a regression dressed as a fix - §7.4 measured sparse feedback making
+        the model worse than none."""
+        tight = pp.run_campaign(
+            seed=1337, target_category="MALWARE", cycles=10, adversary_reach=0.0
+        )
+        loose = pp.run_campaign(
+            seed=1337,
+            target_category="MALWARE",
+            cycles=10,
+            adversary_reach=0.0,
+            tolerance=3.0,
+        )
+        tight_rows = tight["cycles"][-1]["totalAdmitted"]
+        loose_rows = loose["cycles"][-1]["totalAdmitted"]
+        assert tight_rows >= 0.99 * loose_rows, (
+            f"tighter tolerance cost {loose_rows - tight_rows} honest rows"
+        )

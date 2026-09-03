@@ -265,12 +265,12 @@ are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
 
 Also unresolved, and load-bearing:
 
-9. **`caps.DEFAULT_TOLERANCE` is still 3.0**, which §11 measured lets a patient
-   adversary ratchet its allowance 3.5 → 27.5 over ten cycles. §11.4 measured
-   that 1.5 contains the attack 10× for a 0.15% honest-throughput cost. **One
-   line, evidence behind it, deliberately not changed** — §10.3's lesson was
-   that security defaults should be decided rather than inherited, including
-   from me.
+9. **A patient adversary is contained, not eliminated.** `DEFAULT_TOLERANCE` is
+   1.5, which §11.4 measured holding a ten-cycle campaign to 2.3 admitted rows
+   against 22.9 at the old 3.0. That bounds the ratchet; it does not detect one.
+   **Nothing monitors the baseline's growth rate**, and §11.5.4 is explicit that
+   the ratchet was only visible because the honest control was run — every batch
+   is within policy by construction.
 10. **`event_type` tracks attack category almost perfectly in this corpus**, so
     §9's result **flatters the defence**. The mechanism is sound; the effect size
     is unlikely to transfer to real telemetry where an attack spans many event
