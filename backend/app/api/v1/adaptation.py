@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.adaptation.active_learning import selectors
 from app.adaptation.active_learning import service as active_learning
+from app.adaptation.deployment import service as deployment
 from app.adaptation.drift import monitor as drift_monitor
 from app.adaptation.feedback import datasets, targets
 from app.adaptation.feedback import service as feedback_service
@@ -584,4 +585,111 @@ def get_proposal(
     proposal = proposals.get(db, proposal_id)
     if proposal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    return _proposal_read(proposal)
+
+
+@router.post(
+    "/proposals/{proposal_id}/deploy",
+    response_model=ProposalRead,
+    summary="Deploy an approved adaptation",
+    description=(
+        "Administrator only. Applies an approved proposal to production and "
+        "records what it displaced, so a rollback restores the version that was "
+        "actually replaced rather than one inferred afterwards.\n\n"
+        "Everything that can fail is checked before anything changes: if the "
+        "deployment is refused, the currently approved model keeps serving."
+    ),
+    responses={
+        403: {"model": Message, "description": "Administrator role required"},
+        404: {"model": Message, "description": "Unknown proposal"},
+        409: {"model": Message, "description": "Not approved, or the artifact failed verification"},
+    },
+)
+def deploy_proposal(
+    proposal_id: int,
+    request: Request,
+    user: User = Depends(require(Permission.ADAPTATION_DEPLOY)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    if proposals.get(db, proposal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    try:
+        proposal = deployment.deploy(db, proposal_id, deployed_by=user.email)
+    except ValueError as exc:
+        # The rollback of the transaction leaves production exactly as it was.
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.ADAPTATION_PROPOSAL_DEPLOYED,
+        user=user,
+        target_type="adaptation_proposal",
+        target_id=str(proposal.id),
+        ip_address=client_ip(request),
+        details={
+            "type": proposal.proposal_type,
+            "component": proposal.affected_component,
+            "approvedBy": proposal.approved_by,
+            "rollbackTarget": proposal.rollback_state,
+        },
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _proposal_read(proposal)
+
+
+@router.post(
+    "/proposals/{proposal_id}/rollback",
+    response_model=ProposalRead,
+    summary="Roll back a deployed adaptation",
+    description=(
+        "Administrator only. Restores the version recorded at deployment time. "
+        "A reason is required and kept: a rolled-back proposal is the most "
+        "informative row in the table, and only if it says why."
+    ),
+    responses={
+        403: {"model": Message, "description": "Administrator role required"},
+        404: {"model": Message, "description": "Unknown proposal"},
+        409: {"model": Message, "description": "Not deployed, or no rollback target"},
+        422: {"model": Message, "description": "A reason is required"},
+    },
+)
+def rollback_proposal(
+    proposal_id: int,
+    payload: ProposalDecision,
+    request: Request,
+    user: User = Depends(require(Permission.ADAPTATION_DEPLOY)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    if proposals.get(db, proposal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not (payload.reason or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A rollback needs a reason.",
+        )
+    try:
+        proposal = deployment.rollback(
+            db, proposal_id, rolled_back_by=user.email, reason=payload.reason
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.ADAPTATION_PROPOSAL_ROLLED_BACK,
+        user=user,
+        target_type="adaptation_proposal",
+        target_id=str(proposal.id),
+        ip_address=client_ip(request),
+        details={
+            "reason": payload.reason,
+            "restored": proposal.rollback_state,
+            "deployedBy": proposal.deployed_by,
+        },
+    )
+    db.commit()
+    db.refresh(proposal)
     return _proposal_read(proposal)

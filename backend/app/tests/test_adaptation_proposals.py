@@ -300,18 +300,14 @@ class TestProposalAPIPermissions:
 
 
 class TestProposalAPIWorkflow:
-    def test_no_deployment_endpoint_exists_yet(self) -> None:
-        """Deployment is Phase I, and it must apply a change and be able to
-        reverse it - not merely flip a status. Until that exists there is no
-        endpoint, so a proposal cannot reach production by any HTTP route.
-
-        The service-level refusal is covered by
-        ``TestDeployment.test_only_an_approved_proposal_may_be_deployed``.
-        """
-        from app.main import app
-
-        schema = app.openapi()
-        assert [path for path in schema["paths"] if "proposals" in path and "deploy" in path] == []
+    def test_deploying_an_unapproved_proposal_is_refused(self, client, auth_headers) -> None:
+        created = client.post(
+            "/api/v1/adaptation/proposals", json=_payload(), headers=auth_headers
+        ).json()
+        response = client.post(
+            f"/api/v1/adaptation/proposals/{created['id']}/deploy", headers=auth_headers
+        )
+        assert response.status_code == 409
 
     def test_every_transition_is_audited(self, client, auth_headers) -> None:
         created = client.post(

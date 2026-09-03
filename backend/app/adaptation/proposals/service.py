@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.adaptation import AdaptationProposal
-from app.models.enums import ProposalStatus, ProposalType
+from app.models.enums import MLModelStatus, ProposalStatus, ProposalType
 
 
 def _now() -> datetime:
@@ -81,6 +81,32 @@ def create(
     return proposal
 
 
+def _sync_candidate_status(
+    db: Session, proposal: AdaptationProposal, decision: ProposalStatus
+) -> None:
+    """Move a model proposal's candidate in step with the decision.
+
+    Only for model updates, and only for the two decisions that have a model
+    meaning. A threshold proposal has no candidate, and inventing a status
+    transition for one would be a lie about what was decided.
+    """
+    if proposal.proposal_type != ProposalType.MODEL_UPDATE.value:
+        return
+    if proposal.candidate_model_id is None:
+        return
+
+    from app.models.ml import MLModel
+
+    candidate = db.get(MLModel, proposal.candidate_model_id)
+    if candidate is None:
+        return
+
+    if decision is ProposalStatus.APPROVED:
+        candidate.status = MLModelStatus.APPROVED.value
+    elif decision is ProposalStatus.REJECTED:
+        candidate.status = MLModelStatus.REJECTED.value
+
+
 def _require(db: Session, proposal_id: int) -> AdaptationProposal:
     proposal = db.get(AdaptationProposal, proposal_id)
     if proposal is None:
@@ -119,6 +145,12 @@ def approve(db: Session, proposal_id: int, *, approved_by: str) -> AdaptationPro
     # propose and approve; surfacing it is more honest than pretending the
     # separation exists.
     proposal.self_approved = approved_by == proposal.proposed_by
+
+    # Approving a model proposal is the only route out of `candidate`. Without
+    # it the deployment step would have to bypass the lifecycle gate to do its
+    # job, which would make the gate decorative.
+    _sync_candidate_status(db, proposal, ProposalStatus.APPROVED)
+
     db.flush()
     return proposal
 
@@ -140,11 +172,18 @@ def reject(db: Session, proposal_id: int, *, rejected_by: str, reason: str) -> A
     proposal.status = ProposalStatus.REJECTED.value
     proposal.rejected_by = rejected_by
     proposal.rejection_reason = reason
+    _sync_candidate_status(db, proposal, ProposalStatus.REJECTED)
     db.flush()
     return proposal
 
 
-def mark_deployed(db: Session, proposal_id: int, *, deployed_by: str) -> AdaptationProposal:
+def mark_deployed(
+    db: Session,
+    proposal_id: int,
+    *,
+    deployed_by: str,
+    rollback_state: dict | None = None,
+) -> AdaptationProposal:
     """Record that an approved proposal has been applied to production.
 
     Captures ``rollback_state`` from the recorded before-state at this moment,
@@ -162,7 +201,12 @@ def mark_deployed(db: Session, proposal_id: int, *, deployed_by: str) -> Adaptat
     proposal.status = ProposalStatus.DEPLOYED.value
     proposal.deployed_by = deployed_by
     proposal.deployed_at = _now()
-    proposal.rollback_state = dict(proposal.before_state or {})
+    # The caller may supply a more precise target than the recorded
+    # before-state - a model deployment knows exactly which version it
+    # displaced, which is not always what the proposal was written against.
+    proposal.rollback_state = (
+        dict(rollback_state) if rollback_state is not None else dict(proposal.before_state or {})
+    )
     db.flush()
     return proposal
 
