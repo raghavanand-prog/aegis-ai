@@ -911,6 +911,12 @@ measuring), with a floor of 2 for unseen groups. Its baseline is learned from
 **held-out honest seeds** — learning it from the attacked stream would teach it
 the attack as normal.
 
+> **Superseded default (§11.4).** These rows were measured at tolerance 3.0,
+> which was the default at the time. It is now **1.5**. Re-measured at 1.5 the
+> same attack admits **2.0 poisoned rows rather than 4.0**, retaining 421 of 442
+> honest rows and restoring target recall (+0.074) — so the conclusion below
+> strengthens rather than changes. The original numbers are kept as measured.
+
 | Policy | poisoned rows | Δ target recall | honest feedback rows | honest-augmented FPR |
 | --- | --- | --- | --- | --- |
 | **global** (status quo) | 22.0 | **−0.2026** | 421 | 0.2537 |
@@ -1086,7 +1092,10 @@ Artifact: `app/evaluation/reports/v6-patient-poisoning-20260903T170616Z.json`.
 
 ### 11.2 The ratchet turns
 
-10 cycles, 8 seeds, target MALWARE, tolerance at the current default of 3.0.
+10 cycles, 8 seeds, target MALWARE, **at the then-default tolerance of 3.0**.
+This is the measurement that motivated lowering it (§11.4); the campaign at the
+new default of 1.5 is in `v6-patient-poisoning-20260903T171656Z.json`, where the
+adversary's allowance moves 2.19 → 2.88 rather than 3.5 → 27.5.
 
 | | allowance, cycle 0 | allowance, cycle 9 | poison landed, cycle 9 |
 | --- | --- | --- | --- |
@@ -1145,10 +1154,25 @@ for 0.6 fewer honest rows out of 408, a cost of 0.15%.**
 structural: the tolerance binds on *growth*, and honest per-group feedback
 volume does not grow. An adversary's does, because that is the whole mechanism.
 
-**I have not changed the default.** `caps.DEFAULT_TOLERANCE` is still 3.0.
-Lowering it to 1.5 is a one-line change with the evidence above behind it, but
-it is a security-posture decision and §10.3's lesson was that those should be
-made deliberately rather than inherited — including from me.
+**The default is now 1.5.** `caps.DEFAULT_TOLERANCE` was lowered on the evidence
+above, as a deliberate decision rather than an inherited one.
+
+Re-measured at the new default, nothing else regressed:
+
+| | tolerance 3.0 | **tolerance 1.5** |
+| --- | --- | --- |
+| §11 patient campaign, poison at cycle 9 | 22.9 | **2.3** |
+| §9 single-batch attack, poisoned rows | 4.0 | **2.0** |
+| §9 honest feedback rows retained | 424 of 442 | **421 of 442** |
+| §11 honest rows admitted, cycle 9 | 408.1 | **407.5** |
+
+**The single-batch defence improves too** — §9 is strengthened by the change,
+not merely left intact. §6's Arm 2 result is structurally unaffected: `arm2.py`
+uses its own volume ceiling and never calls `caps`.
+
+The behaviour is pinned by test, not the constant: a future change that reopened
+the ratchet would have to defeat a ten-cycle campaign assertion, not just edit a
+number.
 
 ### 11.5 Limitations **[LIMITATION]**
 
