@@ -71,3 +71,37 @@ class FeedbackDatasetRead(CamelModel):
     created_by: str
     created_at: datetime
     notes: str | None
+
+
+class DriftMeasurementRead(CamelModel):
+    """One drift reading, with the bands that produced its status."""
+
+    id: int
+    kind: str
+    feature: str
+    baseline_label: str
+    window_label: str
+    metric_name: str
+    metric_value: float
+    secondary_metric_name: str | None
+    secondary_metric_value: float | None
+    status: str
+    moderate_threshold: float
+    significant_threshold: float
+    reference_samples: int
+    current_samples: int
+    model_identity: str | None
+    measured_at: datetime
+
+
+class DriftStatusResponse(CamelModel):
+    """The drift overview.
+
+    ``interpretation`` is part of the contract, not decoration. A dashboard that
+    renders "drift detected" without it invites the inference that the model has
+    failed, which the measurement does not support.
+    """
+
+    features: list[DriftMeasurementRead]
+    counts_by_status: dict[str, int]
+    interpretation: str
