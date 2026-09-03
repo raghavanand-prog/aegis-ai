@@ -484,7 +484,106 @@ set whose composition resembles production. Track 2's question — how feedback
 quality affects adaptation — is worth asking, but its answer will be about
 contamination repair unless the substrate is fixed first.
 
-## 5. Reproducing
+## 5. The baseline, re-established **[MEASURED]**
+
+§4 showed the V4/V5 static baseline was produced by re-fitting on a
+40%-malicious corpus. This section measures the baseline in the configuration
+**production actually uses**, so every later comparison has an honest comparator.
+
+### 5.1 What production actually does
+
+`train_anomaly_model` fits the **runtime telemetry generator's** corpus — 6,000
+unlabelled vectors over 14 simulated days, ~12% suspicious scenarios,
+`contamination=0.08`, 200 estimators. The labelled corpus is used **only for
+scoring**. V4 and V5's experiments re-fitted on the labelled corpus instead.
+
+Scoring here holds Track 1's corpus, split (`d349ea18a04e06c0`) and frozen 0.65
+threshold fixed, so the number is directly comparable to the static baseline it
+replaces. **Only the fitting data changes.** Measured fit/scoring overlap: **0**.
+
+```bash
+python -m app.adaptation.experiments.run_production_baseline_eval --seeds 10 --max-seconds 3600
+```
+
+Artifact: `app/evaluation/reports/v6-production-baseline-20260903T082627Z.json`.
+
+### 5.2 The re-established baseline, 10 seeds
+
+| | threshold | Precision | Recall | F1 | FPR | alerts |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Production configuration** | 0.650 | 0.590 | 0.731 | **0.6526** | 0.340 | 193.5 |
+| + Arm 1 threshold adaptation | 0.648 | 0.598 | 0.753 | **0.6627** | 0.348 | 198.9 |
+
+ROC-AUC **0.7615** (sd 0.0212).
+
+**This independently reproduces V4 §19.12**, which measured the deployed artifact
+at F1 0.663 and 33.3% FPR. Two different code paths, the same answer — good
+evidence the measurement is sound.
+
+### 5.3 What it does to every prior comparison
+
+| Configuration | F1 |
+| --- | --- |
+| V5 static baseline — refit on 40%-malicious corpus | 0.0389 |
+| V5 both arms, 50 seeds (§1) | 0.2570 |
+| Refit at 12% contamination, no adaptation (§4) | 0.2653 |
+| **Production configuration, no adaptation** | **0.6526** |
+| Production configuration + Arm 1 | **0.6627** |
+
+**The full V5 adaptation loop reaches about 39% of the F1 that the unmodified
+production configuration already achieves.** The V5 numbers were correctly
+measured; the baseline they were measured against was misconfigured by a factor
+of roughly seventeen.
+
+**This is not "adaptation is worthless".** Two honest qualifications:
+
+1. **The operating points differ sharply.** Production runs high-recall /
+   high-FPR (R 0.73, FPR 34%); V5's adapted model ran high-precision /
+   low-recall (P 0.86, R 0.15, FPR 1.7%). F1 strongly favours production; an
+   operator drowning in 193 alerts per 390 events might not. These are different
+   policies, not simply better and worse.
+2. **Distribution shift is real but smaller than contamination.** The production
+   fit is *out of distribution* for this test set — a different generator —
+   giving AUC 0.762, while an in-distribution refit at 4% contamination reaches
+   0.955 (§4.2). Both effects are present; contamination is the larger.
+
+### 5.4 Arm 1 barely helps a correctly-fitted model **[MEASURED]**
+
+Threshold adaptation moves the operating point from 0.650 to **0.648** and F1
+from 0.6526 to 0.6627 — **+0.010**. Against a correctly-fitted model the frozen
+threshold is already near-optimal, and there is very little for Arm 1 to
+recover. Compare Track 1, where the same arm was worth far more precisely
+because the model underneath it was misfitted.
+
+### 5.5 Arm 2 is not applicable in production **[IMPLEMENTATION]**
+
+Curation purifies the fit set. **Production's fit set is unlabelled runtime
+telemetry, not observed events**, so analyst labels have nothing there to
+purify.
+
+V5's Arm 2 implicitly assumes the fit set and the observed event stream are the
+same collection. In the experiments they were — which is exactly why curation
+appeared to work, since it was removing the 40% contamination §4 identified. In
+production they are different collections, and the arm as designed has no
+surface to act on.
+
+**[INFERENCE]** This is the most consequential architectural finding in V6 so
+far. Of V5's two adaptation arms, one is worth +0.010 F1 against a correct
+baseline and the other cannot run in the production configuration at all. Making
+Arm 2 real would mean feeding observed, analyst-labelled events into the
+training corpus — which is a genuine design change, not a tuning question, and
+should be designed deliberately rather than inherited.
+
+### 5.6 Limitations **[LIMITATION]**
+
+1. Both corpora are synthetic. This re-establishes an *experimental* baseline.
+2. The ~12% production figure counts suspicious *scenarios* in an unlabelled
+   generator, not verified malicious events.
+3. A 34% false-positive rate is not obviously an acceptable operating point;
+   "better F1" is not "deployable".
+4. Nothing here is deployed or registered. The production model is unchanged.
+
+## 6. Reproducing
 
 ```bash
 cd backend
@@ -501,6 +600,9 @@ python -m app.adaptation.experiments.run_detector_comparison --seeds 10 --max-se
 
 # section 4
 python -m app.adaptation.experiments.run_contamination_eval --seeds 10 --max-seconds 3600
+
+# section 5
+python -m app.adaptation.experiments.run_production_baseline_eval --seeds 10 --max-seconds 3600
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
