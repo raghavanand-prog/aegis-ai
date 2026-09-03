@@ -163,5 +163,8 @@ class AuditAction(str, Enum):
     THREAT_INTEL_LOOKUP = "threatintel.lookup"
     SEQUENCE_CREATED = "correlation.sequence_created"
     SEQUENCE_PROMOTED = "correlation.sequence_promoted"
+    # --- V5: controlled adaptation ----------------------------------------
+    ADAPTATION_FEEDBACK_SUBMITTED = "adaptation.feedback_submitted"
+    ADAPTATION_FEEDBACK_CORRECTED = "adaptation.feedback_corrected"
     SETTINGS_CHANGED = "system.settings_changed"
     ACCESS_DENIED = "auth.access_denied"
