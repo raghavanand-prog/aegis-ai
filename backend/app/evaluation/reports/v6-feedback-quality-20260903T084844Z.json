@@ -1,0 +1,2185 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-03T08:48:44.847385+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_feedback_quality_eval.py --seeds 10 --max-seconds 5400",
+  "question": "How does analyst feedback quality affect the redesigned Arm 2?",
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395,
+      163476,
+      674128
+    ],
+    "threshold": 0.65,
+    "baseline": "production configuration, telemetry corpus only"
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "results": [
+    {
+      "condition": "nominal",
+      "description": "The V5 / Track 1 settings. The control every other condition is read against.",
+      "feedbackRows": 420.7,
+      "poisonedRows": 14.2,
+      "realisedErrorRate": 0.044164,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6345,
+            "lower": 0.6133,
+            "upper": 0.6575,
+            "stdDev": 0.0369,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.044172,
+          "cohensD": 1.2058
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6795,
+            "lower": 0.6545,
+            "upper": 0.7064,
+            "stdDev": 0.0441,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.051282,
+          "cohensD": -1.2328
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6554,
+            "lower": 0.6375,
+            "upper": 0.6776,
+            "stdDev": 0.0324,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.002813,
+          "cohensD": 0.0854
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.2624,
+            "lower": 0.2397,
+            "upper": 0.2842,
+            "stdDev": 0.0388,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.077351,
+          "cohensD": -1.8116
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 167.4,
+            "lower": 159.9,
+            "upper": 173.9,
+            "stdDev": 11.8622,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -26.1,
+          "cohensD": -2.2431
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7862,
+            "lower": 0.7757,
+            "upper": 0.7968,
+            "stdDev": 0.0174,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.024756,
+          "cohensD": 1.235
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.2905982905982906,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 399
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.25213675213675213,
+          "recall": 0.6474358974358975,
+          "feedbackRows": 418
+        },
+        {
+          "seed": 99,
+          "fpr": 0.2777777777777778,
+          "recall": 0.6730769230769231,
+          "feedbackRows": 451
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.2222222222222222,
+          "recall": 0.7243589743589743,
+          "feedbackRows": 423
+        },
+        {
+          "seed": 7,
+          "fpr": 0.3076923076923077,
+          "recall": 0.6858974358974359,
+          "feedbackRows": 426
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.2564102564102564,
+          "recall": 0.6346153846153846,
+          "feedbackRows": 406
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.18803418803418803,
+          "recall": 0.6217948717948718,
+          "feedbackRows": 430
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.23504273504273504,
+          "recall": 0.7564102564102564,
+          "feedbackRows": 417
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.2948717948717949,
+          "recall": 0.717948717948718,
+          "feedbackRows": 423
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.29914529914529914,
+          "recall": 0.6410256410256411,
+          "feedbackRows": 414
+        }
+      ]
+    },
+    {
+      "condition": "clean",
+      "description": "An unrealistic ceiling: no label noise, no abstention.",
+      "feedbackRows": 471.9,
+      "poisonedRows": 0.0,
+      "realisedErrorRate": 0.0,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6355,
+            "lower": 0.6186,
+            "upper": 0.6525,
+            "stdDev": 0.0285,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.045158,
+          "cohensD": 1.3835
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6615,
+            "lower": 0.6295,
+            "upper": 0.6936,
+            "stdDev": 0.0535,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.069231,
+          "cohensD": -1.4792
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6472,
+            "lower": 0.6288,
+            "upper": 0.6686,
+            "stdDev": 0.0325,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.005435,
+          "cohensD": -0.1649
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.2538,
+            "lower": 0.2342,
+            "upper": 0.2744,
+            "stdDev": 0.0343,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.085898,
+          "cohensD": -2.1078
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 162.6,
+            "lower": 154.3,
+            "upper": 170.4,
+            "stdDev": 13.8018,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -30.9,
+          "cohensD": -2.4408
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7829,
+            "lower": 0.7698,
+            "upper": 0.799,
+            "stdDev": 0.0242,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.02142,
+          "cohensD": 0.9185
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.25213675213675213,
+          "recall": 0.6217948717948718,
+          "feedbackRows": 474
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.21794871794871795,
+          "recall": 0.6282051282051282,
+          "feedbackRows": 450
+        },
+        {
+          "seed": 99,
+          "fpr": 0.2606837606837607,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 506
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.21367521367521367,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 447
+        },
+        {
+          "seed": 7,
+          "fpr": 0.3034188034188034,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 487
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.2948717948717949,
+          "recall": 0.6794871794871795,
+          "feedbackRows": 465
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.2094017094017094,
+          "recall": 0.5641025641025641,
+          "feedbackRows": 465
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.23504273504273504,
+          "recall": 0.7435897435897436,
+          "feedbackRows": 489
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.2863247863247863,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 470
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.26495726495726496,
+          "recall": 0.6153846153846154,
+          "feedbackRows": 466
+        }
+      ]
+    },
+    {
+      "condition": "high_noise",
+      "description": "A bad week: 15% of verdicts are simply wrong.",
+      "feedbackRows": 403.1,
+      "poisonedRows": 42.6,
+      "realisedErrorRate": 0.137584,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6374,
+            "lower": 0.6151,
+            "upper": 0.6601,
+            "stdDev": 0.0379,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.047106,
+          "cohensD": 1.2693
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6878,
+            "lower": 0.6615,
+            "upper": 0.7128,
+            "stdDev": 0.0426,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.042948,
+          "cohensD": -1.052
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6603,
+            "lower": 0.6457,
+            "upper": 0.6773,
+            "stdDev": 0.0263,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.007715,
+          "cohensD": 0.2565
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.2637,
+            "lower": 0.2355,
+            "upper": 0.2953,
+            "stdDev": 0.05,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.076069,
+          "cohensD": -1.5779
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 169.0,
+            "lower": 159.4,
+            "upper": 178.5,
+            "stdDev": 16.0485,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -24.5,
+          "cohensD": -1.7599
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7883,
+            "lower": 0.7755,
+            "upper": 0.8001,
+            "stdDev": 0.0206,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.026784,
+          "cohensD": 1.2452
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.28205128205128205,
+          "recall": 0.6858974358974359,
+          "feedbackRows": 387
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.21367521367521367,
+          "recall": 0.6346153846153846,
+          "feedbackRows": 403
+        },
+        {
+          "seed": 99,
+          "fpr": 0.28205128205128205,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 424
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.20085470085470086,
+          "recall": 0.717948717948718,
+          "feedbackRows": 402
+        },
+        {
+          "seed": 7,
+          "fpr": 0.358974358974359,
+          "recall": 0.7051282051282052,
+          "feedbackRows": 408
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.23931623931623933,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 392
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.2094017094017094,
+          "recall": 0.6025641025641025,
+          "feedbackRows": 411
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.25213675213675213,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 409
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.3076923076923077,
+          "recall": 0.7307692307692307,
+          "feedbackRows": 408
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.2905982905982906,
+          "recall": 0.7051282051282052,
+          "feedbackRows": 387
+        }
+      ]
+    },
+    {
+      "condition": "severe_noise",
+      "description": "Beyond anything V5 tested: 30% of verdicts are wrong.",
+      "feedbackRows": 378.8,
+      "poisonedRows": 84.3,
+      "realisedErrorRate": 0.274999,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.631,
+            "lower": 0.6087,
+            "upper": 0.6561,
+            "stdDev": 0.0407,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.040662,
+          "cohensD": 1.0544
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6808,
+            "lower": 0.6429,
+            "upper": 0.716,
+            "stdDev": 0.0621,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.05,
+          "cohensD": -0.9643
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6535,
+            "lower": 0.6295,
+            "upper": 0.6766,
+            "stdDev": 0.0404,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.000897,
+          "cohensD": 0.0242
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.2671,
+            "lower": 0.2397,
+            "upper": 0.2957,
+            "stdDev": 0.0464,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.07265,
+          "cohensD": -1.5668
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 168.7,
+            "lower": 159.0,
+            "upper": 179.6,
+            "stdDev": 16.7733,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -24.8,
+          "cohensD": -1.7292
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7838,
+            "lower": 0.7682,
+            "upper": 0.7988,
+            "stdDev": 0.0261,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.022294,
+          "cohensD": 0.9158
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.2777777777777778,
+          "recall": 0.5576923076923077,
+          "feedbackRows": 371
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.2264957264957265,
+          "recall": 0.6410256410256411,
+          "feedbackRows": 365
+        },
+        {
+          "seed": 99,
+          "fpr": 0.27350427350427353,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 410
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.19230769230769232,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 385
+        },
+        {
+          "seed": 7,
+          "fpr": 0.29914529914529914,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 376
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.24786324786324787,
+          "recall": 0.6794871794871795,
+          "feedbackRows": 374
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.21367521367521367,
+          "recall": 0.6089743589743589,
+          "feedbackRows": 388
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.3162393162393162,
+          "recall": 0.7564102564102564,
+          "feedbackRows": 386
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.33760683760683763,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 379
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.2863247863247863,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 354
+        }
+      ]
+    },
+    {
+      "condition": "benign_biased",
+      "description": "Analysts under pressure clear alerts: 25% of genuinely malicious events are called benign. The poisoning vector for an arm that admits benign rows into training data.",
+      "feedbackRows": 490.0,
+      "poisonedRows": 83.5,
+      "realisedErrorRate": 0.13154,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6608,
+            "lower": 0.6358,
+            "upper": 0.6871,
+            "stdDev": 0.0442,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.070454,
+          "cohensD": 1.74
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6603,
+            "lower": 0.609,
+            "upper": 0.7019,
+            "stdDev": 0.0775,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.070513,
+          "cohensD": -1.1503
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6572,
+            "lower": 0.6307,
+            "upper": 0.6837,
+            "stdDev": 0.0446,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.004558,
+          "cohensD": 0.1156
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.2295,
+            "lower": 0.1979,
+            "upper": 0.259,
+            "stdDev": 0.0532,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.110257,
+          "cohensD": -2.2103
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 156.7,
+            "lower": 142.5,
+            "upper": 167.7,
+            "stdDev": 21.8279,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -36.8,
+          "cohensD": -2.1132
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7963,
+            "lower": 0.7854,
+            "upper": 0.808,
+            "stdDev": 0.0197,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.03484,
+          "cohensD": 1.6531
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.2777777777777778,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 457
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.18376068376068377,
+          "recall": 0.6410256410256411,
+          "feedbackRows": 494
+        },
+        {
+          "seed": 99,
+          "fpr": 0.23931623931623933,
+          "recall": 0.6794871794871795,
+          "feedbackRows": 537
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.1794871794871795,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 489
+        },
+        {
+          "seed": 7,
+          "fpr": 0.27350427350427353,
+          "recall": 0.6730769230769231,
+          "feedbackRows": 487
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.20085470085470086,
+          "recall": 0.6410256410256411,
+          "feedbackRows": 464
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.1282051282051282,
+          "recall": 0.4807692307692308,
+          "feedbackRows": 514
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.2606837606837607,
+          "recall": 0.7435897435897436,
+          "feedbackRows": 489
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.2863247863247863,
+          "recall": 0.7307692307692307,
+          "feedbackRows": 481
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.26495726495726496,
+          "recall": 0.6089743589743589,
+          "feedbackRows": 488
+        }
+      ]
+    },
+    {
+      "condition": "malicious_biased",
+      "description": "Cautious analysts escalate: 25% of benign events are called malicious. Starves the arm rather than corrupting it.",
+      "feedbackRows": 318.3,
+      "poisonedRows": 14.2,
+      "realisedErrorRate": 0.173675,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6038,
+            "lower": 0.5953,
+            "upper": 0.6125,
+            "stdDev": 0.0143,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.013517,
+          "cohensD": 0.4892
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7141,
+            "lower": 0.6846,
+            "upper": 0.7449,
+            "stdDev": 0.0509,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.016666,
+          "cohensD": -0.3676
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6535,
+            "lower": 0.6407,
+            "upper": 0.6679,
+            "stdDev": 0.0226,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.000905,
+          "cohensD": 0.0317
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.3128,
+            "lower": 0.2962,
+            "upper": 0.3321,
+            "stdDev": 0.0307,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.026923,
+          "cohensD": -0.6856
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 184.6,
+            "lower": 176.4,
+            "upper": 193.1,
+            "stdDev": 14.2377,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -8.9,
+          "cohensD": -0.69
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7716,
+            "lower": 0.7606,
+            "upper": 0.7824,
+            "stdDev": 0.0183,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.0101,
+          "cohensD": 0.4936
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.2948717948717949,
+          "recall": 0.6538461538461539,
+          "feedbackRows": 301
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.2905982905982906,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 317
+        },
+        {
+          "seed": 99,
+          "fpr": 0.31196581196581197,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 349
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.2948717948717949,
+          "recall": 0.7628205128205128,
+          "feedbackRows": 305
+        },
+        {
+          "seed": 7,
+          "fpr": 0.3717948717948718,
+          "recall": 0.7692307692307693,
+          "feedbackRows": 342
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.2905982905982906,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 314
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.29914529914529914,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 332
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.34615384615384615,
+          "recall": 0.7884615384615384,
+          "feedbackRows": 318
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.34615384615384615,
+          "recall": 0.7564102564102564,
+          "feedbackRows": 300
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.28205128205128205,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 305
+        }
+      ]
+    },
+    {
+      "condition": "sparse",
+      "description": "Only 10% of the queue is reviewed at all.",
+      "feedbackRows": 86.8,
+      "poisonedRows": 3.1,
+      "realisedErrorRate": 0.039415,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.55,
+            "lower": 0.5251,
+            "upper": 0.5767,
+            "stdDev": 0.042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.040328,
+          "cohensD": -1.027
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7462,
+            "lower": 0.7244,
+            "upper": 0.7673,
+            "stdDev": 0.0362,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.015385,
+          "cohensD": 0.4095
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6323,
+            "lower": 0.6133,
+            "upper": 0.6527,
+            "stdDev": 0.0328,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.020312,
+          "cohensD": -0.6133
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.4111,
+            "lower": 0.3697,
+            "upper": 0.4513,
+            "stdDev": 0.0673,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.071367,
+          "cohensD": 1.2352
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 212.6,
+            "lower": 202.4,
+            "upper": 222.8,
+            "stdDev": 17.2446,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 19.1,
+          "cohensD": 1.3065
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7429,
+            "lower": 0.73,
+            "upper": 0.7586,
+            "stdDev": 0.0225,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.018518,
+          "cohensD": -0.8248
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.38461538461538464,
+          "recall": 0.7051282051282052,
+          "feedbackRows": 100
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.3333333333333333,
+          "recall": 0.7307692307692307,
+          "feedbackRows": 96
+        },
+        {
+          "seed": 99,
+          "fpr": 0.4358974358974359,
+          "recall": 0.782051282051282,
+          "feedbackRows": 76
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.29914529914529914,
+          "recall": 0.7692307692307693,
+          "feedbackRows": 77
+        },
+        {
+          "seed": 7,
+          "fpr": 0.46153846153846156,
+          "recall": 0.7628205128205128,
+          "feedbackRows": 86
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.4444444444444444,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 83
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.5213675213675214,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 93
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.3974358974358974,
+          "recall": 0.8012820512820513,
+          "feedbackRows": 83
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.4658119658119658,
+          "recall": 0.7692307692307693,
+          "feedbackRows": 79
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.36752136752136755,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 95
+        }
+      ]
+    },
+    {
+      "condition": "delayed",
+      "description": "Feedback lags the stream: only the earlier 60% of events have been reached, so recent behaviour is unreviewed.",
+      "feedbackRows": 148.0,
+      "poisonedRows": 14.2,
+      "realisedErrorRate": 0.043633,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.5745,
+            "lower": 0.561,
+            "upper": 0.5893,
+            "stdDev": 0.0237,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.015772,
+          "cohensD": -0.514
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7282,
+            "lower": 0.7064,
+            "upper": 0.75,
+            "stdDev": 0.0357,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.002564,
+          "cohensD": -0.0687
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6414,
+            "lower": 0.6334,
+            "upper": 0.6513,
+            "stdDev": 0.0147,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.01116,
+          "cohensD": -0.432
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.3615,
+            "lower": 0.3342,
+            "upper": 0.3893,
+            "stdDev": 0.0459,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.021794,
+          "cohensD": 0.4725
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 198.2,
+            "lower": 189.2,
+            "upper": 207.3,
+            "stdDev": 15.3391,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 4.7,
+          "cohensD": 0.3477
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7553,
+            "lower": 0.746,
+            "upper": 0.7652,
+            "stdDev": 0.0167,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.006142,
+          "cohensD": -0.3111
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.36324786324786323,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 138
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.28205128205128205,
+          "recall": 0.6666666666666666,
+          "feedbackRows": 145
+        },
+        {
+          "seed": 99,
+          "fpr": 0.405982905982906,
+          "recall": 0.7628205128205128,
+          "feedbackRows": 158
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.32051282051282054,
+          "recall": 0.7371794871794872,
+          "feedbackRows": 155
+        },
+        {
+          "seed": 7,
+          "fpr": 0.4444444444444444,
+          "recall": 0.7628205128205128,
+          "feedbackRows": 147
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.3547008547008547,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 146
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.358974358974359,
+          "recall": 0.7243589743589743,
+          "feedbackRows": 149
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.37606837606837606,
+          "recall": 0.7756410256410257,
+          "feedbackRows": 135
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.38461538461538464,
+          "recall": 0.75,
+          "feedbackRows": 153
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.3247863247863248,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 154
+        }
+      ]
+    },
+    {
+      "condition": "uncertain_heavy",
+      "description": "An unfamiliar environment: 40% of reviews end undecided. Tests that hesitation is recorded and never counted.",
+      "feedbackRows": 283.7,
+      "poisonedRows": 10.0,
+      "realisedErrorRate": 0.02885,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.5981,
+            "lower": 0.5809,
+            "upper": 0.6163,
+            "stdDev": 0.0283,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.007748,
+          "cohensD": 0.2379
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7224,
+            "lower": 0.6987,
+            "upper": 0.7494,
+            "stdDev": 0.0412,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.008333,
+          "cohensD": -0.2079
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6536,
+            "lower": 0.6404,
+            "upper": 0.6715,
+            "stdDev": 0.0247,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.00103,
+          "cohensD": 0.035
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.3252,
+            "lower": 0.3,
+            "upper": 0.3513,
+            "stdDev": 0.0417,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.01453,
+          "cohensD": -0.3299
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 188.8,
+            "lower": 180.3,
+            "upper": 196.8,
+            "stdDev": 13.563,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -4.7,
+          "cohensD": -0.3751
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7748,
+            "lower": 0.7675,
+            "upper": 0.7831,
+            "stdDev": 0.0134,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.013369,
+          "cohensD": 0.7238
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.3333333333333333,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 274
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.2564102564102564,
+          "recall": 0.6730769230769231,
+          "feedbackRows": 298
+        },
+        {
+          "seed": 99,
+          "fpr": 0.358974358974359,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 258
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.3504273504273504,
+          "recall": 0.782051282051282,
+          "feedbackRows": 264
+        },
+        {
+          "seed": 7,
+          "fpr": 0.4017094017094017,
+          "recall": 0.75,
+          "feedbackRows": 322
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.29914529914529914,
+          "recall": 0.6923076923076923,
+          "feedbackRows": 281
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.3162393162393162,
+          "recall": 0.6794871794871795,
+          "feedbackRows": 300
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.2863247863247863,
+          "recall": 0.7884615384615384,
+          "feedbackRows": 254
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.34615384615384615,
+          "recall": 0.7435897435897436,
+          "feedbackRows": 288
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.3034188034188034,
+          "recall": 0.7051282051282052,
+          "feedbackRows": 298
+        }
+      ]
+    },
+    {
+      "condition": "conflicting",
+      "description": "30% of verdicts are later corrected. Feedback is append-only and the correction supersedes, so a consumer sees one verdict per event.",
+      "feedbackRows": 435.7,
+      "poisonedRows": 9.4,
+      "realisedErrorRate": 0.031042,
+      "comparison": {
+        "precision": {
+          "baseline": {
+            "mean": 0.5903,
+            "lower": 0.5682,
+            "upper": 0.6117,
+            "stdDev": 0.0364,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6295,
+            "lower": 0.6139,
+            "upper": 0.6491,
+            "stdDev": 0.0294,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.039147,
+          "cohensD": 1.1837
+        },
+        "recall": {
+          "baseline": {
+            "mean": 0.7308,
+            "lower": 0.7083,
+            "upper": 0.7564,
+            "stdDev": 0.0389,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6756,
+            "lower": 0.6391,
+            "upper": 0.7103,
+            "stdDev": 0.0604,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.055128,
+          "cohensD": -1.0852
+        },
+        "f1": {
+          "baseline": {
+            "mean": 0.6526,
+            "lower": 0.6334,
+            "upper": 0.6738,
+            "stdDev": 0.0334,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.6509,
+            "lower": 0.6285,
+            "upper": 0.6751,
+            "stdDev": 0.0401,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.001663,
+          "cohensD": -0.0451
+        },
+        "falsePositiveRate": {
+          "baseline": {
+            "mean": 0.3397,
+            "lower": 0.315,
+            "upper": 0.3701,
+            "stdDev": 0.0463,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.265,
+            "lower": 0.2483,
+            "upper": 0.2808,
+            "stdDev": 0.0275,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -0.074787,
+          "cohensD": -1.9644
+        },
+        "alertVolume": {
+          "baseline": {
+            "mean": 193.5,
+            "lower": 187.3,
+            "upper": 200.6,
+            "stdDev": 11.4042,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 167.4,
+            "lower": 159.8,
+            "upper": 174.3,
+            "stdDev": 12.222,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": -26.1,
+          "cohensD": -2.2081
+        },
+        "rocAuc": {
+          "baseline": {
+            "mean": 0.7615,
+            "lower": 0.7489,
+            "upper": 0.775,
+            "stdDev": 0.0224,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "augmented": {
+            "mean": 0.7844,
+            "lower": 0.769,
+            "upper": 0.7995,
+            "stdDev": 0.0254,
+            "samples": 10,
+            "confidence": 0.95,
+            "resamples": 1000,
+            "method": "percentile bootstrap over repeated-seed observations"
+          },
+          "delta": 0.022902,
+          "cohensD": 0.9561
+        }
+      },
+      "perSeed": [
+        {
+          "seed": 1337,
+          "fpr": 0.28205128205128205,
+          "recall": 0.6474358974358975,
+          "feedbackRows": 430
+        },
+        {
+          "seed": 4242,
+          "fpr": 0.25213675213675213,
+          "recall": 0.6538461538461539,
+          "feedbackRows": 434
+        },
+        {
+          "seed": 99,
+          "fpr": 0.2863247863247863,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 466
+        },
+        {
+          "seed": 2024,
+          "fpr": 0.21367521367521367,
+          "recall": 0.7307692307692307,
+          "feedbackRows": 427
+        },
+        {
+          "seed": 7,
+          "fpr": 0.3076923076923077,
+          "recall": 0.6987179487179487,
+          "feedbackRows": 441
+        },
+        {
+          "seed": 819369,
+          "fpr": 0.2606837606837607,
+          "recall": 0.6730769230769231,
+          "feedbackRows": 411
+        },
+        {
+          "seed": 488509,
+          "fpr": 0.23076923076923078,
+          "recall": 0.5641025641025641,
+          "feedbackRows": 439
+        },
+        {
+          "seed": 283395,
+          "fpr": 0.26495726495726496,
+          "recall": 0.7628205128205128,
+          "feedbackRows": 438
+        },
+        {
+          "seed": 163476,
+          "fpr": 0.2777777777777778,
+          "recall": 0.7115384615384616,
+          "feedbackRows": 441
+        },
+        {
+          "seed": 674128,
+          "fpr": 0.27350427350427353,
+          "recall": 0.6025641025641025,
+          "feedbackRows": 430
+        }
+      ]
+    }
+  ],
+  "caveats": [
+    "Read recall, not FPR, to detect the benign-bias failure mode. Benign bias improves FPR, F1 and ROC-AUC while costing recall; monitoring any of those three would miss it.",
+    "Sparse and delayed feedback make the model worse, not merely less good. Feedback volume is a precondition, not a dial.",
+    "Poisoning here is diffuse - randomly chosen malicious events. A targeted adversary labelling one attack category benign is not modelled and would be a more informative test.",
+    "Feedback is simulated; both corpora are synthetic.",
+    "Nothing is deployed."
+  ]
+}
