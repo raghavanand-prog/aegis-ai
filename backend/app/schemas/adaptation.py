@@ -51,3 +51,23 @@ class FeedbackRead(CamelModel):
     supersedes_id: int | None
     superseded_by_id: int | None
     correction_reason: str | None
+
+
+class FeedbackDatasetRead(CamelModel):
+    """An immutable feedback snapshot.
+
+    ``fingerprint`` is part of the identity, not a detail: a result produced
+    over one fingerprint may not be compared against another.
+    """
+
+    id: int
+    name: str
+    version: str
+    fingerprint: str
+    sample_count: int
+    label_distribution: dict[str, int]
+    feature_schema_version: str
+    selection: dict
+    created_by: str
+    created_at: datetime
+    notes: str | None
