@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adaptation.drift import monitor as drift_monitor
 from app.adaptation.feedback import datasets, targets
 from app.adaptation.feedback import service as feedback_service
 from app.adaptation.feedback.labels import FeedbackLabel, FeedbackTargetType
@@ -29,6 +30,8 @@ from app.models.adaptation import AnalystFeedback
 from app.models.enums import AuditAction
 from app.models.user import User
 from app.schemas.adaptation import (
+    DriftMeasurementRead,
+    DriftStatusResponse,
     FeedbackCorrect,
     FeedbackDatasetRead,
     FeedbackRead,
@@ -274,3 +277,61 @@ def get_feedback_dataset(
     if dataset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
     return FeedbackDatasetRead.model_validate(dataset, from_attributes=True)
+
+
+DRIFT_INTERPRETATION = (
+    "These readings describe how the input distribution has moved relative to a "
+    "baseline window. A changed distribution is not evidence that the model has "
+    "become wrong: that is a separate claim, it requires labels, and V5 reports "
+    "it separately as concept drift. Nothing here retrains or rescores anything."
+)
+
+
+@router.get(
+    "/drift",
+    response_model=DriftStatusResponse,
+    summary="Current drift status",
+    description=(
+        "The most recent reading per feature, with the threshold bands that "
+        "produced each status. Read-only: a drift signal is something an analyst "
+        "acts on, never something the platform acts on by itself."
+    ),
+)
+def drift_status(
+    limit: int = Query(default=200, ge=1, le=1000),
+    _: User = Depends(require(Permission.DRIFT_READ)),
+    db: Session = Depends(get_db),
+) -> DriftStatusResponse:
+    readings = drift_monitor.latest_by_feature(db, limit=limit)
+    counts: dict[str, int] = {}
+    for reading in readings:
+        counts[reading.status] = counts.get(reading.status, 0) + 1
+    return DriftStatusResponse(
+        features=[
+            DriftMeasurementRead.model_validate(reading, from_attributes=True)
+            for reading in readings
+        ],
+        counts_by_status=counts,
+        interpretation=DRIFT_INTERPRETATION,
+    )
+
+
+@router.get(
+    "/drift/history",
+    response_model=list[DriftMeasurementRead],
+    summary="Drift history for a feature",
+    description=(
+        "Readings newest first. One reading says the window differs from the "
+        "baseline; the series says whether that is a trend, a spike, or noise."
+    ),
+)
+def drift_history(
+    feature: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    _: User = Depends(require(Permission.DRIFT_READ)),
+    db: Session = Depends(get_db),
+) -> list[DriftMeasurementRead]:
+    return [
+        DriftMeasurementRead.model_validate(reading, from_attributes=True)
+        for reading in drift_monitor.history(db, feature=feature, limit=limit)
+    ]

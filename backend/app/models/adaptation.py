@@ -196,3 +196,60 @@ class FeedbackDatasetMember(Base):
     binary_label: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
     dataset: Mapped[FeedbackDataset] = relationship("FeedbackDataset", back_populates="members")
+
+
+class DriftMeasurement(Base):
+    """One drift reading, with everything needed to argue with it later.
+
+    The thresholds in force are stored **on the row**. A status of "significant"
+    is not interpretable months afterwards without the bands that produced it,
+    and those bands are configurable per deployment - so recording the verdict
+    without them would preserve a conclusion while discarding its basis.
+
+    Nothing about this table triggers anything. A reading is a signal an analyst
+    reads, and V5 has no path from a row here to a retrain.
+    """
+
+    __tablename__ = "drift_measurements"
+    __table_args__ = (
+        CheckConstraint(
+            "reference_samples >= 0 AND current_samples >= 0",
+            name="ck_drift_measurement_samples",
+        ),
+        Index("ix_drift_measurements_feature_time", "feature", "measured_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    #: data | prediction | concept. Kept explicit because the three support
+    #: different conclusions and must never be reported as one another.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    feature: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+
+    #: Which windows were compared. Free text on purpose: "the window the model
+    #: was fitted on" is a statement about provenance, not a foreign key.
+    baseline_label: Mapped[str] = mapped_column(String(128), nullable=False)
+    window_label: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    metric_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    metric_value: Mapped[float] = mapped_column(Float, nullable=False)
+    #: Reported beside PSI because it is in the units of the feature, which is
+    #: what makes a reading actionable rather than merely alarming.
+    secondary_metric_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    secondary_metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    moderate_threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    significant_threshold: Mapped[float] = mapped_column(Float, nullable=False)
+
+    reference_samples: Mapped[int] = mapped_column(Integer, nullable=False)
+    current_samples: Mapped[int] = mapped_column(Integer, nullable=False)
+    detail: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+
+    model_identity: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    measured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<DriftMeasurement {self.kind}:{self.feature} {self.status}>"

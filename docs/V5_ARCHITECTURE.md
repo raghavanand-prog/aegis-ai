@@ -263,6 +263,53 @@ adaptation · candidate model regression · rollback.
 
 ---
 
+## 5a. Drift methodology **[IMPLEMENTATION] + [MEASURED]**
+
+Three measures, chosen for the data types AEGISX has rather than for
+completeness: **PSI** (status driver, conventional bands 0.10 / 0.25),
+**Wasserstein** (reported beside it, in the units of the feature), and
+**chi-square with Cramér's V** for categorical features.
+
+Effect size drives every verdict, never the p-value. Over a large window any
+difference is statistically significant, so a p-value alone would report drift
+permanently on a busy sensor while saying nothing about magnitude.
+
+### Validation against real shift **[MEASURED]**
+
+Run against the full UNSW-NB15 capture in chronological order (2,280,090 flows;
+earliest 60% as the baseline window, latest 20% as "now"), where the malicious
+rate really moves from **4.83% to 18.98%**:
+
+| Feature | PSI | Wasserstein | Status |
+| --- | --- | --- | --- |
+| `dur` | 0.362 | 0.17 | significant |
+| `dbytes` | 0.459 | 14,319.16 | significant |
+| `Sload` | 0.343 | 48,535,475 | significant |
+| `Spkts` | 0.177 | 11.12 | moderate |
+| `swin` | 0.125 | 43.86 | moderate |
+| `sbytes` | 0.157 | 1,571.60 | moderate |
+| `sttl` | **0.004** | **36.66** | stable |
+| `proto` (categorical) | Cramér's V 0.160, p ≈ 0 | — | moderate |
+
+Two results justify design decisions that would otherwise look like
+over-engineering:
+
+- **`sttl` disagrees with itself.** PSI reports *stable* (0.004) while the
+  Wasserstein distance is 36.66. TTL takes few distinct values, so
+  reference-quantile binning puts nearly all mass in one bin and the bin shares
+  barely move even as the values shift substantially. Reporting PSI alone would
+  have declared this feature unchanged. This is why both are stored.
+- **`proto` returns p ≈ 0 at Cramér's V 0.160.** Exactly the predicted failure
+  of significance testing at scale: the p-value is uninformative, the effect
+  size is not. Two protocols (`esp`, `udt`) disappear entirely between windows.
+
+**[LIMITATION]** This validation uses UNSW's raw flow columns, not the
+production 45-feature extractor. It establishes that the measures behave
+correctly on real distribution shift; it is not a statement about drift in the
+features AEGISX actually scores.
+
+---
+
 ## 6. Implementation plan
 
 | Phase | Content |
