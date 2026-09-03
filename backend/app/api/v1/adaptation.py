@@ -25,11 +25,12 @@ from app.adaptation.drift import monitor as drift_monitor
 from app.adaptation.feedback import datasets, targets
 from app.adaptation.feedback import service as feedback_service
 from app.adaptation.feedback.labels import FeedbackLabel, FeedbackTargetType
+from app.adaptation.proposals import service as proposals
 from app.api.deps import client_ip, require
 from app.core.database import get_db
 from app.core.rbac import Permission
 from app.models.adaptation import AnalystFeedback
-from app.models.enums import AuditAction
+from app.models.enums import AuditAction, ProposalStatus
 from app.models.user import User
 from app.schemas.adaptation import (
     DriftMeasurementRead,
@@ -38,6 +39,9 @@ from app.schemas.adaptation import (
     FeedbackDatasetRead,
     FeedbackRead,
     FeedbackSubmit,
+    ProposalCreate,
+    ProposalDecision,
+    ProposalRead,
     ReviewCandidateRead,
     ReviewQueueResponse,
 )
@@ -387,3 +391,197 @@ def review_queue(
         weights=dict(selectors.DEFAULT_WEIGHTS),
         interpretation=REVIEW_QUEUE_INTERPRETATION,
     )
+
+
+def _proposal_read(proposal) -> ProposalRead:
+    return ProposalRead.model_validate(proposal, from_attributes=True)
+
+
+@router.post(
+    "/proposals",
+    response_model=ProposalRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Raise an adaptation proposal",
+    description=(
+        "Requests a change to what AEGISX detects. Creating a proposal changes "
+        "nothing: it enters the queue as `pending` and reaches production only "
+        "through an administrator's approval and a separate deployment step."
+    ),
+    responses={
+        403: {"model": Message, "description": "Analyst role required"},
+        422: {"model": Message, "description": "Missing evidence, or a no-op change"},
+    },
+)
+def create_proposal(
+    payload: ProposalCreate,
+    request: Request,
+    user: User = Depends(require(Permission.ADAPTATION_PROPOSE)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    try:
+        proposal = proposals.create(
+            db,
+            proposal_type=payload.proposal_type,
+            title=payload.title,
+            reason=payload.reason,
+            affected_component=payload.affected_component,
+            before_state=payload.before_state,
+            after_state=payload.after_state,
+            evidence=payload.evidence,
+            expected_impact=payload.expected_impact,
+            risk_assessment=payload.risk_assessment,
+            candidate_model_id=payload.candidate_model_id,
+            feedback_dataset_id=payload.feedback_dataset_id,
+            # The proposer is the authenticated user, never a value from the
+            # request body. An actor a client can choose is not an actor.
+            proposed_by=user.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.ADAPTATION_PROPOSAL_CREATED,
+        user=user,
+        target_type="adaptation_proposal",
+        target_id=str(proposal.id),
+        ip_address=client_ip(request),
+        details={
+            "type": proposal.proposal_type,
+            "component": proposal.affected_component,
+            "before": proposal.before_state,
+            "after": proposal.after_state,
+        },
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _proposal_read(proposal)
+
+
+@router.post(
+    "/proposals/{proposal_id}/approve",
+    response_model=ProposalRead,
+    summary="Approve an adaptation proposal",
+    description=(
+        "Administrator only. Approval authorises the change; it does not apply "
+        "it. A proposal whose safety gates failed cannot be approved."
+    ),
+    responses={
+        403: {"model": Message, "description": "Administrator role required"},
+        404: {"model": Message, "description": "Unknown proposal"},
+        409: {"model": Message, "description": "Not pending, or failed its gates"},
+    },
+)
+def approve_proposal(
+    proposal_id: int,
+    request: Request,
+    user: User = Depends(require(Permission.ADAPTATION_APPROVE)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    if proposals.get(db, proposal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    try:
+        proposal = proposals.approve(db, proposal_id, approved_by=user.email)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.ADAPTATION_PROPOSAL_APPROVED,
+        user=user,
+        target_type="adaptation_proposal",
+        target_id=str(proposal.id),
+        ip_address=client_ip(request),
+        details={
+            "proposedBy": proposal.proposed_by,
+            "selfApproved": proposal.self_approved,
+            "component": proposal.affected_component,
+        },
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _proposal_read(proposal)
+
+
+@router.post(
+    "/proposals/{proposal_id}/reject",
+    response_model=ProposalRead,
+    summary="Reject an adaptation proposal",
+    description="Administrator only. A rejection needs a reason, and is kept.",
+    responses={
+        403: {"model": Message, "description": "Administrator role required"},
+        404: {"model": Message, "description": "Unknown proposal"},
+        409: {"model": Message, "description": "No longer rejectable"},
+        422: {"model": Message, "description": "A reason is required"},
+    },
+)
+def reject_proposal(
+    proposal_id: int,
+    payload: ProposalDecision,
+    request: Request,
+    user: User = Depends(require(Permission.ADAPTATION_APPROVE)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    if proposals.get(db, proposal_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    if not (payload.reason or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A rejection needs a reason.",
+        )
+    try:
+        proposal = proposals.reject(
+            db, proposal_id, rejected_by=user.email, reason=payload.reason
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.ADAPTATION_PROPOSAL_REJECTED,
+        user=user,
+        target_type="adaptation_proposal",
+        target_id=str(proposal.id),
+        ip_address=client_ip(request),
+        details={"reason": payload.reason, "proposedBy": proposal.proposed_by},
+    )
+    db.commit()
+    db.refresh(proposal)
+    return _proposal_read(proposal)
+
+
+@router.get(
+    "/proposals",
+    response_model=list[ProposalRead],
+    summary="List adaptation proposals",
+    description="Newest first. Rejected and rolled-back proposals are kept and listed.",
+)
+def list_adaptation_proposals(
+    proposal_status: ProposalStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=500),
+    _: User = Depends(require(Permission.ADAPTATION_READ)),
+    db: Session = Depends(get_db),
+) -> list[ProposalRead]:
+    return [
+        _proposal_read(proposal)
+        for proposal in proposals.list_proposals(db, status=proposal_status, limit=limit)
+    ]
+
+
+@router.get(
+    "/proposals/{proposal_id}",
+    response_model=ProposalRead,
+    summary="Inspect one adaptation proposal",
+    responses={404: {"model": Message, "description": "Unknown proposal"}},
+)
+def get_proposal(
+    proposal_id: int,
+    _: User = Depends(require(Permission.ADAPTATION_READ)),
+    db: Session = Depends(get_db),
+) -> ProposalRead:
+    proposal = proposals.get(db, proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
+    return _proposal_read(proposal)

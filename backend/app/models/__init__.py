@@ -5,6 +5,7 @@ what Alembic autogeneration and ``create_all`` rely on.
 """
 
 from app.models.adaptation import (
+    AdaptationProposal,
     AnalystFeedback,
     DriftMeasurement,
     FeedbackDataset,
@@ -29,6 +30,7 @@ from app.models.user import User
 
 __all__ = [
     "AIAnalysis",
+    "AdaptationProposal",
     "AnalystFeedback",
     "DriftMeasurement",
     "FeedbackDataset",

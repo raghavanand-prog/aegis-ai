@@ -50,6 +50,13 @@ class Permission(str, Enum):
     FEEDBACK_READ = "feedback:read"
     FEEDBACK_SUBMIT = "feedback:submit"
     DRIFT_READ = "drift:read"
+    ADAPTATION_READ = "adaptation:read"
+    ADAPTATION_PROPOSE = "adaptation:propose"
+    # Approval and deployment are administrator-only and deliberately separate
+    # from proposing. An adaptation reaches production through a decision made
+    # by someone other than the process that suggested it.
+    ADAPTATION_APPROVE = "adaptation:approve"
+    ADAPTATION_DEPLOY = "adaptation:deploy"
 
     # Machine learning (V3)
     ML_READ = "ml:read"
@@ -104,6 +111,7 @@ VIEWER_PERMISSIONS: frozenset[Permission] = frozenset(
         # analysts concluded, and may not add to it.
         Permission.FEEDBACK_READ,
         Permission.DRIFT_READ,
+        Permission.ADAPTATION_READ,
     }
 )
 
@@ -125,6 +133,7 @@ ANALYST_PERMISSIONS: frozenset[Permission] = VIEWER_PERMISSIONS | frozenset(
         # V5: an analyst records verdicts on their own alerts. Approving or
         # deploying an adaptation built from them is deliberately not here.
         Permission.FEEDBACK_SUBMIT,
+        Permission.ADAPTATION_PROPOSE,
     }
 )
 
@@ -138,6 +147,10 @@ ADMIN_PERMISSIONS: frozenset[Permission] = ANALYST_PERMISSIONS | frozenset(
         Permission.SYSTEM_CONFIGURE,
         Permission.ML_MANAGE,
         Permission.AI_CONFIGURE,
+        # V5: approving and deploying an adaptation changes what the whole
+        # platform detects, which is the same class of act as activating a model.
+        Permission.ADAPTATION_APPROVE,
+        Permission.ADAPTATION_DEPLOY,
     }
 )
 
