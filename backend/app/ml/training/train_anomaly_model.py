@@ -133,7 +133,10 @@ def train(
 
     with session_scope() as db:
         version = registry.next_version(db, MODEL_NAME)
-        path = registry.artifact_path(MODEL_NAME, version)
+        # reserve_artifact_path, not artifact_path: it refuses a path that
+        # already exists. Writing through the unchecked helper is what
+        # overwrote a deployed model when the database had been rebuilt.
+        path = registry.reserve_artifact_path(MODEL_NAME, version)
 
         digest = detector.save(path)
         # Read it straight back: an artifact that cannot be loaded must never
