@@ -13,11 +13,14 @@ import pytest
 
 from app.adaptation.experiments import (
     run_adaptation_eval,
+    run_novel_behaviour_eval,
     scenarios,
     seeds,
     simulation,
 )
 from app.adaptation.feedback.labels import FeedbackLabel
+from app.evaluation.datasets.adapters import synthetic_dataset
+from app.evaluation.splits import STRATIFIED_GROUP, build_split
 
 
 class TestSimulatedAnalyst:
@@ -295,3 +298,172 @@ class TestReportEvidence:
         assert row["meanDifference"] > 0
         assert row["cohensD"] is not None
         assert row["seeds"] == 10
+
+
+class TestV5NovelBehaviourHarness:
+    """Pins the V5 harness as it was, so the historical result stays
+    interpretable. These tests were missing: nothing in the repository called
+    `run_new_behaviour`, so V5 section 3 was produced by an uncommitted ad-hoc
+    invocation."""
+
+    def test_the_v5_harness_draws_feedback_only_from_the_fit_set(self) -> None:
+        """The confound, pinned as a fact about the historical harness. The
+        withheld category is removed from the fit set and feedback is then drawn
+        from that same fit set, so no verdict about the withheld category can
+        reach the loop."""
+        result = scenarios.run_new_behaviour(seed=1337, withheld_category="PORT_SCAN")
+        assert result["verdictsAboutWithheld"] == 0
+
+    def test_the_v5_harness_still_reports_both_sides(self) -> None:
+        result = scenarios.run_new_behaviour(seed=1337, withheld_category="PORT_SCAN")
+        assert result["static"]["newBehaviour"]["recall"] is not None
+        assert result["adapted"]["historical"]["recall"] is not None
+
+
+class TestControlledNovelBehaviour:
+    """Track 3's controlled comparison. Same dataset, same seed, same adaptation
+    configuration; the single variable is whether the analyst ever labelled an
+    instance of the withheld category."""
+
+    def test_the_scoring_set_is_disjoint_from_the_adaptation_window(self) -> None:
+        """Without this the corrected arm would simply leak test labels, and a
+        gain would mean nothing."""
+        result = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="PORT_SCAN", feedback_includes_withheld=True
+        )
+        assert set(result["adaptationWindowIds"]).isdisjoint(result["scoringIds"])
+        assert result["scoringIds"]
+
+    def test_both_arms_score_on_exactly_the_same_events(self) -> None:
+        """One variable changed at a time. If the arms scored different events
+        the comparison would be uninterpretable."""
+        withheld = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="PORT_SCAN", feedback_includes_withheld=False
+        )
+        supplied = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="PORT_SCAN", feedback_includes_withheld=True
+        )
+        assert withheld["scoringIds"] == supplied["scoringIds"]
+        assert withheld["adaptationWindowIds"] == supplied["adaptationWindowIds"]
+
+    def test_the_withheld_arm_reproduces_the_v5_confound(self) -> None:
+        result = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="PORT_SCAN", feedback_includes_withheld=False
+        )
+        assert result["verdictsAboutWithheld"] == 0
+
+    def test_the_supplied_arm_actually_supplies_verdicts(self) -> None:
+        result = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="PORT_SCAN", feedback_includes_withheld=True
+        )
+        assert result["verdictsAboutWithheld"] > 0
+
+    def test_it_reports_the_reachable_threshold_floor_and_novel_scores(self) -> None:
+        """The measurement that separates a representation failure from a
+        feedback failure: if novel events do not score above the most permissive
+        reachable threshold, no feedback can help through the threshold arm."""
+        result = scenarios.run_novel_behaviour_controlled(
+            seed=1337, withheld_category="LATERAL_MOVEMENT", feedback_includes_withheld=True
+        )
+        floor = result["reachableThresholdFloor"]
+        assert floor == pytest.approx(
+            scenarios.DEFAULT_THRESHOLD - scenarios.MAX_THRESHOLD_STEP
+        )
+        assert result["novelScores"]["aboveFloor"] == 0
+        assert result["novelScores"]["max"] < floor
+
+    def test_it_refuses_a_category_it_cannot_measure(self) -> None:
+        with pytest.raises(ValueError, match="no held-out samples"):
+            scenarios.run_novel_behaviour_controlled(
+                seed=1337,
+                withheld_category="NOT_A_CATEGORY",
+                feedback_includes_withheld=True,
+            )
+
+
+class TestNovelBehaviourRunner:
+    def test_it_reports_both_arms_per_category_without_aggregating(
+        self, tmp_path
+    ) -> None:
+        """V5 averaged recall across categories and reported 0.0085 over nine
+        runs. Track 3 measured that the categories differ in kind - one is
+        separable by the model, two are not - so a mean across them describes
+        none of them."""
+        report = run_novel_behaviour_eval.main(
+            [
+                "--seeds",
+                "2",
+                "--categories",
+                "PORT_SCAN",
+                "LATERAL_MOVEMENT",
+                "--output-dir",
+                str(tmp_path),
+                "--max-seconds",
+                "900",
+                "--format",
+                "json",
+            ]
+        )
+        assert report == 0
+        written = json.loads(
+            next(tmp_path.glob("v6-novel-behaviour-*.json")).read_text()
+        )
+        categories = {row["withheldCategory"] for row in written["results"]}
+        assert categories == {"PORT_SCAN", "LATERAL_MOVEMENT"}
+        for row in written["results"]:
+            assert set(row["arms"]) == {"feedbackWithheld", "feedbackSupplied"}
+            assert row["arms"]["feedbackWithheld"]["verdictsAboutWithheld"] == 0
+            assert row["perSeed"]
+
+
+class TestTrack1IsNotAffectedByTheConfound:
+    """The novel-behaviour confound is a property of `run_new_behaviour`, which
+    withholds a category from the fit set and then draws feedback from that same
+    fit set. `run_condition` - the path every Track 1 number came from, noise
+    sensitivity included - withholds nothing. These tests assert that difference
+    rather than leaving it to be re-derived by reading."""
+
+    def test_run_condition_offers_feedback_over_the_entire_fit_set(self) -> None:
+        """No category is excluded, so the confound has no precondition here."""
+        corpus = scenarios.prepare_corpus(seed=1337)
+        seen: list[int] = []
+
+        real = simulation.simulate_feedback
+
+        def recording(ground_truth, **kwargs):
+            seen.append(len(ground_truth))
+            return real(ground_truth, **kwargs)
+
+        original = scenarios.simulation.simulate_feedback
+        scenarios.simulation.simulate_feedback = recording
+        try:
+            scenarios.run_condition(corpus, condition="both_arms", seed=1337)
+        finally:
+            scenarios.simulation.simulate_feedback = original
+
+        assert seen == [len(corpus.fit_labels)]
+
+    def test_no_sample_reaches_both_the_feedback_pool_and_the_scoring_set(self) -> None:
+        """Feedback and threshold selection read the fit set; scoring reads the
+        test set. If a *sample* crossed that line, every Track 1 number would be
+        tuned on its own test data."""
+        dataset = synthetic_dataset(seed=1337)
+        plan = build_split(dataset, strategy=STRATIFIED_GROUP, seed=1337)
+        fit_ids = {s.id for s in plan.train.samples} | {
+            s.id for s in plan.validation.samples
+        }
+        test_ids = {s.id for s in plan.test.samples}
+        assert fit_ids.isdisjoint(test_ids)
+
+    def test_the_corpus_has_duplicate_feature_vectors_across_the_split(self) -> None:
+        """Measured, and deliberately not called leakage. Distinct events can
+        share a feature vector - 5.1% of test rows at seed 1337, 17 benign and 3
+        malicious - because the feature space is coarser than the event space.
+        The split is sample- and group-disjoint, so no sample is scored against
+        itself; but the detector does meet vectors in test that it fitted on,
+        and that is a property of the corpus worth pinning rather than
+        discovering later."""
+        corpus = scenarios.prepare_corpus(seed=1337)
+        fit = set(corpus.fit_vectors)
+        colliding = sum(1 for vector in corpus.test_vectors if vector in fit)
+        assert 0 < colliding / len(corpus.test_vectors) < 0.10
