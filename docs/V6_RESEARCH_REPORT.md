@@ -674,7 +674,113 @@ answerable.
 5. Nothing is deployed. Reaching production still requires an approved proposal
    and `activate_model`.
 
-## 7. Reproducing
+## 7. Track 2 — feedback quality **[MEASURED]**
+
+Track 2 was designed against V5's Arm 2, which §6 replaced. That narrows the
+question usefully: the redesigned arm admits analyst-verified **benign** rows
+into training data, so the conditions that matter are the ones pushing analysts
+toward "benign" — simultaneously a quality problem and a poisoning vector.
+
+Ground truth, analyst labels and model predictions stay separate throughout, as
+V5 required. `nominal` reproduces the Track 1 settings and is the control.
+
+```bash
+python -m app.adaptation.experiments.run_feedback_quality_eval --seeds 10 --max-seconds 5400
+```
+
+10 seeds, 10 conditions. Artifact:
+`app/evaluation/reports/v6-feedback-quality-20260903T084844Z.json`.
+
+### 7.1 Results
+
+Deltas against the production baseline (FPR 0.3397, recall 0.7308). Negative
+ΔFPR is good; negative Δrecall is a cost.
+
+| Condition | rows | poisoned | realised error | ΔFPR | Δrecall |
+| --- | --- | --- | --- | --- | --- |
+| clean | 472 | 0 | 0.0% | **−0.0859** | −0.0692 |
+| **benign_biased** | 490 | 83.5 | 13.2% | **−0.1103** | **−0.0705** |
+| nominal | 421 | 14.2 | 4.4% | −0.0774 | −0.0513 |
+| high_noise | 403 | 42.6 | 13.8% | −0.0761 | −0.0429 |
+| conflicting | 436 | 9.4 | 3.1% | −0.0748 | −0.0551 |
+| severe_noise | 379 | 84.3 | 27.5% | −0.0727 | −0.0500 |
+| malicious_biased | 318 | 14.2 | 17.4% | −0.0269 | −0.0167 |
+| uncertain_heavy | 284 | 10.0 | 2.9% | −0.0145 | −0.0083 |
+| **delayed** | 148 | 14.2 | 4.4% | **+0.0218** | −0.0026 |
+| **sparse** | 87 | 3.1 | 3.9% | **+0.0714** | +0.0154 |
+
+### 7.2 Label noise barely matters — and this reverses Track 1
+
+ΔFPR is −0.0774 at nominal, −0.0761 at 15% noise and **−0.0727 at 27.5%
+realised error**. The arm absorbs severe label noise almost intact.
+
+That is the **opposite** of §1.3, where noise degraded V5's curation arm with
+d = 1.44. Both findings are correct, and §4 explains why they differ: V5's
+curation *removed* rows from a 40%-contaminated fit set, so every mislabelled
+row left contamination behind. The redesigned arm *adds* rows to a 6,000-row
+telemetry corpus, where a few dozen mislabelled rows are diluted below the level
+that moves a density estimate.
+
+**Noise sensitivity was a property of the broken configuration, not of feedback
+adaptation.** Track 2's original framing — how much noise can adaptation
+tolerate — turns out to be the wrong question for a correctly-configured system.
+
+### 7.3 The finding that matters: FPR hides the poisoning vector
+
+**`benign_biased` produces the *best* false-positive reduction of any condition**
+(−0.1103, better than `clean`), while carrying 83.5 mislabelled malicious rows
+into training data.
+
+It also produces the **worst recall loss** (−0.0705).
+
+| Condition | ΔFPR | ΔF1 | ΔROC-AUC | Δrecall |
+| --- | --- | --- | --- | --- |
+| nominal | −0.0774 | +0.0028 | +0.0248 | −0.0513 |
+| **benign_biased** | **−0.1103** | **+0.0046** | **+0.0348** | **−0.0705** |
+
+**FPR, F1 and ROC-AUC all say benign bias is an improvement. Only recall reveals
+the cost.** A safety gate or dashboard watching false-positive rate, F1 or AUC
+would score analysts-clearing-alerts-under-pressure as the best feedback the
+system had ever received.
+
+**[INFERENCE]** This is the most operationally important result in V6. It says
+the metric an FPR-reduction feature most naturally reports is precisely the
+metric that cannot detect its characteristic failure. Any gate on this arm must
+include a recall floor.
+
+Why the cap holds anyway: 83.5 poisoned rows sit in ~6,490 total (1.3%), inside
+what the density estimate tolerates. The bound from §6.1 is doing its job — but
+it is doing it against *diffuse* poisoning.
+
+### 7.4 Volume is a precondition, not a dial
+
+**`sparse` and `delayed` make the model worse, not merely less good.** Sparse
+feedback (87 rows) *raises* FPR by 0.0714 and drops precision to 0.550 while
+alert volume climbs to 212.6. Delayed feedback (148 rows) raises FPR by 0.0218.
+
+Below roughly 300 rows the augmentation stops helping and starts perturbing the
+fit. That is a deployment precondition with a number attached: **this arm should
+not run until enough verified-benign feedback has accumulated**, and a system
+that enabled it on day one would degrade the detector it was meant to improve.
+
+`malicious_biased` (318 rows) and `uncertain_heavy` (284 rows) sit just above the
+threshold and deliver correspondingly weak benefit — consistent with volume, not
+bias, being the binding variable for those two.
+
+### 7.5 Limitations **[LIMITATION]**
+
+1. Poisoning here is **diffuse** — randomly chosen malicious events. A targeted
+   adversary labelling one attack category benign is not modelled and would be a
+   more informative test. §6.4 flags the same gap; it remains the most important
+   untested case.
+2. Feedback is simulated. There is no analyst population, and the conditions are
+   models of analyst failure modes rather than observations of them.
+3. Both corpora are synthetic.
+4. The ~300-row threshold is specific to this corpus and telemetry size; it is
+   an existence proof that a threshold exists, not a transferable constant.
+5. Nothing is deployed.
+
+## 8. Reproducing
 
 ```bash
 cd backend
@@ -697,6 +803,9 @@ python -m app.adaptation.experiments.run_production_baseline_eval --seeds 10 --m
 
 # section 6
 python -m app.adaptation.experiments.run_arm2_eval --seeds 10 --max-seconds 3600
+
+# section 7
+python -m app.adaptation.experiments.run_feedback_quality_eval --seeds 10 --max-seconds 5400
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
