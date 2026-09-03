@@ -55,7 +55,7 @@ _SAFE_NAME = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SAFE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 
 
-def artifact_path(name: str, version: str) -> Path:
+def artifact_path(name: str, version: str, *, directory: Path | None = None) -> Path:
     """Artifact location for one model version.
 
     ``name`` and ``version`` come from application code, never from a request
@@ -73,10 +73,10 @@ def artifact_path(name: str, version: str) -> Path:
             f"Model version {version!r} is not a single safe path component."
         )
 
-    path = (artifact_dir() / f"{name}-v{version}.joblib").resolve()
+    root = (directory or artifact_dir()).resolve()
+    path = (root / f"{name}-v{version}.joblib").resolve()
     # Belt and braces: the resolved path must still be inside the artifact
     # directory, whatever the patterns above let through.
-    root = artifact_dir().resolve()
     if not str(path).startswith(str(root)):
         raise RegistryError(f"Refusing an artifact path outside {root}")
     return path
@@ -115,8 +115,38 @@ def list_models(db: Session, *, name: str | None = None, limit: int = 100) -> li
     return list(db.scalars(stmt))
 
 
-def next_version(db: Session, name: str) -> str:
-    """Next ``major.minor`` for a model name. Existing versions are untouched."""
+def _highest_version_on_disk(name: str, directory: Path | None = None) -> int:
+    """Largest major version with an artifact present.
+
+    The database is not the only record that a version existed. An artifact on
+    disk is evidence too, and it is the evidence that survives a database being
+    rebuilt from migrations - which is exactly when re-issuing a version would
+    overwrite a deployed model.
+    """
+    root = directory or artifact_dir()
+    try:
+        entries = list(root.glob(f"{name}-v*.joblib"))
+    except OSError:  # pragma: no cover - unreadable directory
+        return 0
+
+    highest = 0
+    for entry in entries:
+        stem = entry.name[len(f"{name}-v") : -len(".joblib")]
+        try:
+            highest = max(highest, int(stem.split(".")[0]))
+        except (ValueError, IndexError):
+            continue
+    return highest
+
+
+def next_version(db: Session, name: str, *, directory: Path | None = None) -> str:
+    """Next ``major.minor`` for a model name. Existing versions are untouched.
+
+    Takes the maximum of what the database records and what exists on disk.
+    Consulting the database alone was a measured defect: with an empty
+    ``ml_models`` table and a v1.0 artifact still present, this returned "1.0"
+    and the subsequent write destroyed a digest-verified production model.
+    """
     existing = list(db.scalars(select(MLModel.version).where(MLModel.name == name)))
     highest = 0
     for value in existing:
@@ -124,7 +154,61 @@ def next_version(db: Session, name: str) -> str:
             highest = max(highest, int(str(value).split(".")[0]))
         except (ValueError, IndexError):  # noqa: PERF203 - a hand-written version is fine
             continue
+
+    highest = max(highest, _highest_version_on_disk(name, directory))
     return f"{highest + 1}.0"
+
+
+def reserve_artifact_path(
+    name: str, version: str, *, directory: Path | None = None
+) -> Path:
+    """Validated artifact path for a version that must not already exist.
+
+    Every writer goes through here rather than through ``artifact_path``. The
+    registry has always refused to register a name@version twice, but that guard
+    protects the database row, not the file: a rebuilt database made the row
+    disappear while the artifact stayed exactly where it was, and the next
+    training run silently overwrote a deployed model.
+
+    Refusing is the whole behaviour. An artifact is immutable, so a caller that
+    wants a different model wants a different version.
+    """
+    path = artifact_path(name, version, directory=directory)
+    if path.exists():
+        raise RegistryError(
+            f"{path.name} already exists on disk. Model artifacts are immutable: "
+            "overwriting one would invalidate the digest recorded against every "
+            "inference that version produced, and would destroy the deployed "
+            "model if this is the serving version. Train a new version instead."
+        )
+    return path
+
+
+def artifact_digest(path: Path) -> str:
+    """SHA-256 of an artifact on disk."""
+    # Imported here rather than at module scope: the detector module pulls in
+    # scikit-learn, and the registry is imported on the API path where that
+    # cost is not wanted.
+    from app.ml.models.isolation_forest import sha256_file
+
+    return sha256_file(path)
+
+
+def verify_artifact(path: Path, *, expected_sha256: str | None) -> bool:
+    """Whether the artifact on disk still matches the digest recorded for it.
+
+    A mismatch means the file changed after registration. That is a tampered or
+    clobbered model, and a tampered model is a detection engine that lies - so
+    callers treat a False here as fatal rather than as a warning.
+    """
+    if expected_sha256 is None:
+        return False
+    try:
+        if not path.exists():
+            return False
+        return artifact_digest(path) == expected_sha256
+    except OSError:  # pragma: no cover - unreadable artifact
+        return False
 
 
 def register(
