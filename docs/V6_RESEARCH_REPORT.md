@@ -1060,7 +1060,110 @@ not one they inherit.
    production detection state. None of this changes that; V5's deployment,
    registry-immutability and proposal suites pass unchanged.
 
-## 11. Reproducing
+## 11. The patient adversary — §9's defence has a shelf life **[MEASURED]**
+
+§9.3 named this and did not test it. §10.3 made it more load-bearing, not less:
+since `baseline_relative` became the default, the baseline is consulted on every
+run.
+
+### 11.1 The attack
+
+A patient adversary does not fight the cap — it **feeds** it. Each cycle it
+contributes as much as the ceiling allows, so **every individual batch is within
+policy**. The next cycle's baseline is a mean over history that now includes
+that contribution, so the ceiling rises. It is a ratchet.
+
+Threat model unchanged from §8: an analyst with ordinary feedback permissions
+and patience. No privileged access, no code execution. The campaign starts from
+honest history, because §10.3 makes production refuse a cold start — modelling
+an attack that begins at cycle zero would model something the system forbids.
+
+```bash
+python -m app.adaptation.experiments.run_patient_poisoning_eval --seeds 8 --max-seconds 5400
+```
+
+Artifact: `app/evaluation/reports/v6-patient-poisoning-20260903T170616Z.json`.
+
+### 11.2 The ratchet turns
+
+10 cycles, 8 seeds, target MALWARE, tolerance at the current default of 3.0.
+
+| | allowance, cycle 0 | allowance, cycle 9 | poison landed, cycle 9 |
+| --- | --- | --- | --- |
+| **honest control** | 3.5 | **3.5** | 1.4 |
+| **patient adversary** | 3.5 | **27.5** | **22.9** |
+
+**The honest control does not ratchet.** That is what makes the adversarial
+ratchet attributable rather than an artefact of the simulation — an honest
+campaign's per-group volume is stationary, so the ceiling it earns is too.
+
+Per-cycle, the adversary's ceiling climbs 5.0 → 7.5 → 10.2 → 13.5 → 17.1 →
+21.4 → … **By cycle 5 it lands 21 rows** — more than the 22-row single batch
+that cost 0.2026 of target recall in §8, and which §9's defence clipped to 4.
+
+**§9's defence is not defeated; it is delayed.** At one cycle it holds exactly
+as measured there (3.4 rows admitted, Cohen's d 0.018 — no damage). By three
+cycles it does not.
+
+### 11.3 Detection damage — present, and noisy **[LIMITATION]**
+
+12 seeds, per-category recall on MALWARE:
+
+| cycles | poison landed | honest recall | poisoned recall | d |
+| --- | --- | --- | --- | --- |
+| 1 | 3.4 | 0.8450 [0.682, 0.966] | 0.8501 [0.678, 0.973] | +0.02 |
+| **3** | 6.8 | 0.9187 [0.863, 0.966] | **0.7253** [0.518, 0.907] | **−0.73** |
+| 6 | 13.9 | 0.8469 [0.678, 0.965] | 0.7295 [0.560, 0.873] | −0.43 |
+| 10 | 21.1 | 0.7360 [0.575, 0.894] | 0.6964 [0.517, 0.866] | −0.12 |
+
+Damage is directionally present from three cycles. **It is not cleanly
+dose-responsive, and the intervals overlap heavily** — precisely the problem
+§8.5 established for per-category recall at these sample sizes. More poison at
+ten cycles does not produce more measured damage, and with these intervals I
+cannot say whether that is saturation, drift in the honest arm, or noise.
+
+**The ratchet on the allowance is the robust result here. The recall column is
+supporting evidence, not a dose-response curve**, and should not be quoted as
+one.
+
+### 11.4 The mitigation, measured
+
+`tolerance` is the parameter that decides whether the ratchet turns. 10 cycles,
+8 seeds:
+
+| tolerance | attack poison, cycle 9 | honest rows admitted, cycle 9 |
+| --- | --- | --- |
+| 1.25 | **2.0** | 407.3 |
+| **1.5** | **2.3** | **407.5** |
+| 2.0 | 6.4 | 407.5 |
+| **3.0** *(current default)* | **22.9** | 408.1 |
+
+**Tolerance 1.5 contains the attack at 2.3 rows against 22.9 — a 10× reduction —
+for 0.6 fewer honest rows out of 408, a cost of 0.15%.**
+
+**[INFERENCE]** That is close to free, and the reason it is nearly free is
+structural: the tolerance binds on *growth*, and honest per-group feedback
+volume does not grow. An adversary's does, because that is the whole mechanism.
+
+**I have not changed the default.** `caps.DEFAULT_TOLERANCE` is still 3.0.
+Lowering it to 1.5 is a one-line change with the evidence above behind it, but
+it is a security-posture decision and §10.3's lesson was that those should be
+made deliberately rather than inherited — including from me.
+
+### 11.5 Limitations **[LIMITATION]**
+
+1. **Per-category recall is too noisy to quantify the damage** (§11.3). The
+   allowance ratchet is the measurement to trust.
+2. One target category, one corpus, 8–12 seeds.
+3. The adversary is modelled as maximally greedy each cycle — it takes the whole
+   allowance. A slower adversary would ratchet more quietly and might evade a
+   growth-rate detector that this one would trip.
+4. **The ratchet is only visible because the honest control was run.** A
+   deployment with no equivalent baseline-history monitoring would see nothing:
+   every batch is within policy, by construction.
+5. Feedback is simulated; both corpora are synthetic. Nothing is deployed.
+
+## 12. Reproducing
 
 ```bash
 cd backend
@@ -1089,6 +1192,9 @@ python -m app.adaptation.experiments.run_feedback_quality_eval --seeds 10 --max-
 
 # section 8
 python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --max-seconds 5400
+
+# section 11
+python -m app.adaptation.experiments.run_patient_poisoning_eval --seeds 8 --max-seconds 5400
 
 # section 9 - one run per policy
 python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --targets MALWARE --cap-policy baseline_relative --max-seconds 3600
