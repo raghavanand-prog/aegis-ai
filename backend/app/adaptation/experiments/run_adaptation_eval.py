@@ -21,7 +21,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from app.adaptation.experiments import scenarios
+from app.adaptation.experiments import scenarios, seeds
 from app.evaluation.reports.store import write_report
 from app.evaluation.watchdog import add_argument as add_timeout_argument
 from app.evaluation.watchdog import start as start_watchdog
@@ -46,7 +46,14 @@ NOISE_RATES = (0.0, 0.05, 0.15)
 
 #: Conditions whose behaviour does not depend on feedback quality, so running
 #: them at every noise rate would repeat identical work.
-NOISE_INVARIANT = {"static_v4", "no_feedback_retrain"}
+#:
+#: ``random_feedback`` belongs here and was missed in V5: shuffling short-
+#: circuits the noise branch of the simulator, so all three noise rates produced
+#: byte-identical results (F1 0.106497 in every row of the published report).
+#: Collapsing it is a cost fix, not a change of evidence, and
+#: ``TestNoiseInvariantConditions`` asserts the invariance rather than assuming
+#: it.
+NOISE_INVARIANT = {"static_v4", "no_feedback_retrain", "random_feedback"}
 
 
 def _aggregate(values: list[float | None]) -> dict[str, Any]:
@@ -78,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     watchdog = start_watchdog(args.max_seconds, label="v5 adaptation evaluation")
-    seeds = [1337, 4242, 99, 2024, 7][: args.seeds]
+    seed_plan = seeds.build_seeds(args.seeds)
 
     try:
         corpus = scenarios.prepare_corpus()
@@ -88,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             rates = (0.05,) if condition in NOISE_INVARIANT else NOISE_RATES
             for noise in rates:
                 runs = []
-                for seed in seeds:
+                for seed in seed_plan:
                     result = scenarios.run_condition(
                         corpus,
                         condition=condition,
@@ -109,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
                     {
                         "condition": condition,
                         "requestedNoiseRate": noise,
-                        "seeds": seeds,
+                        "seeds": seed_plan,
                         "metrics": {
                             metric: _aggregate([run.metrics[metric] for run in runs])
                             for metric in (
