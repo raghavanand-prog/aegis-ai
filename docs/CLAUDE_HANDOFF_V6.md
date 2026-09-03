@@ -265,12 +265,13 @@ are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
 
 Also unresolved, and load-bearing:
 
-9. **A patient adversary is contained, not eliminated.** `DEFAULT_TOLERANCE` is
-   1.5, which §11.4 measured holding a ten-cycle campaign to 2.3 admitted rows
-   against 22.9 at the old 3.0. That bounds the ratchet; it does not detect one.
-   **Nothing monitors the baseline's growth rate**, and §11.5.4 is explicit that
-   the ratchet was only visible because the honest control was run — every batch
-   is within policy by construction.
+9. **A patient adversary is contained and now visible, but only to a reader.**
+   `DEFAULT_TOLERANCE` is 1.5 (§11.4) and `feedback/baseline_monitor.py` flags a
+   group whose submissions dwarf its own history (§12), recorded on the
+   candidate as `augmentation.baselineAssessment`. It is **advisory** — nothing
+   acts on a flag. And §12.4.1 is the real caveat: the bands are calibrated
+   against a *greedy* adversary that submits its maximum every cycle. A slower
+   one may not flag at all.
 10. **`event_type` tracks attack category almost perfectly in this corpus**, so
     §9's result **flatters the defence**. The mechanism is sound; the effect size
     is unlikely to transfer to real telemetry where an attack spans many event

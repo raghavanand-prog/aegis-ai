@@ -18,7 +18,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.adaptation.feedback import augmentation as feedback_augmentation
-from app.adaptation.feedback import caps
+from app.adaptation.feedback import baseline_monitor, caps
 from app.core.config import settings
 from app.ml.models.isolation_forest import IsolationForestDetector
 from app.ml.registry import registry
@@ -141,6 +141,24 @@ def train_candidate(
         fit_vectors.extend(result.vectors)
         augmentation_report = result.as_dict()
         augmentation_report["datasetFingerprint"] = dataset.fingerprint
+
+        # Advisory, and recorded on the candidate because that is what an
+        # approver reads. V6 §11.5.4's complaint was that a patient campaign is
+        # invisible - every batch is within policy - and the cap bounds it
+        # without ever surfacing it. This surfaces it. It blocks nothing.
+        try:
+            augmentation_report["baselineAssessment"] = baseline_monitor.assess(
+                db, dataset_id=dataset.id
+            ).as_dict()
+        except ValueError as error:
+            # Thin history is not a training failure. "Could not assess, and
+            # here is why" is a fact about the candidate; a missing field would
+            # read as "not checked".
+            augmentation_report["baselineAssessment"] = {
+                "flagged": [],
+                "findings": {},
+                "unavailableReason": str(error),
+            }
         # Whether the baseline was learned from history or supplied by the
         # caller. An approver reading this needs to know which.
         augmentation_report["baselineRatesDerived"] = derived

@@ -196,6 +196,11 @@ def run_campaign(
                 "cycle": cycle,
                 "baselineRate": round(baseline_rate, 4),
                 "targetAllowance": round(allowance, 4),
+                # Pre-cap: what the analyst *submitted* for this group. The cap
+                # clamps `targetAdmitted`, so monitoring that signal cannot see
+                # an attack the cap is successfully suppressing - measured, and
+                # the reason the growth monitor reads this field instead.
+                "targetEligible": sum(1 for _, g in eligible if g == target_group),
                 "targetAdmitted": sum(1 for _, g in kept_pairs if g == target_group),
                 # Malicious rows admitted *in the targeted group*: the attack.
                 "poisonLanded": poison,

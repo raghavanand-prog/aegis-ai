@@ -1187,7 +1187,93 @@ number.
    every batch is within policy, by construction.
 5. Feedback is simulated; both corpora are synthetic. Nothing is deployed.
 
-## 12. Reproducing
+## 12. The baseline growth monitor **[IMPLEMENTATION]**
+
+§11 bounded the ratchet and §11.5.4 named what it did not do: **detect** one.
+Every batch in a patient campaign is within policy by construction, so no policy
+check fires. The ratchet was visible in §11 only because an honest control ran
+beside it, and production has no such control.
+
+### 12.1 The signal is not what gets admitted
+
+The obvious monitor watches admitted volume per group. Measured, it does not
+work — at the default tolerance the adversary's admitted counts are **flatter
+than honest**:
+
+| signal = admitted rows | growth ratio | max increasing run |
+| --- | --- | --- |
+| honest | 1.336 | 1.25 |
+| **patient adversary** | **1.033** | **0.12** |
+
+**A working cap erases its own evidence.** It clamps precisely the quantity the
+naive monitor watches, so that monitor would go quiet exactly when it mattered.
+
+What the cap does not touch is what an analyst **submits**. Over 12 seeds and
+10 cycles, mean submissions per group against that group's own historical rate:
+
+| arm | mean ratio | range |
+| --- | --- | --- |
+| honest | 1.22 | 0.60 – 1.85 |
+| **patient adversary** | **15.79** | **9.34 – 20.70** |
+
+**No overlap**, with a 5× gap. The bands — moderate at 3.0, significant at 6.0 —
+sit in the empty space between 1.85 and 9.34. They were chosen from that gap,
+not from a standard, and the report says so.
+
+### 12.2 What it does
+
+`app/adaptation/feedback/baseline_monitor.py` compares one feedback dataset's
+benign-labelled submissions per `event_type` against the mean of **prior**
+datasets, and classifies the ratio using the existing `DriftStatus` vocabulary.
+
+It is **advisory** — V5 decision 25, *drift is a signal, not a verdict*, applies
+unchanged. The cap does the bounding; this makes an invisible campaign visible.
+It writes nothing and refuses nothing.
+
+| Property | Behaviour |
+| --- | --- |
+| Signal | submissions (membership), never admissions |
+| Baseline | prior datasets only — the batch under review cannot sanction itself |
+| New event type | reported `unbaselined`, **not flagged** — novelty is not evidence of attack |
+| Rare group | ratios computed against `MIN_BASELINE`, so one extra verdict is not a tenfold spike |
+| Thin history | **refused**, not guessed — a ratio against one batch is noise with a status attached |
+
+**Surfaced on the candidate.** `train_candidate` records the assessment in
+`augmentation.baselineAssessment`, because the approver reads the candidate. A
+clean batch records an empty `flagged` list rather than omitting the field: *no
+campaign detected* is a fact, and a missing field would read as *not checked*.
+Thin history records its reason and training proceeds — the monitor's refusal is
+not a training failure.
+
+### 12.3 A property of feedback datasets worth knowing
+
+Found while building this: **a feedback dataset is a cumulative snapshot, not an
+incremental batch.** `datasets.build` selects every current non-superseded
+training-eligible row, so per-group counts grow across snapshots even under
+honest use.
+
+That is why the comparison is a *ratio against the mean of prior snapshots*
+rather than a difference. Steady honest accumulation keeps the ratio near 1; a
+campaign appears as a step. A monitor built on differences would have flagged
+ordinary growth.
+
+### 12.4 Limitations **[LIMITATION]**
+
+1. **The bands are calibrated on one adversary against one corpus.** My
+   adversary submits its maximum every cycle from the start. A slower one — 2×
+   its baseline rather than 15× — would sit inside the moderate band or below it
+   and might not flag at all. **The measured 5× separation is a property of a
+   greedy attacker, not a guarantee.**
+2. **`event_type` is the grouping key**, so §9.3's caveat applies: it tracks
+   attack category almost perfectly in this synthetic corpus and would be
+   blunter on real telemetry.
+3. It detects **concentration in one group**. An adversary spreading submissions
+   across several event types would dilute the ratio, and is not modelled.
+4. Advisory by design. Nothing acts on a flag automatically, so its value
+   depends entirely on somebody reading it.
+5. No live analyst feedback exists; exercised by tests and synthetic campaigns.
+
+## 13. Reproducing
 
 ```bash
 cd backend
