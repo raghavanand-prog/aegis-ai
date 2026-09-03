@@ -58,8 +58,13 @@ export default function ProposalQueue({
   return (
     <div className="space-y-3">
       {proposals.map((proposal) => {
-        const validated = proposal.validation?.status !== "not_validated";
         const gates = proposal.validation?.gates as { passed?: boolean } | undefined;
+        // "Validated" means an evaluation actually ran. An absent or empty
+        // validation object is *not* validated - treating it as validated was a
+        // real defect: a proposal raised straight through the API showed no
+        // warning at all, which is the exact misreading this badge prevents.
+        const validated =
+          gates !== undefined && proposal.validation?.status !== "not_validated";
         const reason = reasons[proposal.id] ?? "";
 
         return (

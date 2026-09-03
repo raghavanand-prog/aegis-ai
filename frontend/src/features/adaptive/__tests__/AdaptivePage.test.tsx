@@ -187,6 +187,28 @@ describe("AdaptivePage", () => {
     ).toBeInTheDocument();
   });
 
+  it("warns when a proposal carries no validation at all", async () => {
+    // An empty validation object means no evaluation ran. Rendering that as
+    // validated was a defect found in browser verification.
+    fetchProposals.mockResolvedValue([{ ...UNVALIDATED_PROPOSAL, validation: {} }]);
+    const user = userEvent.setup();
+    renderWithProviders(<AdaptivePage />);
+    await user.click(await screen.findByRole("button", { name: "Proposals" }));
+    expect(
+      await screen.findByText(/Not validated — no evaluation has been run/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not warn when gates actually ran and passed", async () => {
+    fetchProposals.mockResolvedValue([
+      { ...UNVALIDATED_PROPOSAL, validation: { gates: { passed: true } } },
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<AdaptivePage />);
+    await user.click(await screen.findByRole("button", { name: "Proposals" }));
+    expect(screen.queryByText(/Not validated/i)).not.toBeInTheDocument();
+  });
+
   it("marks an AI-drafted proposal as advisory", async () => {
     const user = userEvent.setup();
     renderWithProviders(<AdaptivePage />);
