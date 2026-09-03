@@ -276,3 +276,56 @@ New modules: `app/evaluation/{datasets,experiments,splits,metrics}`,
 
 See `docs/EVALUATION_METHODOLOGY.md`, `docs/DATASET_CARD.md`,
 `docs/MODEL_CARD.md`, `docs/REPRODUCIBILITY.md`, `docs/RESEARCH_REPORT.md`.
+
+
+---
+
+## V5: the adaptation layer
+
+Still a modular monolith. No microservices, no Kafka, no Redis, no graph
+database, no distributed model serving — V5 added none of them and needed none.
+
+V4 added a measurement layer *around* the detector. V5 adds a proposal loop
+around it, on the same principle: **the production detection path is not
+edited.**
+
+```
+PRODUCTION (unchanged)                    ADAPTATION (V5, advisory)
+  ...→ rules + ML → risk → incident  ──▶  analyst feedback
+       │                                        ↓
+       │  features, inferences ──────────▶ drift monitor ──▶ signal
+       │                                        ↓
+       └──────────────────────────────▶ active learning ──▶ review queue
+                                                ↓
+                                    feedback dataset (versioned)
+                                                ↓
+                                    candidate training (CLI only)
+                                                ↓
+                                    V4 experiment framework
+                                                ↓
+                                          safety gates
+                                                ↓
+                                      adaptation proposal
+                                                ↓
+                                     shadow (no production effect)
+                                                ↓
+                                      HUMAN APPROVAL (admin)
+                                                ↓
+                          registry.activate_model() ──▶ deployment
+                                                ↓
+                                    monitoring ──▶ rollback
+```
+
+The **only** write into production detection state is the pre-existing
+`registry.activate_model`, reachable solely through an approved proposal.
+
+New package `backend/app/adaptation/`: `feedback/`, `drift/`,
+`active_learning/`, `candidates/`, `proposals/`, `deployment/`, `ai/`,
+`experiments/`.
+
+New tables (migrations 0005–0009): `analyst_feedback`, `feedback_datasets`,
+`feedback_dataset_members`, `drift_measurements`, `adaptation_proposals`, plus a
+widened `ml_models.status` constraint. Candidate evaluation reuses V4's
+`evaluation_experiments` / `evaluation_runs` rather than duplicating them.
+
+Frontend: `features/adaptive/` at `/dashboard/adaptive`.

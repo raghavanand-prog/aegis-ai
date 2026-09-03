@@ -203,9 +203,9 @@ for the second detector.
 ## Tests and checks
 
 ```bash
-cd backend  && pytest && ruff check .          # 301 tests
+cd backend  && pytest && ruff check .          # 535 tests
 cd backend  && python -m app.evaluation.run_detection_eval
-cd frontend && npm run verify                  # lint + typecheck + 33 tests + build
+cd frontend && npm run verify                  # lint + typecheck + 48 tests + build
 ```
 
 CI runs all of the above plus an Alembic upgrade/downgrade/upgrade cycle against
@@ -228,17 +228,41 @@ false-positive-rate ceiling on the detection evaluation.
 | [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) | Threats, mitigations, residual risk |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, commands, conventions, troubleshooting |
 | [docs/API.md](docs/API.md) | Endpoint map, conventions, examples |
+| [docs/V5_ARCHITECTURE.md](docs/V5_ARCHITECTURE.md) | Adaptive SOC design, Phase A audit, drift methodology |
+| [docs/V5_EXPERIMENTAL_DESIGN.md](docs/V5_EXPERIMENTAL_DESIGN.md) | Pre-registered V5 design and predictions |
+| [docs/V5_RESEARCH_REPORT.md](docs/V5_RESEARCH_REPORT.md) | Measured static-vs-adaptive results |
+| [docs/ADAPTATION_CARD.md](docs/ADAPTATION_CARD.md) | The standard record for a production-affecting change |
+
+## Adaptive SOC (V5)
+
+V5 adds a controlled adaptation layer: analyst feedback, drift detection, active
+learning, candidate models, safety gates, proposals, approval, shadow
+evaluation, deployment and rollback — at `/dashboard/adaptive`.
+
+**The system may propose. It may not decide.** The only write into production
+detection state is `registry.activate_model`, reachable solely through a
+proposal an administrator approved. AI may draft a proposal and is refused as an
+approver. There is no endpoint that trains a model, builds a dataset or runs an
+experiment.
+
+What was measured, on a synthetic corpus with simulated feedback:
+
+- Adaptation moved F1 from **0.038 to 0.238** (recall 1.9% → 14.1%) — but a
+  **random-label control also improved to 0.107**, so one third of that gain
+  comes from the mechanism and two thirds from feedback content. Only the
+  control makes that separable.
+- Adaptation did **not** help against behaviour the model had never seen
+  (recall 0.000 → 0.0085, 1 of 9 runs), and caused **no** historical regression.
+- A full adaptation cycle costs **2.97 s** of machine time; rollback takes
+  1.1 ms. Human approval time is deliberately not measured.
+- Three of seven pre-registered predictions were wrong, and are reported as
+  wrong in [docs/V5_RESEARCH_REPORT.md](docs/V5_RESEARCH_REPORT.md).
 
 ## Roadmap
 
-V3 deliberately stops short of anything self-modifying. There is no automatic
-retraining, no adaptive threshold, no autonomous deployment and no autonomous
-response — building those before there is a reproducible baseline to measure
-against would mean changing the detector and the yardstick at the same time.
-
-V4's highest-value work is a labelled corpus the ML measurement can stand on:
-either a purpose-built generator containing genuine behavioural novelty, or a
-public dataset (CIC-IDS, UNSW-NB15) adapted through the existing normalizer.
-Everything V3 records — model version, feature schema version, dataset version,
-inference timestamp, detection source, anomaly score, risk signals, correlation
-ids, AI provider and prompt version — exists so that experiment is reproducible.
+The obvious next question is whether any of this survives contact with real
+analysts. Every published V5 result uses simulated feedback, a synthetic corpus
+and three seeds; the effect size is not settled and the loop has never been
+driven by a person. Closing that gap — real feedback, more seeds, and a
+deployment where drift is observed rather than induced — is worth more than any
+new subsystem.

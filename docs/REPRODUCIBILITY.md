@@ -59,8 +59,18 @@ Expected, and verifiable from the run's own output:
 | Samples | 6,000 (4,800 fitted, 1,200 held out) |
 | Seed | 4242 |
 | Contamination | 0.08 |
-| Recommended threshold | 0.654 |
-| Flagged at 0.65 | 1.25% of held-out traffic |
+| Recommended threshold | 0.648 |
+| Flagged at 0.65 | 0.75% of held-out traffic |
+
+> **Corrected in V5 Phase A.** This table previously read 0.654 / 1.25%. Those
+> figures do not reproduce. Three independent runs — two in isolated artifact
+> directories — produce the byte-identical artifact `016c6dbf37f53d03…` with
+> 0.75% flagged and a recommended threshold of 0.648. Training **is** fully
+> deterministic; the published numbers were stale.
+>
+> Note also that the artifact shipped as the V4 deployed model
+> (`053d1ff3…`) is **not** reproducible from current code. It predates the
+> determinism fix described in the V4 handoff §3 and is an orphan.
 
 A different corpus fingerprint means the generator changed. Investigate before
 comparing any number against a published one.
@@ -94,6 +104,12 @@ python -m app.evaluation.run_system_eval
 Every CLI accepts `--max-seconds` (default 900; `0` disables). On expiry it
 exits 142 with thread stacks rather than hanging silently — the V3 deadlock
 taught that lesson.
+
+> **The default is too small for the UNSW suite.** Measured in V5 Phase A on an
+> Apple Silicon laptop: Isolation Forest takes ~220s and the supervised
+> reference ~610s, so the watchdog fires mid-suite and **no report is written**.
+> Pass `--max-seconds 3600` for any full UNSW run. This is why no V4 experiment
+> artifacts existed on disk at the V5 handoff.
 
 ## 5. Verify you reproduced it
 
