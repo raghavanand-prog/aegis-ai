@@ -173,3 +173,32 @@ Degraded-mode behaviour is now **measured**, not asserted: five scenarios (no
 model, corrupt artifact, digest mismatch, no threat intel, AI unavailable) each
 confirm that ingestion, normalization and rule detection continue. See
 `app/evaluation/system_eval.py`.
+
+
+---
+
+## V5: controlled adaptation
+
+Adaptation adds a path that can change what the platform detects, so it adds
+controls rather than relaxing them.
+
+| Control | Enforcement |
+| --- | --- |
+| No autonomous production change | `registry.activate_model` refuses any model not in a servable state; a candidate reaches production only through an approved proposal |
+| Human approval is human | `proposals.approve` refuses actors prefixed `ai:`, `system:`, `automation:` |
+| Separation of duties | Proposer and approver are distinct columns; `self_approved` is recorded when they match |
+| No training over HTTP | No endpoint trains a model or builds a dataset; asserted by test |
+| Artifact immutability | `reserve_artifact_path` refuses an existing path; `next_version` consults disk as well as the database |
+| Artifact integrity | Digest verified before evaluation and before deployment; a mismatch refuses and leaves the incumbent serving |
+| Untrusted feedback | Analyst comments pass the existing sanitizer before reaching a prompt; injection attempts are reported as findings |
+| MITRE provenance | AI-cited techniques the evidence does not support are recorded as ungrounded, never as attribution |
+| Fail-safe | Deployment validates before it mutates; on refusal the transaction rolls back and the approved model keeps serving |
+| Audit | Every proposal transition writes an audit row with actor, before/after state and rollback target |
+
+### The one finding worth naming
+
+**[MEASURED]** Before V5, model immutability was enforced against the database
+only. With a rebuilt database — an empty `ml_models` table and a `v1.0` artifact
+still on disk — `next_version` returned `1.0` and training overwrote the
+digest-verified deployed model. Observed directly: `053d1ff3…` → `016c6dbf…`.
+Fixed, with the original scenario reproduced as a regression test.

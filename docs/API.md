@@ -151,3 +151,36 @@ Every payload carries the provenance of the number it reports — dataset name,
 version and fingerprint, split strategy and fingerprint, feature schema version,
 ruleset fingerprint, model version and artifact digest — and a `scoreKind` that
 keeps an anomaly ranking from being read as a probability.
+
+
+---
+
+## V5: controlled adaptation — `/api/v1/adaptation`
+
+| Method | Path | Permission | Notes |
+| --- | --- | --- | --- |
+| POST | `/adaptation/feedback` | `feedback:submit` | Analyst. Audited |
+| POST | `/adaptation/feedback/{id}/correct` | `feedback:submit` | Supersedes; never edits. Audited |
+| GET | `/adaptation/feedback` · `/{id}` | `feedback:read` | Viewer and above |
+| GET | `/adaptation/datasets` · `/{id}` | `feedback:read` | **GET only** — building a dataset is a CLI act |
+| GET | `/adaptation/drift` · `/drift/history` | `drift:read` | Carries an `interpretation` string, rendered verbatim |
+| GET | `/adaptation/review-queue` | `feedback:read` | Recommends; cannot label or train |
+| POST | `/adaptation/proposals` | `adaptation:propose` | Analyst. Refuses empty evidence and no-op changes |
+| GET | `/adaptation/proposals` · `/{id}` | `adaptation:read` | Viewer and above |
+| POST | `/adaptation/proposals/{id}/approve` | `adaptation:approve` | **Administrator.** Refuses failed gates and non-human actors |
+| POST | `/adaptation/proposals/{id}/reject` | `adaptation:approve` | Administrator. Reason required |
+| POST | `/adaptation/proposals/{id}/deploy` | `adaptation:deploy` | Administrator. Validates before mutating |
+| POST | `/adaptation/proposals/{id}/rollback` | `adaptation:deploy` | Administrator. Reason required |
+
+**There is no endpoint that trains a model, builds a dataset or runs an
+experiment.** Each is minutes of CPU, and over HTTP that is a
+resource-exhaustion primitive. All three are CLI operations with a named
+operator. Tests assert the absence of such routes.
+
+Six new permissions, on the existing three roles — no new role was introduced:
+
+| Permission | viewer | analyst | admin |
+| --- | --- | --- | --- |
+| `feedback:read`, `drift:read`, `adaptation:read` | ✅ | ✅ | ✅ |
+| `feedback:submit`, `adaptation:propose` | | ✅ | ✅ |
+| `adaptation:approve`, `adaptation:deploy` | | | ✅ |
