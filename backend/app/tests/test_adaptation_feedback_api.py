@@ -202,9 +202,10 @@ class TestNoTrainingOverHttp:
         schema = app.openapi()
         adaptation_paths = [path for path in schema["paths"] if "/adaptation" in path]
         assert adaptation_paths, "the adaptation API should be mounted"
-        forbidden = [
-            path
-            for path in adaptation_paths
-            if "train" in path or "retrain" in path or "deploy" in path
-        ]
-        assert forbidden == [], f"adaptation exposes training/deployment over HTTP: {forbidden}"
+        # Training only. Deploying an approved proposal is a legitimate
+        # administrator action - RBAC-gated, audited, and reversible - whereas
+        # training is minutes of CPU that no HTTP request should be able to
+        # start. The earlier form of this test also forbade "deploy", which
+        # confused a resource-exhaustion concern with an authorisation one.
+        forbidden = [path for path in adaptation_paths if "train" in path or "retrain" in path]
+        assert forbidden == [], f"adaptation exposes training over HTTP: {forbidden}"
