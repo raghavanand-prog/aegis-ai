@@ -583,7 +583,98 @@ should be designed deliberately rather than inherited.
    "better F1" is not "deployable".
 4. Nothing here is deployed or registered. The production model is unchanged.
 
-## 6. Reproducing
+## 6. Arm 2, redesigned **[MEASURED]**
+
+§5.5 established that V5's Arm 2 cannot run in the production configuration:
+curation purifies the fit set, and production's fit set is unlabelled telemetry
+rather than observed events. This redesigns it so it has a surface to act on.
+
+### 6.1 The design
+
+V5's arm *removed* analyst-identified malicious rows from a corpus of observed
+events. The redesign *adds* analyst-verified **benign** observed events to the
+telemetry corpus:
+
+```
+telemetry corpus (unlabelled, 6,000 rows)
+  + observed events an analyst verified benign
+  − anything called malicious, suspicious or uncertain
+  bounded by max_feedback_fraction
+```
+
+An Isolation Forest consumes "here is more traffic that is normal" natively —
+that is what a fit set *is*. And it targets the weakness §5 measured, a **34%
+false-positive rate**, using the most abundant signal a real SOC produces:
+false-positive triage.
+
+**This is a poisoning surface and is treated as one.** Adding analyst-supplied
+rows to training data means a mistaken or hostile analyst could teach the model
+that an attack is normal. Three bounds, each asserted by test:
+
+1. **Admission is positive-listed** — a row enters only if its label is
+   training-eligible *and* projects to benign. `confirmed_malicious`,
+   `true_positive`, `suspicious` and `uncertain` are all refused.
+2. **The feedback share is capped**, bounding the blast radius of bad labels
+   however many arrive. Measured: at a 0.05 cap the bound binds (315 rows,
+   4.99%); at 0.20 the natural volume is 399 rows (6.2%) and the cap does not
+   bind. **It is a safety bound, not a tuning knob.**
+3. **The telemetry corpus is augmented, never replaced.**
+
+An adversarial regression test labels *every* event benign, including genuinely
+malicious ones, and asserts the cap still holds.
+
+```bash
+python -m app.adaptation.experiments.run_arm2_eval --seeds 10 --max-seconds 3600
+```
+
+Artifact: `app/evaluation/reports/v6-arm2-20260903T083516Z.json`.
+
+### 6.2 Result — it does what it was designed to do
+
+10 seeds, 6,000 telemetry rows + 399 feedback rows (6.2%), of which 9 were
+mislabelled by the simulated analyst. CI95 is a percentile bootstrap.
+
+| Metric | Production baseline | + redesigned Arm 2 | Cohen's d |
+| --- | --- | --- | --- |
+| **False-positive rate** | 0.3397 [0.315, 0.370] | **0.2624** [0.240, 0.284] | **−1.81** |
+| Precision | 0.5903 [0.568, 0.612] | **0.6345** [0.613, 0.658] | +1.21 |
+| Recall | 0.7308 [0.708, 0.756] | 0.6795 [0.655, 0.706] | −1.23 |
+| ROC-AUC | 0.7615 [0.749, 0.775] | **0.7862** [0.776, 0.797] | +1.24 |
+| F1 | 0.6526 [0.633, 0.674] | 0.6554 [0.638, 0.678] | **+0.09** |
+
+**False positives fall by 7.7 points — a 23% relative reduction — with
+non-overlapping intervals and a large effect size.** Alert volume drops from
+193.5 to 167.4 per 390 events. Separability genuinely improves (AUC +0.025), so
+this is not purely an operating-point shift.
+
+**F1 barely moves, and reporting this as an F1 result would misdescribe it.**
+The arm trades recall (−0.051) for precision (+0.044), which roughly cancels in
+F1. Whether that trade is good is an operator's judgement, not a metric's: it is
+26 fewer alerts per 390 events at the cost of missing about 5% more attacks.
+
+### 6.3 This answers V5's RQ1, which V5 could not test
+
+V5 asked *"Can analyst feedback reduce false positives?"* and had to answer
+**"Not tested as framed"** — its misconfigured baseline had FPR 0.0%, so there
+was no false-positive problem to solve. Against a correctly-fitted baseline at
+34% FPR, the answer is **yes, measurably**: 0.3397 → 0.2624, d = −1.81.
+
+The question was always the right one. It needed a correct baseline to become
+answerable.
+
+### 6.4 Limitations **[LIMITATION]**
+
+1. Feedback is simulated; there is no analyst population.
+2. Both corpora are synthetic.
+3. The recall cost is real and is not obviously acceptable — this is a policy
+   trade, not a free improvement.
+4. The poisoning bound is tested against a naive all-benign adversary. A
+   targeted adversary who labels only the events resembling their intended
+   attack is not modelled, and would be a more informative test.
+5. Nothing is deployed. Reaching production still requires an approved proposal
+   and `activate_model`.
+
+## 7. Reproducing
 
 ```bash
 cd backend
@@ -603,6 +694,9 @@ python -m app.adaptation.experiments.run_contamination_eval --seeds 10 --max-sec
 
 # section 5
 python -m app.adaptation.experiments.run_production_baseline_eval --seeds 10 --max-seconds 3600
+
+# section 6
+python -m app.adaptation.experiments.run_arm2_eval --seeds 10 --max-seconds 3600
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable

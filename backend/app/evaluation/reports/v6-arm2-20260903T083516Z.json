@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-03T08:35:16.811165+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_arm2_eval.py --seeds 10 --max-seconds 3600",
+  "question": "Does adding analyst-verified benign observed events to the production training corpus reduce false positives?",
+  "design": {
+    "note": "V5's Arm 2 removed analyst-identified malicious rows from a corpus of observed events, which production's fit set is not. This adds analyst-verified benign observed events to the telemetry corpus instead.",
+    "admission": "Positive-listed: a row enters only if its label is training-eligible and projects to benign. confirmed_malicious, true_positive, suspicious and uncertain are all refused.",
+    "maxFeedbackFraction": 0.2,
+    "capBinds": false
+  },
+  "composition": {
+    "telemetryRows": 6000,
+    "feedbackRows": 399,
+    "feedbackFraction": 0.062353,
+    "mislabelledRowsAdmitted": 9,
+    "admittedOutsideFitSplit": 0,
+    "admittedVectorsAlsoSeenInScoringSet": 10
+  },
+  "scoring": {
+    "datasetFingerprint": "c0f04f3ccb2a63b8",
+    "splitFingerprint": "d349ea18a04e06c0",
+    "threshold": 0.65
+  },
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395,
+      163476,
+      674128
+    ],
+    "noiseRate": 0.05
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "comparison": {
+    "precision": {
+      "baseline": {
+        "mean": 0.5903,
+        "lower": 0.5682,
+        "upper": 0.6117,
+        "stdDev": 0.0364,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 0.6345,
+        "lower": 0.6133,
+        "upper": 0.6575,
+        "stdDev": 0.0369,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": 1.2058
+    },
+    "recall": {
+      "baseline": {
+        "mean": 0.7308,
+        "lower": 0.7083,
+        "upper": 0.7564,
+        "stdDev": 0.0389,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 0.6795,
+        "lower": 0.6545,
+        "upper": 0.7064,
+        "stdDev": 0.0441,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -1.2328
+    },
+    "f1": {
+      "baseline": {
+        "mean": 0.6526,
+        "lower": 0.6334,
+        "upper": 0.6738,
+        "stdDev": 0.0334,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 0.6554,
+        "lower": 0.6375,
+        "upper": 0.6776,
+        "stdDev": 0.0324,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": 0.0854
+    },
+    "falsePositiveRate": {
+      "baseline": {
+        "mean": 0.3397,
+        "lower": 0.315,
+        "upper": 0.3701,
+        "stdDev": 0.0463,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 0.2624,
+        "lower": 0.2397,
+        "upper": 0.2842,
+        "stdDev": 0.0388,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -1.8116
+    },
+    "alertVolume": {
+      "baseline": {
+        "mean": 193.5,
+        "lower": 187.3,
+        "upper": 200.6,
+        "stdDev": 11.4042,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 167.4,
+        "lower": 159.9,
+        "upper": 173.9,
+        "stdDev": 11.8622,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": -2.2431
+    },
+    "rocAuc": {
+      "baseline": {
+        "mean": 0.7615,
+        "lower": 0.7489,
+        "upper": 0.775,
+        "stdDev": 0.0224,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "augmented": {
+        "mean": 0.7862,
+        "lower": 0.7757,
+        "upper": 0.7968,
+        "stdDev": 0.0174,
+        "samples": 10,
+        "confidence": 0.95,
+        "resamples": 1000,
+        "method": "percentile bootstrap over repeated-seed observations"
+      },
+      "cohensD": 1.235
+    }
+  },
+  "perSeed": [
+    {
+      "seed": 1337,
+      "baselineF1": 0.6409495548961424,
+      "augmentedF1": 0.6506024096385543,
+      "baselineFpr": 0.31196581196581197,
+      "augmentedFpr": 0.2905982905982906
+    },
+    {
+      "seed": 4242,
+      "baselineF1": 0.6587537091988132,
+      "augmentedF1": 0.639240506329114,
+      "baselineFpr": 0.29914529914529914,
+      "augmentedFpr": 0.25213675213675213
+    },
+    {
+      "seed": 99,
+      "baselineF1": 0.6534090909090909,
+      "augmentedF1": 0.6441717791411042,
+      "baselineFpr": 0.34615384615384615,
+      "augmentedFpr": 0.2777777777777778
+    },
+    {
+      "seed": 2024,
+      "baselineF1": 0.7096774193548387,
+      "augmentedF1": 0.7040498442367601,
+      "baselineFpr": 0.27350427350427353,
+      "augmentedFpr": 0.2222222222222222
+    },
+    {
+      "seed": 7,
+      "baselineF1": 0.6096256684491979,
+      "augmentedF1": 0.6388059701492537,
+      "baselineFpr": 0.4444444444444444,
+      "augmentedFpr": 0.3076923076923077
+    },
+    {
+      "seed": 819369,
+      "baselineF1": 0.6198830409356725,
+      "augmentedF1": 0.6285714285714284,
+      "baselineFpr": 0.3418803418803419,
+      "augmentedFpr": 0.2564102564102564
+    },
+    {
+      "seed": 488509,
+      "baselineF1": 0.6514285714285714,
+      "augmentedF1": 0.6531986531986532,
+      "baselineFpr": 0.3418803418803419,
+      "augmentedFpr": 0.18803418803418803
+    },
+    {
+      "seed": 283395,
+      "baselineF1": 0.704225352112676,
+      "augmentedF1": 0.7173252279635258,
+      "baselineFpr": 0.3162393162393162,
+      "augmentedFpr": 0.23504273504273504
+    },
+    {
+      "seed": 163476,
+      "baselineF1": 0.6573816155988857,
+      "augmentedF1": 0.6646884272997033,
+      "baselineFpr": 0.36324786324786323,
+      "augmentedFpr": 0.2948717948717949
+    },
+    {
+      "seed": 674128,
+      "baselineF1": 0.6206896551724138,
+      "augmentedF1": 0.6134969325153374,
+      "baselineFpr": 0.358974358974359,
+      "augmentedFpr": 0.29914529914529914
+    }
+  ],
+  "caveats": [
+    "F1 is close to unchanged. This arm trades recall for precision; reporting it as an F1 result would misdescribe what it does.",
+    "Feedback is simulated. There is no analyst population.",
+    "Both corpora are synthetic.",
+    "Nothing is deployed. Reaching production still requires an approved proposal and activate_model."
+  ]
+}
