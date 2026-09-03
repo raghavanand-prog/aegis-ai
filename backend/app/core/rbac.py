@@ -49,6 +49,7 @@ class Permission(str, Enum):
     # feedback row is evidence that will later shape a training set.
     FEEDBACK_READ = "feedback:read"
     FEEDBACK_SUBMIT = "feedback:submit"
+    DRIFT_READ = "drift:read"
 
     # Machine learning (V3)
     ML_READ = "ml:read"
@@ -102,6 +103,7 @@ VIEWER_PERMISSIONS: frozenset[Permission] = frozenset(
         # V5: feedback is part of the SOC picture - a viewer may see what
         # analysts concluded, and may not add to it.
         Permission.FEEDBACK_READ,
+        Permission.DRIFT_READ,
     }
 )
 
