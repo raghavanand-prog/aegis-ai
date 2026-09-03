@@ -114,8 +114,19 @@ def _require(db: Session, proposal_id: int) -> AdaptationProposal:
     return proposal
 
 
+#: Actors that may never approve. The AI drafts proposals; letting it also
+#: approve one would make "human approval" a string the machine can write.
+_NON_HUMAN_ACTOR_PREFIXES = ("ai:", "system:", "automation:")
+
+
 def approve(db: Session, proposal_id: int, *, approved_by: str) -> AdaptationProposal:
     """Sign off a pending proposal. Does not deploy it."""
+    if any(approved_by.startswith(prefix) for prefix in _NON_HUMAN_ACTOR_PREFIXES):
+        raise ValueError(
+            f"{approved_by!r} is not a human actor and cannot approve an "
+            "adaptation. AI may draft a proposal; only a person may accept one."
+        )
+
     proposal = _require(db, proposal_id)
 
     if proposal.status == ProposalStatus.REJECTED.value:
