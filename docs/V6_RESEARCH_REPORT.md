@@ -960,7 +960,89 @@ targeted-poisoning harness. Wiring it into the production adaptation path,
 together with the per-category recall tracking §8.2 showed is necessary, remains
 outstanding work.
 
-## 10. Reproducing
+## 10. Wired into the production path **[IMPLEMENTATION]**
+
+§§6–9 were measured in the experiment harness. This section is the code change
+that puts them on the path a real candidate takes.
+
+### 10.1 What was actually wrong
+
+`train_candidate` accepted `feedback_dataset_id` and recorded it in the model's
+parameters. **It did nothing else with it.** The fit set was the telemetry
+corpus and nothing but the telemetry corpus, so analyst feedback had never
+influenced production candidate training — consistent with §5.5, and stronger:
+not merely inapplicable, but unwired.
+
+### 10.2 Three changes
+
+**1. The cap moved into production.**
+`app/adaptation/experiments/feedback_caps.py` → `app/adaptation/feedback/caps.py`.
+Policy code cannot live under `experiments/` if the production trainer calls it.
+Import-only move; the §9 experiments still pass against the new location.
+
+**2. A per-category recall gate.** `GatePolicy` gains
+`max_per_category_recall_drop` (0.10) and `min_category_samples` (10);
+`evaluation.py` now scores every candidate and baseline per attack category and
+feeds both into the gate and into the report's new `perCategory` block.
+
+The bound is **looser** than the aggregate recall bound (0.05) on purpose:
+per-category recall is measured over far fewer samples and §8.5 measured
+intervals as wide as [0.334, 0.836]. A tighter bound would veto on noise.
+
+When no per-category data is supplied the check is **advisory, not a veto** —
+every pre-V6 caller passes none, so vetoing would reject every candidate
+outright. The absence is surfaced to the approver rather than counted as a pass,
+which is what `GateCheck.advisory` already existed for. A category measured on
+the incumbent but missing from the candidate **fails**: the candidate has not
+been shown safe on it.
+
+**3. `app/adaptation/feedback/augmentation.py`** turns a feedback dataset into
+rows a candidate may be fitted on, and `train_candidate` appends them.
+
+| Property | Behaviour |
+| --- | --- |
+| Admission | `binary_label is False` only — verified benign. `true_positive` and `confirmed_malicious` refused |
+| Target type | events only; incidents and sequences have no single vector, skipped and **counted** |
+| Vector source | the stored `MLInference` row — the vector the model actually scored |
+| Vector order | rebuilt in `feature_names` order, never the stored JSON key order |
+| Incomplete vector | refused, never padded |
+| Cap | `caps.apply`, default `global` (pre-V6 behaviour preserved) |
+| Provenance | admitted count, per-group counts, cap policy and every skip reason recorded on the model |
+
+**The vector comes from the stored inference, not from the event's columns.**
+Re-deriving would risk training on a vector that was never the one the analyst's
+verdict referred to, and the mismatch would be silent.
+
+### 10.3 Defaults preserve V5 behaviour
+
+`cap_policy` defaults to `global`, and with no `feedback_dataset_id` the fit set
+is telemetry alone — asserted by test. **§9 measured that `global` does not stop
+targeted poisoning**, so the CLI exposes `--cap-policy baseline_relative`, which
+derives its per-group baseline from prior feedback datasets *excluding the batch
+being admitted* (`_baseline_rates_for`). That exclusion is the production
+analogue of §9's held-out honest seeds: a baseline computed over the dataset
+under review would learn that batch's own spike as normal.
+
+```bash
+python -m app.adaptation.candidates.train_candidate     --feedback-dataset-id 7 --cap-policy baseline_relative
+```
+
+### 10.4 What is still not closed **[LIMITATION]**
+
+1. **`global` remains the default.** Changing a security default silently is
+   worse than documenting a sharp edge, so the safer policy is opt-in. An
+   operator admitting real analyst feedback who does not pass
+   `--cap-policy baseline_relative` gets §8's vulnerability.
+2. **The baseline is only as trustworthy as the history it reads.** §9.3's
+   patient adversary — raising the baseline across several datasets — defeats
+   it, and is still untested.
+3. **No live analyst feedback exists**, so the wiring is exercised by tests and
+   synthetic corpora, not by use.
+4. `activate_model` behind an approved proposal remains the only write into
+   production detection state. None of this changes that; V5's deployment,
+   registry-immutability and proposal suites pass unchanged.
+
+## 11. Reproducing
 
 ```bash
 cd backend
