@@ -333,9 +333,17 @@ category included in it has been learned as normal. High novel AUC is partly a
 restatement of what was withheld.
 
 **The fit set is 40% malicious.** Measured: 1,664 of 4,160 fit samples — and the
-same 40% holds in the Track 1 corpus (624 of 1,560). The production Isolation
-Forest is configured `contamination=0.08`. **The corpus violates the detector's
-central assumption by a factor of 5.**
+same 40% holds in the Track 1 corpus (624 of 1,560), against a configured
+`contamination=0.08`. **The corpus violates the detector's central assumption
+that its fitting data is mostly normal.**
+
+> **Correction (§4).** This paragraph originally said the corpus "violates the
+> detector's central assumption by a factor of 5", implying the `contamination`
+> *parameter* was mis-set. The direction is right, the named mechanism was
+> wrong: `contamination` never reaches `anomaly_score`, which squashes the raw
+> score about the **median of the training scores**; the parameter only sets
+> scikit-learn's `offset_` for `predict()`. The binding problem is the fitting
+> data itself. §4 measures it directly.
 
 That reframes several earlier results:
 
@@ -359,7 +367,124 @@ does not provide.
 None. This is a read-only comparison; the production detector, the registry and
 the adaptation loop are untouched. Track 2 remains safe to proceed.
 
-## 4. Reproducing
+## 4. Fit-set contamination — the largest finding so far **[MEASURED]**
+
+### 4.1 What was found
+
+The labelled evaluation corpus's fit split is **40% malicious** (624 of 1,560).
+Three facts make that consequential:
+
+1. **The production model is not trained on it.** `train_anomaly_model` fits the
+   runtime telemetry generator's corpus, whose suspicious scenarios run at about
+   **12%** (238 of 2,000, from its scenario mix).
+2. **The corpus's own provenance says so** — *"out of distribution for the
+   anomaly model trained on the runtime telemetry generator; ML metrics on this
+   corpus are a lower bound."* It was built to exercise **rule** thresholds.
+3. **V4 and V5 nonetheless re-fitted an Isolation Forest on it** and reported the
+   result as the **static baseline** every adaptation gain is measured against.
+
+An unsupervised density estimator fitted where two fifths of the mass is attack
+traffic has learned attacks as normal.
+
+### 4.2 The controlled sweep
+
+Corpus, split, seed, detector, threshold and test set fixed; the fit split is
+resampled to a **constant 900 rows** at each level so sample count cannot be
+confounded with contamination. 10 seeds.
+
+```bash
+python -m app.adaptation.experiments.run_contamination_eval --seeds 10 --max-seconds 3600
+```
+
+Artifact: `app/evaluation/reports/v6-contamination-20260903T081901Z.json`.
+
+| Fit-set malicious % | ROC-AUC | F1 @ 0.65 | recall | precision | alerts |
+| --- | --- | --- | --- | --- | --- |
+| **40%** *(as V4/V5 used it)* | 0.5721 | 0.0237 | 0.010 | 0.938 | 1.6 |
+| 30% | 0.7014 | 0.0443 | 0.021 | 0.963 | 3.3 |
+| 20% | 0.8240 | 0.0947 | 0.051 | 1.000 | 7.9 |
+| **12%** *(production-like)* | 0.9000 | **0.2653** | 0.154 | 0.997 | 24.1 |
+| 8% *(configured contamination)* | 0.9337 | **0.3390** | 0.207 | 1.000 | 32.3 |
+| 4% | **0.9547** | **0.3865** | 0.244 | 0.998 | 38.2 |
+| 0% | 0.9274 | 0.0645 | 0.034 | 0.961 | 5.5 |
+
+**Separability rises monotonically as contamination falls**, ROC-AUC 0.572 →
+0.955. The detector was never as blind as V4/V5 measured; it was fitted on the
+wrong data.
+
+**The 0% row is not a regression in separability** — AUC stays at 0.927. F1
+collapses because the *frozen 0.65 threshold* no longer matches an all-benign
+training median. That is itself a finding: the 0.65 operating point is tuned to
+a contaminated score distribution.
+
+### 4.3 What this does to the V5 adaptation result **[MEASURED]**
+
+Track 1 measured full adaptation (both arms, 5% noise, 50 seeds) at **F1
+0.2570**. From the sweep, with **no adaptation at all**:
+
+| | F1 |
+| --- | --- |
+| V5 static baseline, as reported | 0.0389 |
+| **V5 both arms, 50 seeds** | **0.2570** |
+| Fitting at 12% contamination, no adaptation | **0.2653** |
+| Fitting at 8% contamination, no adaptation | **0.3390** |
+| Fitting at 4% contamination, no adaptation | **0.3865** |
+
+**Simply fitting on production-like data matches the entire adaptation loop, and
+fitting cleaner beats it.** The V5 gain is real and was honestly measured, but a
+large part of what adaptation achieved was repairing a fit set that should not
+have been 40% malicious.
+
+This is not a claim that adaptation is worthless — the two are not exclusive, and
+adaptation operates where a clean fit set is not simply available. It is a claim
+that **the static baseline was a misconfigured comparator**, which inflates every
+"× improvement" framing derived from it.
+
+### 4.4 It also explains Track 1's noise sensitivity **[MEASURED]**
+
+§1.3 found that label noise degrades adaptation (F1 0.2826 → 0.2570 → 0.2110,
+d = 1.44) and that **curation** is the noise-sensitive component — contradicting
+V5's claim that curation is robust to noise. The mechanism was unexplained.
+
+It is contamination. Curation drops rows an analyst called malicious, so it *is*
+a contamination reduction, and label noise decides how much survives:
+
+| Noise | fit malicious % before | after curation | fit size after |
+| --- | --- | --- | --- |
+| 0% | 40.0% | **26.6%** | 1,275 |
+| 5% | 40.0% | **27.8%** | 1,267 |
+| 15% | 40.0% | **30.4%** | 1,250 |
+
+Read against §4.2, where AUC and F1 change steeply across exactly that 26–30%
+band: more noise leaves more contamination, and more contamination costs
+detection. The causal chain is complete, and it is the same variable throughout.
+
+Note also that curation only reaches ~27%, well short of the 8–12% where the
+detector performs best. **Curation is a partial, indirect fix for a problem that
+can be fixed directly.**
+
+### 4.5 Limitations **[LIMITATION]**
+
+1. The corpus is synthetic, and by its own provenance out of distribution for
+   this model. These numbers bound an experimental artefact, not production.
+2. The 40% row uses a 900-row fit set and is **not** identical to V5's static
+   baseline, which used the full 1,560-row split (F1 0.0389). The sweep is
+   internally valid; cross-comparison to §1 is indicative, not exact.
+3. Production's ~12% figure counts *suspicious scenarios* in an unlabelled
+   generator, not verified malicious events. It is an estimate of composition,
+   not a measured contamination rate.
+4. Nothing here is deployed. The production model is unchanged.
+
+### 4.6 What should follow **[INFERENCE]**
+
+The V4/V5 evaluation substrate, not the adaptation machinery, is now the
+weakest link. Before Track 2 spends more seeds characterising feedback quality
+against a misconfigured baseline, the baseline should be re-established on a fit
+set whose composition resembles production. Track 2's question — how feedback
+quality affects adaptation — is worth asking, but its answer will be about
+contamination repair unless the substrate is fixed first.
+
+## 5. Reproducing
 
 ```bash
 cd backend
@@ -373,6 +498,9 @@ python -m app.adaptation.experiments.run_novel_behaviour_eval --seeds 10 --max-s
 
 # section 3
 python -m app.adaptation.experiments.run_detector_comparison --seeds 10 --max-seconds 5400
+
+# section 4
+python -m app.adaptation.experiments.run_contamination_eval --seeds 10 --max-seconds 3600
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
