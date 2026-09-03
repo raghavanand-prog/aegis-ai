@@ -15,6 +15,7 @@ from app.evaluation.metrics.classification import ConfusionMatrix
 from app.evaluation.metrics.ranking import (
     balanced_accuracy,
     bootstrap_interval,
+    cohens_d,
     matthews_correlation,
     normalized_confusion,
     pr_auc,
@@ -182,3 +183,36 @@ def test_bootstrap_refuses_to_decorate_two_observations() -> None:
     interval = bootstrap_interval([0.5, 0.6])
     assert interval["lower"] is None
     assert "decoration" in interval["unavailableReason"]
+
+
+# ------------------------------------------------------------------ effect size
+
+
+def test_cohens_d_is_zero_for_identical_samples() -> None:
+    values = [0.1, 0.2, 0.3, 0.4]
+    assert cohens_d(values, values) == 0.0
+
+
+def test_cohens_d_is_signed_by_which_sample_is_larger() -> None:
+    low = [0.10, 0.11, 0.12, 0.13]
+    high = [0.30, 0.31, 0.32, 0.33]
+    assert cohens_d(high, low) > 0
+    assert cohens_d(low, high) < 0
+
+
+def test_cohens_d_shrinks_as_spread_grows() -> None:
+    """The V5 report's caution was that spread was large relative to the gap.
+    An effect size that ignored spread would erase exactly that caution."""
+    tight = cohens_d([0.30, 0.31, 0.32], [0.10, 0.11, 0.12])
+    loose = cohens_d([0.05, 0.31, 0.60], [0.01, 0.11, 0.25])
+    assert tight > loose
+
+
+def test_cohens_d_refuses_samples_too_small_to_pool_variance() -> None:
+    """Reported as unavailable rather than as zero - the project's rule that a
+    missing measurement is never rendered as a number."""
+    assert cohens_d([0.5], [0.2]) is None
+
+
+def test_cohens_d_is_unavailable_when_both_samples_are_constant() -> None:
+    assert cohens_d([0.2, 0.2, 0.2], [0.5, 0.5, 0.5]) is None

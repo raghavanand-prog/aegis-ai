@@ -209,3 +209,89 @@ class TestNoiseInvariantConditions:
             truth, seed=17, noise_rate=0.15, coverage=1.0, shuffle_labels=True
         )
         assert [(v.index, v.label) for v in quiet] == [(v.index, v.label) for v in loud]
+
+
+def _varying_run_condition(corpus, *, condition, seed, **kwargs):
+    """A stand-in that varies with condition and seed, so spread exists and an
+    interval and an effect size are actually computable."""
+    base = 0.25 if condition == "both_arms" else 0.10
+    offset = (seed % 7) / 100.0
+    return scenarios.ScenarioResult(
+        name=condition,
+        condition=condition,
+        seed=seed,
+        metrics={
+            "precision": 0.8,
+            "recall": 0.14,
+            "f1": base + offset,
+            "falsePositiveRate": 0.017,
+            "falseNegativeRate": 0.86,
+            "alertVolume": 26.0,
+            "threshold": 0.65,
+        },
+    )
+
+
+def _run(tmp_path, monkeypatch, seed_count: int) -> dict:
+    monkeypatch.setattr(scenarios, "run_condition", _varying_run_condition)
+    monkeypatch.setattr(
+        run_adaptation_eval.scenarios, "run_condition", _varying_run_condition
+    )
+    assert (
+        run_adaptation_eval.main(
+            [
+                "--seeds",
+                str(seed_count),
+                "--output-dir",
+                str(tmp_path),
+                "--max-seconds",
+                "600",
+            ]
+        )
+        == 0
+    )
+    return json.loads(next(tmp_path.glob("v5-adaptation-*.json")).read_text())
+
+
+class TestReportEvidence:
+    """V6 requires per-seed results, intervals and effect sizes. V5's report
+    aggregated the per-seed values away, so its stated 0.117-0.333 spread could
+    not be recomputed from the artifact - only from the console log."""
+
+    def test_every_condition_records_its_per_seed_results(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        report = _run(tmp_path, monkeypatch, 10)
+        for result in report["results"]:
+            per_seed = result["perSeed"]
+            assert [row["seed"] for row in per_seed] == result["seeds"]
+            assert all("f1" in row["metrics"] for row in per_seed)
+
+    def test_aggregates_carry_a_bootstrap_interval(self, tmp_path, monkeypatch) -> None:
+        report = _run(tmp_path, monkeypatch, 10)
+        f1 = report["results"][0]["metrics"]["f1"]
+        assert f1["ci95"]["lower"] is not None
+        assert f1["ci95"]["lower"] <= f1["mean"] <= f1["ci95"]["upper"]
+
+    def test_an_interval_is_unavailable_rather_than_invented_below_three_seeds(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        report = _run(tmp_path, monkeypatch, 2)
+        f1 = report["results"][0]["metrics"]["f1"]
+        assert f1["ci95"]["lower"] is None
+        assert f1["ci95"]["unavailableReason"]
+
+    def test_the_report_compares_adaptation_against_the_random_control(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """The comparison V5 had to compute by hand. Without it in the artifact,
+        the 34%/66% mechanism-versus-content split is not reproducible."""
+        report = _run(tmp_path, monkeypatch, 10)
+        comparisons = {
+            (row["treatment"], row["control"], row["metric"]): row
+            for row in report["comparisons"]
+        }
+        row = comparisons[("both_arms", "random_feedback", "f1")]
+        assert row["meanDifference"] > 0
+        assert row["cohensD"] is not None
+        assert row["seeds"] == 10

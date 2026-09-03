@@ -242,3 +242,40 @@ def bootstrap_interval(
         "resamples": resamples,
         "method": "percentile bootstrap over repeated-seed observations",
     }
+
+
+def cohens_d(treatment: list[float], control: list[float]) -> float | None:
+    """Cohen's d: the gap between two seed samples in units of their spread.
+
+    V5 reported a both-arms F1 mean 0.131 above the random-label control and
+    then declined to call it settled, because the spread across three seeds was
+    about the same size as the gap. A difference of means alone cannot express
+    that; an effect size can, which is why V6 reports one beside every
+    comparison.
+
+    Returns ``None`` rather than 0.0 where d is undefined - fewer than two
+    observations on a side, or no variance to pool. A missing measurement is
+    never rendered as a number.
+    """
+    left = [value for value in treatment if value is not None]
+    right = [value for value in control if value is not None]
+    if len(left) < 2 or len(right) < 2:
+        return None
+
+    mean_left = sum(left) / len(left)
+    mean_right = sum(right) / len(right)
+    var_left = sum((value - mean_left) ** 2 for value in left) / (len(left) - 1)
+    var_right = sum((value - mean_right) ** 2 for value in right) / (len(right) - 1)
+
+    pooled = ((len(left) - 1) * var_left + (len(right) - 1) * var_right) / (
+        len(left) + len(right) - 2
+    )
+    # Both samples constant: the means may differ, but there is no spread to
+    # express the difference in, so d is undefined rather than infinite. The
+    # tolerance is not cosmetic - repeated identical values do not sum to
+    # exactly equal means in binary floating point, so a bare `<= 0.0` misses
+    # the case it exists to catch. A pooled standard deviation below 1e-9 is
+    # constant for metrics that live in [0, 1].
+    if math.sqrt(max(pooled, 0.0)) < 1e-9:
+        return None
+    return _rounded((mean_left - mean_right) / math.sqrt(pooled))
