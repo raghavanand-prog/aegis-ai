@@ -253,3 +253,87 @@ class DriftMeasurement(Base):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<DriftMeasurement {self.kind}:{self.feature} {self.status}>"
+
+
+class AdaptationProposal(Base):
+    """A request to change what AEGISX detects, and the record of its fate.
+
+    This table is the human-in-the-loop requirement made structural. Production
+    detection behaviour changes through an approved proposal or it does not
+    change, and every column here exists so that months later the question "why
+    does the platform behave this way" has a complete answer: what changed, why,
+    on what evidence, who approved it, when, and what it would revert to.
+
+    ``before_state`` is captured at creation and ``rollback_state`` at
+    deployment, deliberately rather than being derived afterwards. Reconstructing
+    "what was it before" from the current configuration is exactly the operation
+    that fails when it is needed most.
+
+    Nothing here is deleted. A rejected proposal is a measured refusal, and a
+    rolled-back one is the most valuable row in the table.
+    """
+
+    __tablename__ = "adaptation_proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'deployed', "
+            "'rolled_back', 'superseded')",
+            name="ck_adaptation_proposal_status",
+        ),
+        Index("ix_adaptation_proposals_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    proposal_type: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    #: The thing that would change, named precisely enough to act on.
+    affected_component: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+
+    before_state: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    after_state: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    #: What supports the request. A proposal without this is an opinion.
+    evidence: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    #: Gate results and the evaluation behind them.
+    validation: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    expected_impact: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    risk_assessment: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    #: Links to the artifacts a reviewer needs. Nullable: a threshold proposal
+    #: has no candidate model, and inventing one would be worse than a null.
+    candidate_model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ml_models.id", ondelete="SET NULL"), nullable=True
+    )
+    feedback_dataset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("feedback_datasets.id", ondelete="SET NULL"), nullable=True
+    )
+
+    #: Who did what. Separate columns rather than one actor field, because the
+    #: whole point is that these are different people.
+    proposed_by: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    approved_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rejected_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    deployed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rolled_back_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    #: Recorded, not prevented. Three roles means an administrator can propose
+    #: and approve; hiding that would be worse than surfacing it.
+    self_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rollback_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Captured at deployment: the state to return to, not a state to recompute.
+    rollback_state: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<AdaptationProposal {self.id} {self.proposal_type} {self.status}>"

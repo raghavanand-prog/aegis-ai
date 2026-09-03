@@ -182,5 +182,50 @@ class AuditAction(str, Enum):
     # --- V5: controlled adaptation ----------------------------------------
     ADAPTATION_FEEDBACK_SUBMITTED = "adaptation.feedback_submitted"
     ADAPTATION_FEEDBACK_CORRECTED = "adaptation.feedback_corrected"
+    ADAPTATION_PROPOSAL_CREATED = "adaptation.proposal_created"
+    ADAPTATION_PROPOSAL_APPROVED = "adaptation.proposal_approved"
+    ADAPTATION_PROPOSAL_REJECTED = "adaptation.proposal_rejected"
+    ADAPTATION_PROPOSAL_DEPLOYED = "adaptation.proposal_deployed"
+    ADAPTATION_PROPOSAL_ROLLED_BACK = "adaptation.proposal_rolled_back"
     SETTINGS_CHANGED = "system.settings_changed"
     ACCESS_DENIED = "auth.access_denied"
+
+
+class ProposalType(str, Enum):
+    """What an adaptation proposal asks to change.
+
+    Every one of these is a *request*. None of them is applied by being
+    created, and the two recommendation types deliberately never modify a
+    production rule or correlation pattern directly - they propose wording an
+    engineer reviews.
+    """
+
+    MODEL_UPDATE = "model_update"
+    THRESHOLD_UPDATE = "threshold_update"
+    FEATURE_CONFIG_UPDATE = "feature_config_update"
+    DETECTION_RULE_RECOMMENDATION = "detection_rule_recommendation"
+    CORRELATION_PATTERN_RECOMMENDATION = "correlation_pattern_recommendation"
+
+
+class ProposalStatus(str, Enum):
+    """The adaptation approval lifecycle.
+
+        pending -> approved -> deployed -> rolled_back
+                -> rejected
+
+    Nothing skips a step, and there is no transition that a machine may take on
+    a proposal's behalf.
+    """
+
+    #: Raised, awaiting a human decision.
+    PENDING = "pending"
+    #: A named approver signed it off. Not yet in production.
+    APPROVED = "approved"
+    #: Refused, with a reason. Kept, because a refusal is a result.
+    REJECTED = "rejected"
+    #: Applied to production.
+    DEPLOYED = "deployed"
+    #: Applied and then withdrawn.
+    ROLLED_BACK = "rolled_back"
+    #: Replaced by a later proposal covering the same component.
+    SUPERSEDED = "superseded"
