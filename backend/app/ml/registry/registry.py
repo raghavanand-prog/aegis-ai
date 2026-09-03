@@ -265,10 +265,25 @@ def register(
 
 
 def activate_model(db: Session, model: MLModel) -> MLModel:
-    """Make ``model`` the serving version, archiving the incumbent."""
+    """Make ``model`` the serving version, archiving the incumbent.
+
+    A model may only be activated from a state that is allowed to serve. This
+    is the single chokepoint between V5's candidate lifecycle and production:
+    a candidate that has not been evaluated and approved cannot be activated,
+    however it is reached.
+    """
+    from app.adaptation.candidates.lifecycle import may_serve
+
     if model.status == MLModelStatus.FAILED.value:
         raise RegistryError(
             f"{model.identity} is marked failed and cannot be activated."
+        )
+    if not may_serve(model.status):
+        raise RegistryError(
+            f"{model.identity} is {model.status} and is not approved for serving. "
+            "A candidate reaches production through evaluation, safety gates and "
+            "an administrator's approval - never by being trained, and never "
+            "because it scored well."
         )
 
     current = get_active(db, model.name)

@@ -211,7 +211,11 @@ def test_next_version_increments_the_major(db, detector, tmp_path: Path) -> None
     path = tmp_path / "v.joblib"
     digest = detector.save(path)
     _register(db, "1.0", path, digest)
-    assert registry.next_version(db, MODEL_NAME) == "2.0"
+    # Scoped to this test's own artifact directory. Since V5, next_version
+    # takes the maximum of the database and the filesystem, so an unscoped call
+    # would depend on whatever artifacts happen to exist in the shared
+    # directory. The behaviour under test is the increment itself.
+    assert registry.next_version(db, MODEL_NAME, directory=tmp_path) == "2.0"
     db.rollback()
 
 

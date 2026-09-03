@@ -83,6 +83,22 @@ class MLModelStatus(str, Enum):
     #: Training produced an artifact that failed validation.
     FAILED = "failed"
 
+    # --- V5: the controlled adaptation lifecycle --------------------------
+    # A candidate exists as an artifact and a record and nothing else. It has
+    # no route to serving except through evaluation, safety gates and an
+    # administrator's approval, and `may_serve` is the single place that says so.
+    #: Trained, registered, and deliberately inert.
+    CANDIDATE = "candidate"
+    #: Under evaluation against the deployed model.
+    EVALUATING = "evaluating"
+    #: Passed its gates and been approved by a human. Eligible to be activated.
+    APPROVED = "approved"
+    #: Evaluated and refused. Kept, never deleted - a rejection is a result.
+    REJECTED = "rejected"
+    #: Was deployed, then withdrawn. Distinct from archived: this one failed in
+    #: production, and that is worth being able to see later.
+    ROLLED_BACK = "rolled_back"
+
 
 class ThreatIntelStatus(str, Enum):
     """Outcome of a single provider lookup - never silently conflated."""

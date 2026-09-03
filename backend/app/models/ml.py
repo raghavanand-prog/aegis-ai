@@ -44,7 +44,9 @@ class MLModel(Base, TimestampMixin):
         UniqueConstraint("name", "version", name="uq_ml_model_name_version"),
         Index("ix_ml_models_name_status", "name", "status"),
         CheckConstraint(
-            "status IN ('active', 'archived', 'failed')", name="ck_ml_models_status"
+            "status IN ('active', 'archived', 'failed', 'candidate', "
+            "'evaluating', 'approved', 'rejected', 'rolled_back')",
+            name="ck_ml_models_status"
         ),
     )
 
