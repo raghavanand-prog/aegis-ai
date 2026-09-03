@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    adaptation,
     ai,
     analytics,
     audit,
@@ -34,6 +35,7 @@ api_router.include_router(detection.router)
 # V4: research evaluation. Read only, and deliberately separate from the
 # production detection endpoints above.
 api_router.include_router(evaluation.router)
+api_router.include_router(adaptation.router)
 # --- V3 -------------------------------------------------------------------
 api_router.include_router(ml.router)
 api_router.include_router(sequences.router)

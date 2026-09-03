@@ -43,6 +43,13 @@ class Permission(str, Enum):
     # not something an HTTP request should be able to trigger.
     EVALUATION_READ = "evaluation:read"
 
+    # Analyst feedback and controlled adaptation (V5). Reading what the SOC
+    # concluded about its own detections is transparency, in the same spirit as
+    # evaluation:read. Submitting a claim is an analyst action, because a
+    # feedback row is evidence that will later shape a training set.
+    FEEDBACK_READ = "feedback:read"
+    FEEDBACK_SUBMIT = "feedback:submit"
+
     # Machine learning (V3)
     ML_READ = "ml:read"
     ML_MANAGE = "ml:manage"
@@ -92,6 +99,9 @@ VIEWER_PERMISSIONS: frozenset[Permission] = frozenset(
         # Anyone who can see what the platform concluded may see how well it
         # actually performs.
         Permission.EVALUATION_READ,
+        # V5: feedback is part of the SOC picture - a viewer may see what
+        # analysts concluded, and may not add to it.
+        Permission.FEEDBACK_READ,
     }
 )
 
@@ -110,6 +120,9 @@ ANALYST_PERMISSIONS: frozenset[Permission] = VIEWER_PERMISSIONS | frozenset(
         # list - that changes what the whole platform detects.
         Permission.THREAT_INTEL_ENRICH,
         Permission.AI_REQUEST,
+        # V5: an analyst records verdicts on their own alerts. Approving or
+        # deploying an adaptation built from them is deliberately not here.
+        Permission.FEEDBACK_SUBMIT,
     }
 )
 
