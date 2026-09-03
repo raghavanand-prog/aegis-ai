@@ -310,6 +310,46 @@ features AEGISX actually scores.
 
 ---
 
+## 5b. Promotion gates **[IMPLEMENTATION] + [MEASURED]**
+
+A gate answers *is it safe to put this in front of live traffic*, never *is it
+better*. Better on one metric is how a detector trades half its recall for a
+prettier false-positive rate and ships because the summary line improved.
+
+Four properties: an unmeasured metric never passes a gate (V4's rule); one
+improved metric never outweighs a catastrophic regression; every threshold is
+configuration carrying a stated rationale rather than a constant; and passing
+every gate promotes nothing.
+
+Defaults, all configurable, all argued rather than asserted: recall drop ≤ 0.05
+(the metric a SOC cannot buy back), FPR increase ≤ 0.05 (analyst time, against
+an already-costly 33.3% measured baseline), precision drop ≤ 0.10 (this trade is
+sometimes legitimate), F1 drop ≤ 0.05 (a backstop for a candidate worse on every
+axis), latency ratio ≤ 2.0 (scoring is on the ingestion path), and ≥ 100
+evaluation samples.
+
+### First real gate decision **[MEASURED]**
+
+Candidate `isolation_forest@2.0` (800-sample corpus) against deployed `@1.0`
+(6,000), both scored over the same 1,950 samples in the same chronological
+order with the production extractor, dataset `c0f04f3ccb2a63b8`, threshold 0.65:
+
+| | Precision | Recall | F1 | FPR | Latency |
+| --- | --- | --- | --- | --- | --- |
+| Deployed `v1.0` | 60.6% | 75.1% | 0.671 | 32.6% | 1.69 ms |
+| Candidate `v2.0` | 50.1% | **80.1%** | 0.616 | **53.2%** | 1.68 ms |
+
+**Gates: FAILED.** The candidate gains 5 points of recall — a naive "is it
+better at catching attacks" check would have promoted it — at a cost of +20.7pp
+FPR, −10.5pp precision and −0.054 F1. Latency passed at 0.99× parity. The
+candidate's status after evaluation is unchanged: `candidate`.
+
+The deployed model's figures cross-check against §2's §19.12 result (P 59.8%,
+R 74.4%, F1 0.663, FPR 33.3%); the small gap is the full corpus at threshold
+0.65 versus the test split at 0.64.
+
+---
+
 ## 6. Implementation plan
 
 | Phase | Content |
