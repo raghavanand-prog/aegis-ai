@@ -2,3 +2,9 @@
 # not committed. Run `python -m app.evaluation.run_detection_eval` to produce it.
 detection-eval-*.json
 latest.json
+
+# V4/V5 experiment reports: regenerable from the dataset + engine.
+v4-experiments-*.json
+latest-v4-experiments-*.json
+v5-*.json
+latest-v5-*.json
