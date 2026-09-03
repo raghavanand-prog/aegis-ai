@@ -243,3 +243,74 @@ class TestCandidateEvaluation:
         assert report["baseline"] is None
         assert report["gates"]["passed"] is False
         assert any("baseline" in f.lower() for f in report["gates"]["failures"])
+
+
+class TestPerCategoryRecallGate:
+    """V6 §8 measured that a candidate can lose 20 points of recall on one
+    attack category while aggregate recall moves less than its own seed noise.
+    Every aggregate gate passes that candidate. This is the gate that does not."""
+
+    def _matrix(self, *, tp: int, fn: int, fp: int = 5, tn: int = 500) -> ConfusionMatrix:
+        return ConfusionMatrix(
+            true_positives=tp, false_negatives=fn, false_positives=fp, true_negatives=tn
+        )
+
+    def test_a_single_category_collapse_fails_even_when_the_aggregate_passes(
+        self,
+    ) -> None:
+        """The §8 attack, expressed as a gate input: aggregate recall barely
+        moves, one category's recall halves."""
+        baseline = self._matrix(tp=130, fn=26)
+        candidate = self._matrix(tp=126, fn=30)  # aggregate recall 0.833 -> 0.808
+
+        aggregate_only = gates.evaluate(baseline=baseline, candidate=candidate)
+        assert aggregate_only.passed, "the aggregate gates must not see this"
+
+        result = gates.evaluate(
+            baseline=baseline,
+            candidate=candidate,
+            baseline_per_category={"MALWARE": self._matrix(tp=20, fn=4)},
+            candidate_per_category={"MALWARE": self._matrix(tp=10, fn=14)},
+        )
+        assert not result.passed
+        assert any("MALWARE" in failure for failure in result.failures)
+
+    def test_a_category_within_the_bound_passes(self) -> None:
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26),
+            candidate=self._matrix(tp=129, fn=27),
+            baseline_per_category={"MALWARE": self._matrix(tp=20, fn=4)},
+            candidate_per_category={"MALWARE": self._matrix(tp=20, fn=4)},
+        )
+        assert result.passed
+
+    def test_absent_per_category_data_is_advisory_not_a_silent_pass(self) -> None:
+        """Backward compatibility without pretending. Existing callers supply no
+        per-category data, so vetoing would reject every candidate; but the
+        absence is surfaced to the approver rather than treated as fine, which is
+        what the `advisory` flag exists for."""
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26), candidate=self._matrix(tp=129, fn=27)
+        )
+        check = next(c for c in result.checks if c.name == "per_category_recall")
+        assert check.advisory
+        assert check.status == "not_measured"
+        assert result.passed, "an advisory must not veto"
+
+    def test_a_category_present_in_the_baseline_but_missing_from_the_candidate_fails(
+        self,
+    ) -> None:
+        """A candidate evaluated on fewer categories than the incumbent has not
+        been shown to be safe on the rest."""
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26),
+            candidate=self._matrix(tp=129, fn=27),
+            baseline_per_category={"MALWARE": self._matrix(tp=20, fn=4)},
+            candidate_per_category={},
+        )
+        assert not result.passed
+
+    def test_the_policy_states_its_rationale(self) -> None:
+        rationale = gates.GatePolicy().rationale()
+        assert "max_per_category_recall_drop" in rationale
+        assert "min_category_samples" in rationale

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.adaptation.experiments import feedback_caps as caps
+from app.adaptation.feedback import caps
 
 
 def _candidates(**counts: int) -> list[caps.CapCandidate]:

@@ -95,7 +95,7 @@ class TestCapPoliciesAgainstTheAttack:
     per-group policies do about it, and what they cost."""
 
     def test_a_baseline_relative_cap_admits_far_fewer_poisoned_rows(self) -> None:
-        from app.adaptation.experiments import feedback_caps
+        from app.adaptation.feedback import caps as feedback_caps
 
         rates = tp.honest_baseline_rates(seeds=(4242, 99))
         unguarded = tp.measure(seed=1337, target_category="MALWARE")
