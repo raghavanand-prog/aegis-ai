@@ -24,10 +24,11 @@ approval is still required to deploy. The question is whether those controls are
 from __future__ import annotations
 
 import random
+from collections import Counter
 from functools import lru_cache
 from typing import Any
 
-from app.adaptation.experiments import arm2, simulation
+from app.adaptation.experiments import arm2, feedback_caps, simulation
 from app.adaptation.experiments.scenarios import (
     DEFAULT_THRESHOLD,
     _fit,
@@ -40,6 +41,36 @@ from app.evaluation.metrics.ranking import roc_auc
 from app.evaluation.splits import STRATIFIED_GROUP, build_split
 from app.ml.features.extractor import FEATURE_NAMES, FeatureExtractor
 from app.ml.training.corpus import DEFAULT_SAMPLES, DEFAULT_SPAN_DAYS, build_corpus
+
+#: The field feedback is grouped by. Produced by the normalizer before any
+#: detection or labelling, so a cap keyed on it is implementable in production.
+#: Deliberately not the ground-truth attack category, which production lacks.
+GROUP_FIELD = "event_type"
+
+
+def _group_of(sample) -> str:
+    return str(sample.candidate.get(GROUP_FIELD) or "unknown")
+
+
+def honest_baseline_rates(*, seeds: tuple[int, ...], noise_rate: float = 0.05,
+                          coverage: float = 0.5) -> dict[str, float]:
+    """Mean admitted-benign rows per group under **honest** feedback.
+
+    Computed from seeds other than the one under attack. A baseline learned from
+    the attacked stream would learn the attack as normal, which is the obvious
+    way to get this wrong.
+    """
+    totals: Counter[str] = Counter()
+    for seed in seeds:
+        _, fit_samples, _ = _prepare(seed)
+        labels = [bool(s.is_malicious) for s in fit_samples]
+        verdicts = simulation.simulate_feedback(
+            labels, seed=seed, noise_rate=noise_rate, coverage=coverage
+        )
+        for verdict in verdicts:
+            if arm2._admissible(verdict.label):
+                totals[_group_of(fit_samples[verdict.index])] += 1
+    return {group: count / len(seeds) for group, count in totals.items()}
 
 
 @lru_cache(maxsize=8)
@@ -69,6 +100,9 @@ def measure(
     noise_rate: float = 0.05,
     coverage: float = 0.5,
     max_feedback_fraction: float = arm2.DEFAULT_MAX_FEEDBACK_FRACTION,
+    cap_policy: str = feedback_caps.POLICY_GLOBAL,
+    baseline_rates: dict[str, float] | None = None,
+    per_group_ceiling: int | None = None,
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
 ) -> dict[str, Any]:
@@ -121,10 +155,21 @@ def measure(
     ceiling = int(len(telemetry) * max_feedback_fraction / (1 - max_feedback_fraction))
 
     def admit(verdicts: list[simulation.SimulatedVerdict]) -> list[simulation.SimulatedVerdict]:
-        admitted = [v for v in verdicts if arm2._admissible(v.label)]
-        if len(admitted) > ceiling:
-            admitted = random.Random(seed).sample(admitted, ceiling)  # noqa: S311
-        return admitted
+        eligible = [v for v in verdicts if arm2._admissible(v.label)]
+        kept = feedback_caps.apply(
+            [
+                feedback_caps.CapCandidate(
+                    index=v.index, group=_group_of(fit_samples[v.index])
+                )
+                for v in eligible
+            ],
+            policy=cap_policy,
+            global_ceiling=ceiling,
+            per_group_ceiling=per_group_ceiling,
+            baseline_rates=baseline_rates,
+        )
+        allowed = {candidate.index for candidate in kept}
+        return [v for v in eligible if v.index in allowed]
 
     honest_admitted = admit(honest)
     attacked_admitted = admit(attacked)
@@ -168,6 +213,7 @@ def measure(
         "seed": seed,
         "targetCategory": target_category,
         "adversaryReach": adversary_reach,
+        "capPolicy": cap_policy,
         "poisonedCategories": sorted(
             {
                 fit_samples[v.index].category

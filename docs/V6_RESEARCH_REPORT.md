@@ -875,7 +875,92 @@ Reported because they are genuine mitigating factors, not to soften the finding:
 4. Feedback is simulated; both corpora are synthetic.
 5. Nothing is deployed, and no defence is implemented.
 
-## 9. Reproducing
+## 9. A defence that works — the per-group cap **[MEASURED]**
+
+§8 left targeted poisoning as a documented, undefended vulnerability. This
+implements and tests the defence it recommended.
+
+### 9.1 Why the obvious defence fails
+
+Measured honest behaviour, admitted-benign rows per `event_type` over 8 seeds:
+
+| | | | |
+| --- | --- | --- | --- |
+| auth_success | 114.6 | credential_access | 1.6 |
+| firewall_allow | 84.5 | **malware_detected** | **1.4** |
+| process_creation | 58.5 | data_exfiltration | 1.2 |
+| antivirus_scan | 46.9 | ransomware_behavior | 1.1 |
+
+Under attack, `malware_detected` supplies **22**.
+
+The discriminating signal is **not** that a group is large — `auth_success`
+legitimately supplies 114 — but that **a group almost never legitimately called
+benign suddenly is**. So a flat per-group ceiling cannot work: any value
+permitting 114 also permits 22.
+
+Grouping is by `event_type`, which the **normalizer** produces before any
+detection or labelling. It is deliberately *not* the ground-truth attack
+category — production does not have that, and a defence keyed on it could not
+ship.
+
+### 9.2 Three policies, measured
+
+Target MALWARE, 8 seeds, full adversary reach. The `baseline_relative` policy
+admits up to `tolerance × baseline` rows per group (tolerance 3.0, chosen before
+measuring), with a floor of 2 for unseen groups. Its baseline is learned from
+**held-out honest seeds** — learning it from the attacked stream would teach it
+the attack as normal.
+
+| Policy | poisoned rows | Δ target recall | honest feedback rows | honest-augmented FPR |
+| --- | --- | --- | --- | --- |
+| **global** (status quo) | 22.0 | **−0.2026** | 421 | 0.2537 |
+| per_group_absolute = 25 | 21.9 | −0.0271 | **200** | **0.3504** |
+| **baseline_relative** | **4.0** | **+0.0101** | 421 | 0.2537 |
+
+Against §5's telemetry-only baseline of **FPR 0.3397**:
+
+- **`baseline_relative` neutralises the attack at no cost.** Poisoned rows fall
+  22 → 4 (−82%), target recall under attack goes to **+0.0101** — statistically
+  indistinguishable from the unattacked model — and it keeps **all 421** honest
+  feedback rows and the full FPR benefit (0.3397 → 0.2537).
+- **`per_group_absolute` is the worst of both.** It does not stop the attack
+  (21.9 of 22 poisoned rows admitted, because 22 < the ceiling of 25) *and* it
+  destroys half the honest feedback (421 → 200), leaving FPR at **0.3504 —
+  worse than using no feedback at all.** The naive defence is actively harmful.
+
+**[LIMITATION]** `per_group_absolute`'s Δ target recall (−0.027) is not
+comparable to the others: capping also weakens the *unattacked* arm it is
+measured against, which moves its own baseline (target recall 0.9286 rather than
+0.8079). Its poisoned-row count and honest-feedback cost are the interpretable
+figures.
+
+### 9.3 What this defence depends on **[LIMITATION]**
+
+1. **A trusted baseline.** `baseline_relative` needs honest per-group rates. An
+   adversary patient enough to poison the baseline itself — contributing
+   slightly elevated `malware_detected` benign labels over many cycles until the
+   baseline rises — would defeat it. This is a real weakness, not a hypothetical
+   one, and it is **not tested here**.
+2. **`event_type` tracks attack category almost perfectly in this corpus** (
+   MALWARE → `malware_detected`, PORT_SCAN → `firewall_deny`). On real telemetry
+   an attack spans many event types and a defender's grouping is correspondingly
+   blunter. **This result flatters the defence**, and the honest reading is that
+   the *mechanism* is sound rather than that the effect size transfers.
+3. Only MALWARE was used for the policy comparison.
+4. The tolerance of 3.0 and floor of 2 were chosen before measuring, but not
+   tuned or swept.
+5. Nothing is deployed. This is an experimental cap, not a change to the
+   production adaptation path.
+
+### 9.4 Status of the §8 vulnerability
+
+**Mitigated in the experimental pipeline, not closed in production.** The cap
+lives in `app/adaptation/experiments/feedback_caps.py` and is exercised by the
+targeted-poisoning harness. Wiring it into the production adaptation path,
+together with the per-category recall tracking §8.2 showed is necessary, remains
+outstanding work.
+
+## 10. Reproducing
 
 ```bash
 cd backend
@@ -904,6 +989,9 @@ python -m app.adaptation.experiments.run_feedback_quality_eval --seeds 10 --max-
 
 # section 8
 python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --max-seconds 5400
+
+# section 9 - one run per policy
+python -m app.adaptation.experiments.run_targeted_poisoning_eval --seeds 8 --targets MALWARE --cap-policy baseline_relative --max-seconds 3600
 ```
 
 Timestamped reports under `app/evaluation/reports/` are committed as immutable
