@@ -40,10 +40,21 @@ POLICY_PER_GROUP_ABSOLUTE = "per_group_absolute"
 POLICY_BASELINE_RELATIVE = "baseline_relative"
 POLICIES = (POLICY_GLOBAL, POLICY_PER_GROUP_ABSOLUTE, POLICY_BASELINE_RELATIVE)
 
-#: Multiple of a group's honest baseline that may still be admitted. Chosen
-#: before measuring the defence's effect, so the safety parameter is not a
-#: function of the result it produced.
-DEFAULT_TOLERANCE = 3.0
+#: Multiple of a group's honest baseline that may still be admitted.
+#:
+#: **Lowered from 3.0 to 1.5 in V6 §11.4.** At 3.0 a patient adversary ratchets
+#: its own ceiling: it takes the whole allowance each cycle, every batch stays
+#: within policy, and the next cycle's baseline - a mean over history that now
+#: includes that batch - rises. Measured over ten cycles, the allowance went
+#: 3.5 -> 27.5 and admitted poison reached 22.9 rows, past the ~22 that cost
+#: 0.2026 of target recall in §8. At 1.5 the same campaign is contained at 2.3
+#: rows.
+#:
+#: The cost is 0.15% of honest throughput (407.5 rows against 408.1), and it is
+#: that small for a structural reason: this bounds *growth*, and honest
+#: per-group feedback volume is stationary. Only an attack needs its own
+#: contribution to keep rising.
+DEFAULT_TOLERANCE = 1.5
 #: Rows allowed for a group with no baseline. Small and non-zero: a genuinely
 #: new event type should be able to contribute a little, not nothing and not
 #: everything.
