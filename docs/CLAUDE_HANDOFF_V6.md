@@ -169,8 +169,13 @@ experiment harness.
    rebuilt in `feature_names` order; non-event targets and incomplete vectors
    are skipped **and counted**.
 
-**Defaults preserve V5 behaviour exactly** — asserted by test. No
-`feedback_dataset_id` means telemetry alone; `cap_policy` defaults to `global`.
+**No `feedback_dataset_id` means telemetry alone**, exactly as V5 — asserted by
+test. `cap_policy` defaults to **`baseline_relative`**, the policy V6 §9
+measured stops targeted poisoning; `global` is an explicit opt-out. The default
+derives its per-group baseline from prior feedback datasets, excluding the batch
+being admitted, and **refuses a cold start** rather than degrading silently —
+with no baseline every group falls to the floor, a measured 6 rows of 220, and
+§7.4 measured feedback that sparse is worse than none.
 
 **No new migrations. No schema change. No frontend change.** Head is still
 `0009_v5_proposals`; migrations round-trip base→head→base→head on SQLite.
@@ -254,22 +259,18 @@ are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
 
 Also unresolved, and load-bearing:
 
-9. **`global` is still the default cap policy.** §9 measured that it does *not*
-   stop targeted poisoning. An operator who admits real feedback without
-   `--cap-policy baseline_relative` gets §8's vulnerability. **[INFERENCE]** I
-   left it opt-in because changing a security default silently seemed worse than
-   documenting a sharp edge — but there is a good argument the safe thing should
-   be the default, and it is a one-line change.
-10. **The patient baseline-poisoning adversary is untested.** §9's defence
-    learns its baseline from feedback history; an adversary who raises that
-    baseline across several datasets defeats it.
-11. **`event_type` tracks attack category almost perfectly in this corpus**, so
+9. **The patient baseline-poisoning adversary is untested.** §9's defence
+   learns its baseline from feedback history; an adversary who raises that
+   baseline across several datasets defeats it. **This is now more load-bearing,
+   not less**: since `baseline_relative` became the default, the baseline is
+   consulted on every run.
+10. **`event_type` tracks attack category almost perfectly in this corpus**, so
     §9's result **flatters the defence**. The mechanism is sound; the effect size
     is unlikely to transfer to real telemetry where an attack spans many event
     types.
-12. **All feedback is still simulated.** No analyst population exists. This was
+11. **All feedback is still simulated.** No analyst population exists. This was
     V5's first recommendation and it remains unaddressed.
-13. Everything inherited from V4 §19 and V3 still applies.
+12. Everything inherited from V4 §19 and V3 still applies.
 
 ---
 
@@ -277,19 +278,17 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Decide the cap default** (§9.9). One line, and it is a security posture
-   decision that should be made deliberately rather than inherited.
-2. **Pay the documentation debt** (§9.8) before more code lands. Four documents
+1. **Pay the documentation debt** (§9.8) before more code lands. Four documents
    currently describe a system that no longer exists.
-3. **Rebuild the evaluation substrate.** The V4/V5 corpus is a rule-testing
+2. **Rebuild the evaluation substrate.** The V4/V5 corpus is a rule-testing
    corpus that was pressed into service as ML training data. Until a corpus
    exists whose contamination resembles production, every detection number on it
    bounds an artefact.
-4. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
+3. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
    first, or adding a source deepens it.
-5. **Real analyst feedback**, still the highest-value thing available and still
+4. **Real analyst feedback**, still the highest-value thing available and still
    not done.
-6. PostgreSQL and one live provider, whenever the environment permits.
+5. PostgreSQL and one live provider, whenever the environment permits.
 
 **[INFERENCE]** Do *not* treat §3's table as a reason to abandon adaptation. It
 says the baseline was wrong, not that feedback is worthless — the redesigned
