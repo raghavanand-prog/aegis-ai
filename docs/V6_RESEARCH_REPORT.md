@@ -1485,7 +1485,109 @@ Two things follow:
 knowledge of the labels and no operator gets it. It is used here as a
 *comparable* quantity, not an achievable one.
 
-## 15. Reproducing
+## 15. The fixed-threshold audit **[MEASURED]**
+
+§14.5 recommended auditing every fixed-threshold comparison. The confound
+condition is precise: **comparing models fitted on different data at one frozen
+threshold**. Where both models share a fit set, a fixed threshold is fine.
+
+### 15.1 Classification of every site
+
+| Site | Models compared | Verdict |
+| --- | --- | --- |
+| `candidates/gates.py` + `evaluation.py` | incumbent vs candidate, **both from `build_corpus`** | **Sound in its normal mode** — see §15.2 |
+| `candidates/gates.py`, candidate **augmented** (V6 §10) | telemetry vs telemetry+feedback | **CONFOUNDED** — §15.3 |
+| `scenarios.run_condition` (Track 1, V5 headline) | static vs refitted arms | **Confounded** |
+| `scenarios.run_new_behaviour` (§2) | static vs refitted | **Confounded** |
+| `contamination.measure` (§4) | refit per level | **Confounded** — already noted §14.4 |
+| `production_baseline.measure` (§5) | telemetry-fit vs eval-fit | **Confounded** — §14 |
+| `arm2.measure` (§6) | telemetry vs telemetry+feedback | **Confounded** — §15.3 |
+| `feedback_quality.measure` (§7) | same structure as §6 | **Confounded** |
+| `targeted_poisoning`, `patient_poisoning` (§§8–11) | honest vs attacked fit sets | **Confounded** |
+| `candidate_detectors` (§3) | uses ROC-AUC throughout | **Sound** |
+
+Ten of eleven comparison sites use a fixed threshold across differently-fitted
+models. §3 is the exception, and its choice of ROC-AUC turns out to have been
+load-bearing rather than stylistic.
+
+### 15.2 The production gate is sound in its normal mode
+
+The important reassurance. Four candidates from the same generator, different
+seeds — the ordinary incumbent-versus-candidate case:
+
+| seed | ROC-AUC | recall @ 0.65 | best F1 | 0.65 percentile |
+| --- | --- | --- | --- | --- |
+| 1337 | 0.7438 | 0.6923 | 0.6761 | 53.6 |
+| 4242 | 0.7495 | 0.7115 | 0.6760 | 52.8 |
+| 99 | 0.7737 | 0.7115 | 0.6777 | 52.6 |
+| 2024 | 0.7210 | 0.7244 | 0.6648 | 51.5 |
+
+**The 0.65 percentile is stable (51.5–53.6)** and recall spread is 0.032, inside
+the gate's 0.05 bound. Because `train_candidate` fits every candidate on
+`build_corpus`, incumbent and candidate share a distribution and the frozen
+threshold means the same thing for both.
+
+### 15.3 V6's own augmentation reintroduces the confound
+
+§10 changed what a candidate is. A candidate trained *with* feedback
+augmentation is fitted on a different distribution from an incumbent trained
+without it — and that is exactly the confound condition.
+
+Measured, 5 seeds:
+
+| | ROC-AUC | recall @ 0.65 | best F1 | 0.65 percentile |
+| --- | --- | --- | --- | --- |
+| telemetry only | 0.7529 | 0.7295 | 0.6773 | 50.7 |
+| + feedback augmented | **0.7862** | 0.6846 | **0.6921** | **56.4** |
+
+**The augmented candidate is genuinely better** — ROC-AUC +0.033,
+best-achievable F1 +0.015 — and the gate sees **recall −0.0449 against a bound
+of 0.05**. It came within **0.005** of rejecting a better model because adding
+verified-benign rows raised the training median and moved where 0.65 sits.
+
+**This is a defect in V6's own work**, introduced in §10 and predicted by §14.5
+before it was found.
+
+It also re-reads §6. That section described the arm as *"trading recall for
+precision"*. At matched operating points it does no such thing: it is **strictly
+better** on both threshold-free measures, and the apparent trade is the
+calibration shift. The FPR improvement §6 celebrated and the recall loss it
+conceded are **the same effect**.
+
+### 15.4 The fix
+
+`GatePolicy` gains `max_roc_auc_drop` (0.03), and `evaluate()` a
+**`discrimination`** check reading threshold-free separation beside the
+fixed-threshold gates. `evaluate_candidate` computes and supplies it.
+
+It does **not** overrule the recall gate. V5's rule — a gate is a veto, a human
+decides — holds. What it does is tell the approver which explanation applies:
+
+- recall down, **AUC up** → *"any recall change at the frozen threshold is
+  calibration, not lost capability"*
+- recall down, **AUC down** → *"a recall change is not explained by calibration
+  alone"* — and the candidate fails, as it should
+
+Absent AUC is **advisory**, not a silent pass, matching the per-category gate
+added in §10.
+
+### 15.5 What the audit does not do **[LIMITATION]**
+
+1. **The confounded experiment sections have not been re-run.** §§1, 2, 4, 6–11
+   still report F1 at a frozen threshold across differently-fitted models. Their
+   *directions* are supported by threshold-free evidence where it exists (§3,
+   §13.3, §14.4); their *magnitudes* are not trustworthy.
+2. **V5's headline is the most affected.** `run_condition` compares a static
+   model against refitted arms at 0.65. §14 measured that moving to a model's own
+   best threshold is worth up to +0.53 F1 on this data, which is larger than the
+   entire adaptation effect V5 reported. **How much of V5's 0.0389 → 0.2570
+   survives a matched-operating-point comparison is not known**, and I would not
+   assume it is most of it.
+3. `max_roc_auc_drop = 0.03` is set from the seed-to-seed AUC spread measured in
+   §15.2 (0.053 across four seeds), deliberately tighter than that spread. It has
+   not been tuned against a population of real candidates.
+
+## 16. Reproducing
 
 ```bash
 cd backend

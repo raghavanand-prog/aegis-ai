@@ -314,3 +314,64 @@ class TestPerCategoryRecallGate:
         rationale = gates.GatePolicy().rationale()
         assert "max_per_category_recall_drop" in rationale
         assert "min_category_samples" in rationale
+
+
+class TestDiscriminationCheck:
+    """V6 §15: a fixed-threshold gate cannot tell a worse model from a
+    differently-calibrated one.
+
+    Measured on V6's own feedback augmentation: it improves ROC-AUC by 0.033 and
+    best-achievable F1 by 0.015 - genuinely better - while recall at the frozen
+    0.65 falls 0.0449 against a bound of 0.05. The gate came within 0.005 of
+    rejecting a better model because adding benign rows to the fit set raised the
+    training median and moved where 0.65 sits.
+
+    So the gate now reads a threshold-free capability measure beside the
+    fixed-threshold ones. It does not overrule them - V5's rule that a gate is a
+    veto and a human decides still holds - it tells the approver which of the two
+    explanations applies.
+    """
+
+    def _matrix(self, *, tp: int, fn: int, fp: int = 5, tn: int = 500) -> ConfusionMatrix:
+        return ConfusionMatrix(
+            true_positives=tp, false_negatives=fn, false_positives=fp, true_negatives=tn
+        )
+
+    def test_a_recall_drop_with_improved_discrimination_is_named_as_calibration(
+        self,
+    ) -> None:
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26),
+            candidate=self._matrix(tp=123, fn=33),
+            baseline_roc_auc=0.7529,
+            candidate_roc_auc=0.7862,
+        )
+        check = next(c for c in result.checks if c.name == "discrimination")
+        assert check.passed
+        assert "calibration" in check.description.lower()
+
+    def test_a_recall_drop_with_degraded_discrimination_is_not_excused(self) -> None:
+        """The case the recall gate exists for must still fail."""
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26),
+            candidate=self._matrix(tp=100, fn=56),
+            baseline_roc_auc=0.78,
+            candidate_roc_auc=0.61,
+        )
+        assert not result.passed
+        check = next(c for c in result.checks if c.name == "discrimination")
+        assert not check.passed
+
+    def test_discrimination_is_advisory_when_not_measured(self) -> None:
+        """Every pre-V6 caller supplies no AUC. Vetoing would reject every
+        candidate; treating absence as a pass would hide the gap."""
+        result = gates.evaluate(
+            baseline=self._matrix(tp=130, fn=26), candidate=self._matrix(tp=129, fn=27)
+        )
+        check = next(c for c in result.checks if c.name == "discrimination")
+        assert check.advisory
+        assert check.status == "not_measured"
+        assert result.passed
+
+    def test_the_policy_states_its_rationale(self) -> None:
+        assert "max_roc_auc_drop" in gates.GatePolicy().rationale()

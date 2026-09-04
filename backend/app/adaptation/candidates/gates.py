@@ -77,6 +77,19 @@ class GatePolicy:
     #: and the category is reported as unmeasured rather than judged.
     min_category_samples: int = 10
 
+    #: Threshold-free capability. Every other gate reads metrics at one frozen
+    #: threshold, and V6 §14 measured that such a threshold names a different
+    #: operating point for each model, because `anomaly_score` is calibrated to
+    #: the median of that model's own training scores. A candidate fitted on
+    #: different data can therefore lose recall at 0.65 while being strictly
+    #: better - measured on V6's own feedback augmentation, ROC-AUC +0.033 and
+    #: best-achievable F1 +0.015 against a recall drop of 0.0449, within 0.005
+    #: of failing the recall gate.
+    #:
+    #: ROC-AUC is rank-based and immune to that, so it separates "worse model"
+    #: from "differently calibrated model".
+    max_roc_auc_drop: float = 0.03
+
     #: Below this many samples a comparison is noise dressed as evidence.
     min_evaluation_samples: int = 100
 
@@ -96,6 +109,13 @@ class GatePolicy:
             "max_precision_drop": (
                 "Precision may fall if recall rises - that trade is sometimes "
                 "wanted. It may not collapse."
+            ),
+            "max_roc_auc_drop": (
+                "Threshold-free capability. Every other gate reads one frozen "
+                "threshold, which V6 §14 measured names a different operating "
+                "point per model - so a candidate fitted on different data can "
+                "lose recall at 0.65 while separating better. ROC-AUC is "
+                "rank-based and tells the two apart."
             ),
             "max_per_category_recall_drop": (
                 "Aggregate recall divides a single-category collapse by the "
@@ -314,6 +334,8 @@ def evaluate(
     candidate_dataset_fingerprint: str | None = None,
     baseline_per_category: dict[str, ConfusionMatrix] | None = None,
     candidate_per_category: dict[str, ConfusionMatrix] | None = None,
+    baseline_roc_auc: float | None = None,
+    candidate_roc_auc: float | None = None,
     policy: GatePolicy | None = None,
 ) -> GateResult:
     """Run every gate. Writes nothing and promotes nothing."""
@@ -365,6 +387,49 @@ def evaluate(
             higher_is_better=True,
         ),
     ]
+
+    # Threshold-free capability, read beside the fixed-threshold gates above so
+    # an approver can tell a worse candidate from a differently-calibrated one.
+    if baseline_roc_auc is None or candidate_roc_auc is None:
+        checks.append(
+            GateCheck(
+                name="discrimination",
+                description=(
+                    "Threshold-free separation (ROC-AUC), against the incumbent. "
+                    "Not supplied for this evaluation, so a recall change cannot "
+                    "be attributed to capability rather than calibration. "
+                    "Advisory: surfaced to the approver rather than treated as a "
+                    "pass."
+                ),
+                passed=True,
+                status="not_measured",
+                advisory=True,
+            )
+        )
+    else:
+        drop = baseline_roc_auc - candidate_roc_auc
+        improved = drop <= 0
+        checks.append(
+            GateCheck(
+                name="discrimination",
+                description=(
+                    "Threshold-free separation (ROC-AUC), against the incumbent. "
+                    + (
+                        "It improved, so any recall change at the frozen "
+                        "threshold is calibration, not lost capability - the "
+                        "candidate separates better and its operating point "
+                        "moved."
+                        if improved
+                        else "It fell, so a recall change is not explained by "
+                        "calibration alone."
+                    )
+                ),
+                passed=drop <= policy.max_roc_auc_drop,
+                status="ok" if drop <= policy.max_roc_auc_drop else "failed",
+                threshold=policy.max_roc_auc_drop,
+                observed=round(drop, 6),
+            )
+        )
 
     per_category_check, per_category_failures = _per_category_check(
         baseline=baseline_per_category,
@@ -435,6 +500,7 @@ def evaluate(
             "maxFprIncrease": policy.max_fpr_increase,
             "maxPrecisionDrop": policy.max_precision_drop,
             "maxF1Drop": policy.max_f1_drop,
+            "maxRocAucDrop": policy.max_roc_auc_drop,
             "maxPerCategoryRecallDrop": policy.max_per_category_recall_drop,
             "minCategorySamples": float(policy.min_category_samples),
             "maxLatencyIncreaseRatio": policy.max_latency_increase_ratio,
