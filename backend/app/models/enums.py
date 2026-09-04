@@ -196,6 +196,9 @@ class AuditAction(str, Enum):
     INCIDENT_ASSIGNED = "incident.assigned"
     RESPONSE_ACTION = "incident.response_action"
     IOC_VIEWED = "ioc.viewed"
+    # V9: reading one specific evidence item and its provenance. The
+    # evidence *list* is not audited - that is how the workspace opens.
+    EVIDENCE_VIEWED = "evidence.viewed"
     DETECTION_EVALUATION_RUN = "detection.evaluation_run"
     # --- V3: AI / ML / enrichment -----------------------------------------
     ML_MODEL_TRAINED = "ml.model_trained"

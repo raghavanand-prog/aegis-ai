@@ -19,6 +19,7 @@ import RiskBreakdown from "@/features/detection/components/RiskBreakdown";
 import { fetchAIAnalyses, fetchAIStatus, requestAIAnalysis } from "@/services/api/ai";
 import type { AIAnalysisKind } from "@/services/api/ai";
 import { api } from "@/services/api/client";
+import { fetchIncidentEvidence } from "@/services/api/evidence";
 import { fetchIncidentMLFindings, fetchMLStatus } from "@/services/api/ml";
 import {
   enrichIndicator,
@@ -91,6 +92,13 @@ export default function InvestigationWorkspace({
   const mlQuery = useQuery({
     queryKey: ["incident", incidentId, "ml"],
     queryFn: () => fetchIncidentMLFindings(incidentId as string),
+    enabled,
+  });
+
+  // V9: the same evidence, with the provenance of each piece attached.
+  const evidenceQuery = useQuery({
+    queryKey: ["incident", incidentId, "evidence"],
+    queryFn: () => fetchIncidentEvidence(incidentId as string),
     enabled,
   });
 
@@ -336,7 +344,13 @@ export default function InvestigationWorkspace({
               )}
 
               {tab === "evidence" && (
-                <EvidenceTab incident={incident} ml={mlQuery.data} />
+                <EvidenceTab
+                  incident={incident}
+                  ml={mlQuery.data}
+                  evidence={evidenceQuery.data}
+                  evidenceLoading={evidenceQuery.isLoading}
+                  evidenceError={evidenceQuery.isError}
+                />
               )}
 
               {tab === "intel" && (
