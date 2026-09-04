@@ -14,6 +14,7 @@ from app.models.adaptation import (
 from app.models.ai_analysis import AIAnalysis
 from app.models.audit import AuditLog
 from app.models.base import Base, JSONType, TimestampMixin, utcnow
+from app.models.decision import DecisionEvidenceBinding
 from app.models.evaluation import (
     EvaluationDatasetRecord,
     Experiment,
@@ -37,6 +38,7 @@ __all__ = [
     "FeedbackDatasetMember",
     "AuditLog",
     "Base",
+    "DecisionEvidenceBinding",
     "EvaluationDatasetRecord",
     "Event",
     "Experiment",

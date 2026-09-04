@@ -18,11 +18,11 @@ phase; producing one belongs here.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.evidence import registry
+from app.evidence.binding import manifest_for
 from app.evidence.models import EvidenceItem, EvidenceKind
 
 
@@ -45,11 +45,14 @@ class EvidenceSet:
         """One digest over the whole set.
 
         Covers each item's identity **and** its content digest, so it changes
-        if an item is added, removed, or altered underneath. Sorted, so the
-        order providers happen to run in cannot change it.
+        if an item is added, removed, or altered underneath.
+
+        Delegated to ``binding.manifest_for`` rather than computed here: a
+        decision's recorded manifest is compared against this one, and two
+        implementations of "the same digest" is exactly the sort of divergence
+        that would make a verification quietly wrong.
         """
-        lines = sorted(f"{item.evidence_id}:{item.content_digest}" for item in self.items)
-        return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+        return manifest_for((item.evidence_id, item.content_digest) for item in self.items)
 
     def counts_by_kind(self) -> dict[str, int]:
         counts: dict[str, int] = {}
