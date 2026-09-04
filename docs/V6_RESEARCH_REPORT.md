@@ -1691,7 +1691,136 @@ should care about.
    rebuilt substrate is a further step and would likely move these numbers again.
 4. Feedback remains simulated.
 
-## 17. Reproducing
+## 17. §§2 and 6–11 re-scored **[MEASURED]**
+
+§16 re-ran Track 1. This completes the audit across the remaining sections. Each
+was re-scored threshold-free — per-category ROC-AUC where the claim was
+per-category, capability AUC where the claim was about damage.
+
+**Three findings survive, two invert, one is unresolved.**
+
+### 17.1 Summary
+
+| § | Claim as published | Verdict |
+| --- | --- | --- |
+| 2.4 | Adaptation helps 4 of 13 novel categories (PORT_SCAN, SUSPICIOUS_DNS, BRUTE_FORCE, SUSPICIOUS_POWERSHELL) | **INVERTED** — §17.2 |
+| 6 | Arm 2 "trades recall for precision" | **Corrected in §15.3** — strictly better at matched points |
+| 7.3 | Benign bias improves FPR while costing recall; recall is the metric that reveals poisoning | **DOES NOT SURVIVE** — §17.3 |
+| 7.4 | Sparse and delayed feedback make the model worse | **Survives, strengthened** — §17.3 |
+| 8 | Targeted poisoning costs real detection | **Survives** — §17.4 |
+| 9 | `baseline_relative` neutralises it | **Survives, confirmed threshold-free** — §17.4 |
+| 11.2 | The allowance ratchets 3.5 → 27.5 | **Survives** — count-based, no threshold involved |
+| 11.3 | The campaign costs detection | **DOES NOT SURVIVE** — §17.5 |
+
+### 17.2 §2 was backwards
+
+Per-category ROC-AUC, static against adapted, 4 seeds, corpus enlarged to clear
+V4's 20-per-class guard:
+
+| category | static AUC | adapted AUC | ΔAUC | §2.4 said |
+| --- | --- | --- | --- | --- |
+| PORT_SCAN | 0.9977 | 0.9973 | **−0.0004** | recall 0.26 → 0.95, "helps" |
+| SUSPICIOUS_DNS | 0.9947 | 0.9982 | +0.0035 | recall 0.07 → 0.57, "helps" |
+| BRUTE_FORCE | 0.9970 | 0.9958 | **−0.0012** | recall 0.03 → 0.42, "helps" |
+| MALWARE | 0.5929 | **0.7957** | **+0.2028** | 0.000, "cannot help" |
+| RANSOMWARE | 0.4502 | **0.6409** | **+0.1907** | 0.000, "cannot help" |
+| LATERAL_MOVEMENT | 0.0488 | **0.2605** | **+0.2118** | 0.000, "cannot help" |
+
+**The three categories §2 credited adaptation with rescuing were already at AUC
+≈ 0.997 under the static model** — perfectly ranked, and merely unflagged because
+0.65 was misplaced. Adaptation contributed nothing to them; it moved the
+threshold.
+
+**The categories §2 said adaptation could not help are the ones where it
+genuinely improves capability**, by +0.19 to +0.21 AUC. They stayed at zero
+recall because they remained below the frozen threshold, not because nothing was
+learned.
+
+**[INFERENCE]** The corrected statement is close to the opposite of the
+published one: *adaptation improves separation on the hard categories and adds
+nothing on the easy ones.* §3's conclusion is unaffected — LATERAL_MOVEMENT at
+static AUC 0.0488 is still dramatically inverted, and 0.26 is still unusable.
+
+### 17.3 §7.3 does not survive; §7.4 does
+
+Re-scored against the telemetry-only baseline, 6 seeds:
+
+| condition | ΔAUC | Δbest F1 | Δrecall @ 20% budget | ΔFPR @ 0.65 | Δrecall @ 0.65 |
+| --- | --- | --- | --- | --- | --- |
+| nominal | +0.0339 | +0.0162 | +0.0406 | −0.0684 | −0.0449 |
+| **benign_biased** | **+0.0477** | **+0.0325** | **+0.0438** | −0.1104 | −0.0481 |
+| malicious_biased | +0.0204 | +0.0113 | +0.0160 | −0.0271 | −0.0107 |
+| severe_noise | +0.0308 | +0.0124 | +0.0342 | −0.0833 | −0.0524 |
+| **sparse** | **−0.0072** | **−0.0213** | +0.0096 | +0.0570 | +0.0224 |
+
+**§7.3 claimed benign bias costs recall while flattering FPR, and that recall is
+therefore the metric exposing it. At matched operating points benign bias costs
+no recall at all** — +0.0438 at a fixed budget — and has the **largest capability
+gain of any condition**. Its apparent recall loss was calibration, exactly like
+every other frozen-threshold artefact in this report.
+
+The mechanism is mundane: benign bias admits *more* rows (490 against nominal's
+421), and more benign training data improves the density estimate. At this
+poisoning level the extra volume outweighs the 83.5 mislabelled rows.
+
+**So §7.3's recommendation — "any gate on this arm must include a recall
+floor" — was wrong twice over.** §8 superseded it once by showing a recall floor
+cannot detect a targeted attack; §17.3 now shows the failure mode it was
+protecting against was not a failure mode. §15.4's discrimination gate is the
+correct control.
+
+**§7.4 survives and is strengthened.** `sparse` is the only condition that
+degrades capability (ΔAUC −0.0072, Δbest-F1 −0.0213). Feedback volume really is
+a precondition.
+
+### 17.4 §§8 and 9 survive
+
+Target-category AUC, MALWARE, 6 seeds:
+
+| cap policy | AUC honest | AUC poisoned | ΔAUC |
+| --- | --- | --- | --- |
+| `global` (undefended, as §8) | 0.9630 | 0.8945 | **−0.0685** |
+| `baseline_relative` (§9's defence) | 0.9577 | 0.9578 | **+0.0002** |
+
+**The targeted attack costs real capability**, not merely calibration — and
+**§9's cap neutralises it completely**, threshold-free. These are the strongest
+results in the report and they are unaffected by the audit.
+
+The contrast with §17.3 is the point: **diffuse benign bias adds helpful volume;
+targeted concentration destroys capability in the category it targets.** The two
+are different mechanisms, and only the second is an attack.
+
+### 17.5 §11's damage does not survive; its ratchet does
+
+| tolerance | AUC honest | AUC poisoned | ΔAUC |
+| --- | --- | --- | --- |
+| 1.5 | 0.8893 | 0.8882 | −0.0011 |
+| 3.0 | 0.8944 | 0.8928 | −0.0016 |
+
+**No measurable capability damage at either tolerance**, so §11.3's recall
+figures were calibration. §11.3 already declined to claim a dose-response curve
+and called the recall column "supporting evidence, not a curve to quote"; that
+caution was right and is now the whole of it.
+
+**§11.2's ratchet stands** — allowance 3.5 → 27.5, honest control flat at 3.5. It
+is a count, with no threshold anywhere near it.
+
+**[LIMITATION] An inconsistency I cannot resolve.** §17.4's single-batch attack
+lands ~22 poisoned rows and costs 0.069 AUC; §11's campaign at tolerance 3.0
+lands ~22.9 and costs 0.0016. **[INFERENCE]** The likeliest explanation is that
+§11's honest control is itself mildly poisoned — it accumulates ~1.4 mislabelled
+MALWARE rows per cycle from ordinary 5% label noise across ten cycles — which
+compresses the difference the comparison is measuring. That is a hypothesis. The
+two results are not reconciled, and the patient campaign should be treated as
+**demonstrated to ratchet but not demonstrated to damage**.
+
+### 17.6 What the audit leaves
+
+Every section that made a threshold-dependent claim has now been re-scored. What
+remains untouched is the corpus: all of this still runs on the V4/V5 substrate
+rather than §13's rebuild, and §13.3 showed those can differ materially.
+
+## 18. Reproducing
 
 ```bash
 cd backend
