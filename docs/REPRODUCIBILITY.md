@@ -332,9 +332,13 @@ round-tripping base→head→base→head to `0011_v7_approval_governance`.
 history. V8 added 22 backend tests — experiment-id stability, augmentation
 provenance and approval latency — and 5 frontend.)*
 
-**PostgreSQL was validated in V7** — 11 migrations, CHECK constraints, foreign
-keys, `ON DELETE SET NULL`, JSONB path queries, transactional rollback and the
-approval state transitions, against PostgreSQL 16.15. It needs Docker:
+**PostgreSQL was validated in V7 and was NOT re-run in V8.** V7 exercised 11
+migrations, CHECK constraints, foreign keys, `ON DELETE SET NULL`, JSONB path
+queries, transactional rollback and the approval state transitions against
+PostgreSQL 16.15. V8 added no migration and changed no column, so that result
+stands on its own terms — but the 15 PostgreSQL tests **skipped** in every V8
+run, and nothing here claims a V8 PostgreSQL verification. Re-running it needs
+Docker:
 
 ```bash
 docker compose -f infrastructure/docker-compose.yml up -d postgres

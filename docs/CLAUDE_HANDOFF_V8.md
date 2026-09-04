@@ -54,13 +54,16 @@ V6 checkpoint:        b7fa9cc
 V7 implementation:    da0a8c6
 V7 checkpoint:        630cb4d   docs(v7): record the checkpoint …
 V8 implementation:    c5e293b   research(v8): back every published result …
-V8 handoff commit:    this commit — the child of c5e293b, which adds this file
+V8 handoff:           3cdecab   docs(v8): the handoff, and what the brief got wrong
+V8 closure commit:    this commit — the child of 3cdecab, which closes V8
 ```
 
 Following V7's decision 45: a document cannot contain the SHA of the commit that
-adds it, so the implementation commit is named (real, checkoutable) and the
-handoff commit is identified by its relationship to it. `git log --oneline -4`
-resolves both.
+adds it. `c5e293b` and `3cdecab` are real and checkoutable; this closure commit
+is identified by its relationship to them. `git log --oneline -5` resolves all
+three.
+
+**V8 is CLOSED at this commit.** §18 records the closure verification.
 
 **V8 starting checkpoint, verified at session start:** `HEAD`, `origin/main` and
 `origin/HEAD` were all at `630cb4d`, working tree clean. V7's §2 was correct.
@@ -535,3 +538,122 @@ problem is not, and no amount of further engineering closes it.
    to see what is actually established and how.
 5. Spot-check the refactor digest:
    `pytest app/tests/test_telemetry_normalizer_characterization.py` → 3 passed.
+
+---
+
+## 18. V8 closure **[MEASURED]**
+
+**V8 IS CLOSED.** No further V8 experiment will be run, and no V8 result is
+outstanding.
+
+### 18.1 Interrupted work — what was actually stopped
+
+Seven background tasks were stopped by the operator at the end of the session.
+Checked rather than assumed, because a stopped task and an interrupted
+experiment are not the same thing:
+
+| Task ids | What they were | Artifact written |
+| --- | --- | --- |
+| `bj2on1h6q`, `bztvfphb7`, `bt5n6xbfh`, `bzap0o95y`, `bo8c1gzyc`, `bbz8yzbl5`, `b7utdxhdt` | `until ! pgrep …; do sleep; done` **polling wait-loops** — duplicate waiters on runs that had already finished | none; each produced **zero bytes of output** |
+
+**No experiment was interrupted.** The experiment and verification processes ran
+to completion and exited 0:
+
+| Task | Run | Exit |
+| --- | --- | --- |
+| `bctz3cu5s` | temporal UNSW (1,911 s) | 0 |
+| `by1j86cvn` | feature-grouped UNSW | 0 |
+| `bvva0167t`, `b9a1ov69b`, `bcj6umrir`, `b398kfdd8` | full `pytest` + `ruff` | 0 |
+
+This is verifiable without trusting the task panel: `run_experiments` writes its
+report **once, at the end**, so an interrupted run leaves *no artifact at all*
+rather than a truncated one. All five V8-era artifacts exist, parse, and carry
+complete result sets — 5 or 6 baselines plus 4 ablation configurations each, the
+system evaluation's four subsystems, and the latency report's 50 iterations.
+
+### 18.2 Closure verification — from committed artifacts, no run repeated
+
+47 checks re-verified every V8 finding against the committed artifacts:
+
+| Area | Result |
+| --- | --- |
+| Temporal split reproduces V6 (identical bar timestamps/timing) | PASS |
+| Temporal densities 2.21 / 13.10 / 20.22%, test leakage 0.00% | PASS |
+| Isolation Forest MCC −0.1615, ROC-AUC 0.6511; risk path 0.4125 | PASS |
+| Fitted vs deployed distinction (FPR 100% vs 33.3%, AUC 0.529 vs 0.763) | PASS |
+| Deployed artifact digest `016c6dbf37f53d03…`, identity `isolation_forest@1.0` | PASS |
+| Experiment identity: 5 fitted ids unchanged from V6; registered id now stable | PASS |
+| Feature-grouped: 78,265 groups, 0.00% leakage both splits, supervised F1 0.9741 | PASS |
+| Historical stratified result unchanged (39,651 test, F1 0.970, AUC 0.4198, 51.80% leakage) | PASS |
+| System eval §§5–8 (15/24 campaigns, 54.31% purity, 10.08×, SSRF 6/6) | PASS |
+| Approval latency: `humanLatencyStatus == UNMEASURED`, no stage named for a human | PASS |
+
+### 18.3 History was not rewritten **[MEASURED]**
+
+`git diff --name-status 630cb4d..HEAD` over `app/evaluation/reports/` shows
+**every artifact change is an addition (`A`)**. No pre-V8 artifact was modified
+or deleted; the only `M` is `.gitignore`, extended to ignore `latest-v7-*` and
+`latest-v8-*` pointers under the existing V6 retention policy.
+
+Across the whole of V8, `docs/RESEARCH_REPORT.md` lost exactly **three lines**,
+all of them *commands* in §9 replaced by versions carrying `--max-seconds 3600`.
+**No published metric, table row or finding was removed or altered.**
+`docs/EVALUATION_METHODOLOGY.md` lost none. `docs/REPRODUCIBILITY.md`'s removals
+are stale verification counts and a stale watchdog note, and the superseded V6
+figures are kept inline as history rather than deleted.
+
+**Scientific conclusions changed: NO.**
+
+### 18.4 Status of every claim at closure
+
+| Claim | Status |
+| --- | --- |
+| Temporal UNSW detector results | **REPRODUCED** (V6 artifact + V8 artifact, identical) |
+| Feature-grouped UNSW (§3) | **REPRODUCED** |
+| Synthetic corpus, fitted detectors (§4) | **REPRODUCED** |
+| Deployed/registered artifact (§4.1) | **REPRODUCED** |
+| Correlation, AI analyst, threat intel, degraded mode (§§5–8) | **REPRODUCED** |
+| UNSW stratified source-grouped (§1, §2) | **VERIFIED** (checked against artifact; not re-run) |
+| Model artifact determinism + rebuilt-DB immutability | **VERIFIED** (byte-identical `016c6dbf37f53d03…`; retrain allocated v2.0) |
+| Approval workflow system latency | **MEASURED** (50 iterations) |
+| Human analyst decision latency | **UNMEASURED** — no analyst population exists |
+| External provider (AI analyst, threat intel) | **UNVERIFIED** — no credentials; `--live` exits 2 |
+| PostgreSQL | **NOT RUN in V8.** V7 validated 16.15; V8 added no migration, and its 15 PostgreSQL tests skipped in every run |
+| `--include-registered` on UNSW-NB15 | **NOT RUN** |
+| Seed variance on temporal / feature-grouped / registered | **NOT RUN** — all single-seed |
+| Live AWS CloudTrail | **NOT RUN** — fixtures only, as in V7 |
+| V4 deployed artifact `053d1ff3…` | **UNREPRODUCIBLE** — destroyed pre-V5, permanently |
+
+**Interrupted: none.**
+
+### 18.5 Verification at closure **[MEASURED]**
+
+Bounded, as scoped. No experiment was re-run for a green checkmark.
+
+| Check | Result |
+| --- | --- |
+| Full `pytest` at `c5e293b` | **857 passed**, exit 0 |
+| Code changed after that run | **none** — docs only (`git diff --name-only c5e293b..HEAD`) |
+| Targeted V8 tests (latency, provenance, experiment-id, normalizer digest) | **35 passed**, exit 0 |
+| `ruff check .` | clean |
+| `vitest run` | **61 passed**, 9 files |
+| Migrations base→head→base→head (SQLite) | PASS, head `0011_v7_approval_governance` |
+| Committed report artifacts parsing with complete result sets | **26 / 26** |
+
+### 18.6 Environment requirements and traps
+
+- **Python 3.11.16, scikit-learn 1.7.2.** The venv is at the **repository root**
+  (`.venv`), not `backend/.venv` — `backend/.venv` is a stale Python 3.9 shell
+  with no dependencies and will fail confusingly.
+- **`run_system_eval` needs a schema.** Run `alembic upgrade head` first;
+  without it, it dies with `no such table: events`.
+- **`--max-seconds 3600` is mandatory for any UNSW run.** The 900 s default
+  cannot finish and writes nothing.
+- **Never run two `pytest` processes concurrently.** `conftest.py` deletes the
+  shared `/tmp` database at import; concurrent runs destroy each other and
+  produce dozens of `readonly database` errors that look like a code defect.
+- **`POST /api/v1/events` keeps writing after the response returns**, via
+  background enrichment. Create events through `event_repository` in tests.
+- **Do not use foreground polling loops to wait on long runs.** Every one of the
+  seven stopped tasks was such a loop. Launch the run in the background and read
+  its artifact when it lands.
