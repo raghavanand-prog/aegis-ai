@@ -76,6 +76,7 @@ def build_augmented_corpus(
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
     all_benign_attack: bool = False,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
     """Build the candidate fit set: telemetry plus verified-benign feedback.
 
@@ -93,7 +94,7 @@ def build_augmented_corpus(
 
     # Observed events an analyst reviewed. The fit split stands in for the
     # production event stream; the test split is never touched.
-    observed = prepare_corpus(seed=seed)
+    observed = prepare_corpus(seed=seed, substrate=substrate)
 
     if all_benign_attack:
         verdicts = [
@@ -145,6 +146,7 @@ def measure(
     noise_rate: float = 0.05,
     coverage: float = 0.5,
     max_feedback_fraction: float = DEFAULT_MAX_FEEDBACK_FRACTION,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
     """Fit with and without the feedback augmentation; score the same test split."""
     built = build_augmented_corpus(
@@ -152,6 +154,7 @@ def measure(
         noise_rate=noise_rate,
         coverage=coverage,
         max_feedback_fraction=max_feedback_fraction,
+        substrate=substrate,
     )
     observed = built["observed"]
     test_vectors = observed.test_vectors
