@@ -2001,7 +2001,116 @@ Stated plainly rather than implied:
    That mismatch is what production has, but it is not a controlled comparison.
 5. Both corpora remain synthetic.
 
-## 20. Reproducing
+## 20. §§2, 7 and 11 migrated — the audit is complete **[MEASURED]**
+
+The last three. `feedback_quality` and `patient_poisoning` now take a
+`substrate`; `targeted_poisoning._prepare` already did. Defaults unchanged.
+
+**One pattern survives, one section is left with nothing, and one finding is
+replaced by a worse one.**
+
+### 20.1 §2's pattern survives; its magnitudes do not
+
+Per-scenario ROC-AUC, static against adapted, 3 seeds, 18,000-sample corpus:
+
+| withheld scenario | static AUC | adapted AUC | ΔAUC |
+| --- | --- | --- | --- |
+| `_defender_malware` | 0.8290 | 0.8365 | +0.0074 |
+| `_firewall_port_scan` | 0.8652 | 0.8904 | +0.0252 |
+| `_dns_beaconing` | **0.4390** | 0.4962 | **+0.0572** |
+
+**§17.2's corrected finding holds: adaptation helps most where the detector is
+weakest.** The hardest scenario gains 7.7× what the easiest does — the same
+ordering §17.2 found on the old corpus.
+
+The magnitudes shrink about fourfold (+0.19 to +0.21 became +0.007 to +0.057),
+and the static baseline is far stronger to begin with (0.83 and 0.87 against
+0.59 and 0.45). **This is the only substantive finding in the report that has
+survived both the threshold audit and the substrate migration.**
+
+### 20.2 §7 has nothing left
+
+| condition | rule-testing ΔAUC | **telemetry ΔAUC** |
+| --- | --- | --- |
+| nominal | +0.0277 | **+0.0485** |
+| benign_biased | +0.0396 | +0.0468 |
+| malicious_biased | +0.0099 | +0.0353 |
+| **sparse** | **−0.0115** | **+0.0149** |
+| severe_noise | +0.0228 | +0.0329 |
+
+**§7.4 does not survive.** *"Sparse and delayed feedback make the model worse"*
+was the one §7 claim still standing after §17. On the rebuilt substrate sparse
+feedback **helps** (+0.0149). Its harm was a property of the old corpus.
+
+**§17.3's own correction also does not transfer.** It found `benign_biased` had
+the largest capability gain; here `nominal` does. That ordering was
+substrate-dependent too.
+
+So of §7's published conclusions: §7.3 died in §17.3, §7.4 dies here, and the
+condition ranking that replaced them does not transfer. **What remains is only
+that feedback augmentation helps under every condition tested, by an amount that
+varies with the substrate.** That is a much weaker statement than §7 made, and
+it is the honest one.
+
+### 20.3 §11's ratchet is replaced by something worse
+
+| target | its group (size) | arm | allowance c0 | allowance c9 | poison c9 |
+| --- | --- | --- | --- | --- | --- |
+| `_defender_malware` | `malware_detected` (35) | honest | 2.00 | 2.00 | 0.8 |
+| | | adversary | 2.00 | **2.44** | **2.0** |
+| `_sysmon_encoded_powershell` | `process_creation` (978) | honest | **597.38** | 597.44 | 1.2 |
+| | | adversary | 597.38 | 614.72 | **17.2** |
+
+**Where the target owns its group, the ratchet is contained** — allowance moves
+2.00 → 2.44 over ten cycles against §11.2's 3.5 → 27.5. That is the tolerance
+lowered to 1.5 in §11.4 doing its job.
+
+**Where the target hides, there is no ratchet because none is needed.** The
+allowance is **597 at cycle zero**, set by the benign volume of the group the
+attack shares a key with. An adversary can contribute freely without ever
+approaching the bound; poison lands at 17.2 against an honest 1.2.
+
+**[INFERENCE]** This is a sharper statement of §19.2 and a more serious one than
+the ratchet it replaces. A patient campaign was an attack requiring ten cycles
+of discipline. **An adversary who simply picks a target inside a high-volume
+group faces no meaningful cap at all, immediately.** The defence's precondition
+is not patience — it is that the grouping key isolates the target.
+
+### 20.4 The audit, complete
+
+Every section has now been re-scored threshold-free (§§14–17) and re-run on the
+rebuilt substrate (§§18–20). What survived:
+
+| Finding | Threshold audit | Substrate migration |
+| --- | --- | --- |
+| §4 contamination degrades discrimination | survived | **replicated** (§13.3) |
+| §2 adaptation helps the *hard* categories | inverted from published, then survived | **survived** (§20.1) |
+| §8 targeted poisoning costs capability | survived | weaker (−0.069 → −0.008) |
+| §9 the per-group cap defends | survived | **conditional on the grouping key** (§19.2) |
+| §6 Arm 2 improves capability | corrected (not a recall trade) | **survived, larger** (§19.4) |
+| V5's adaptation headline | 6.3× → 1.46× | **→ ~0** (§18.2) |
+| §7.3 recall reveals poisoning | **died** | — |
+| §7.4 sparse feedback harms | survived | **died** (§20.2) |
+| §11.2 the allowance ratchets | survived (count-based) | **died**, replaced by §20.3 |
+| §11.3 the campaign costs detection | **died** | — |
+
+**[INFERENCE]** The pattern across the whole audit is consistent and worth
+stating: **findings about mechanism survived; findings about magnitude did
+not.** Every quantity in this report was, to some degree, a property of the
+corpus and the threshold it was measured with.
+
+### 20.5 Limitations **[LIMITATION]**
+
+1. **3–4 seeds** for §§20.1–20.3, against 8–20 earlier. Directions are clear;
+   none of these point estimates is settled.
+2. `_edr_ransomware` could not be measured — too few held-out samples after
+   prevalence resampling to clear V4's 20-per-class guard.
+3. Two target scenarios again in §20.3, chosen for the isolated/hidden contrast.
+4. Prevalence on the rebuilt substrate remains a chosen parameter (§13.4.2).
+5. Both corpora are synthetic. **Nothing in this report is evidence about real
+   attack traffic**, and the audit has not changed that.
+
+## 21. Reproducing
 
 ```bash
 cd backend
