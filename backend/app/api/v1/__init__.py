@@ -11,6 +11,7 @@ from app.api.v1 import (
     detection,
     evaluation,
     events,
+    evidence,
     health,
     incidents,
     iocs,
@@ -27,6 +28,9 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(events.router)
 api_router.include_router(incidents.router)
+# V9: investigation evidence, mounted under the incidents prefix because
+# every question about evidence starts from an incident.
+api_router.include_router(evidence.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)

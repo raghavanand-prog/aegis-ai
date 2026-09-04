@@ -5,8 +5,11 @@ import RiskBreakdown from "@/features/detection/components/RiskBreakdown";
 import type { SignalKind } from "@/features/detection/signalVocabulary";
 import { SignalLegend } from "@/features/detection/components/SignalBadge";
 import UnavailablePanel from "@/features/detection/components/UnavailablePanel";
+import type { ApiEvidenceSet } from "@/services/api/evidence";
 import type { IncidentMLFindings } from "@/services/api/ml";
 import type { ApiIncident } from "@/services/api/types";
+
+import EvidenceProvenance from "./EvidenceProvenance";
 
 /**
  * Every piece of evidence behind the incident, grouped by where it came from.
@@ -19,9 +22,19 @@ import type { ApiIncident } from "@/services/api/types";
 interface EvidenceTabProps {
   incident: ApiIncident;
   ml: IncidentMLFindings | undefined;
+  /** V9: the same evidence with its provenance attached. */
+  evidence: ApiEvidenceSet | undefined;
+  evidenceLoading: boolean;
+  evidenceError: boolean;
 }
 
-export default function EvidenceTab({ incident, ml }: EvidenceTabProps) {
+export default function EvidenceTab({
+  incident,
+  ml,
+  evidence,
+  evidenceLoading,
+  evidenceError,
+}: EvidenceTabProps) {
   const presentKinds = Array.from(
     new Set((incident.riskSignals ?? []).map((signal) => signal.type)),
   ) as SignalKind[];
@@ -122,6 +135,13 @@ export default function EvidenceTab({ incident, ml }: EvidenceTabProps) {
           ))}
         </ul>
       </section>
+
+      {/* --- Provenance (V9) --------------------------------------------- */}
+      <EvidenceProvenance
+        evidence={evidence}
+        isLoading={evidenceLoading}
+        isError={evidenceError}
+      />
     </div>
   );
 }

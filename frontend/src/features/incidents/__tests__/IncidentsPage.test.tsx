@@ -72,6 +72,70 @@ vi.mock("@/services/api/ai", () => ({
   requestAIAnalysis: vi.fn(),
 }));
 
+// V9: evidence provenance. Mocked with a realistic set so the provenance
+// panel renders its real code path rather than the unavailable state.
+vi.mock("@/services/api/evidence", () => ({
+  fetchIncidentEvidence: vi.fn().mockResolvedValue({
+    incidentId: "INC-1024",
+    manifestDigest: "a".repeat(64),
+    total: 2,
+    countsByKind: { event: 1, threat_intel: 1 },
+    countsByOrigin: { observed: 1, reported: 1 },
+    injectionFlagged: [],
+    degradedProviders: [],
+    filters: { kind: null, provider: null },
+    items: [
+      {
+        evidenceId: "EV-0123456789abcdef",
+        kind: "event",
+        title: "Process created: powershell.exe",
+        content: { eventId: "EVT-000042" },
+        contentDigest: "b".repeat(64),
+        containsInjectionAttempt: false,
+        provenance: {
+          provider: "aegisx.telemetry",
+          sourceRef: "event:EVT-000042",
+          origin: "observed",
+          integrity: "write_once",
+          tamperEvidentAtRest: true,
+          observedAt: "2026-01-01T12:00:00+00:00",
+          collectedAt: "2026-01-01T12:00:05+00:00",
+          confidence: null,
+          confidenceBasis: null,
+          incidentRef: "INC-1024",
+          eventRef: "EVT-000042",
+          isSynthetic: true,
+          extra: {},
+        },
+      },
+      {
+        evidenceId: "EV-fedcba9876543210",
+        kind: "threat_intel",
+        title: "virustotal on 203.0.113.5: malicious",
+        content: { reputation: "malicious" },
+        contentDigest: "c".repeat(64),
+        containsInjectionAttempt: false,
+        provenance: {
+          provider: "aegisx.threatintel",
+          sourceRef: "threat_intel_result:9",
+          origin: "reported",
+          integrity: "mutable",
+          tamperEvidentAtRest: false,
+          observedAt: null,
+          collectedAt: "2026-01-01T12:30:00+00:00",
+          confidence: 0.9,
+          confidenceBasis: "virustotal vendor confidence, 0-100",
+          incidentRef: "INC-1024",
+          eventRef: null,
+          isSynthetic: false,
+          extra: { assertedBy: "virustotal" },
+        },
+      },
+    ],
+  }),
+  fetchEvidenceItem: vi.fn(),
+}));
+
 vi.mock("@/services/api/threatIntel", () => ({
   fetchThreatIntelStatus: vi.fn().mockResolvedValue({
     enabled: true,
