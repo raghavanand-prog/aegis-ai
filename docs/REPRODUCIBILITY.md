@@ -77,14 +77,20 @@ comparing any number against a published one.
 
 ## 4. Run the experiments
 
-```bash
-# Primary comparison: random, group-aware, stratified split
-python -m app.evaluation.run_experiments \
-  --dataset unsw-nb15 --split stratified_group --seed 1337 --persist
+**`--max-seconds 3600` is part of the command, not an optional extra.** The
+watchdog's 900 s default cannot complete a UNSW run and the run then writes
+*nothing* — see the measurement below. Every UNSW command here carries it.
 
-# Distribution shift: chronological split over the same corpus
+```bash
+# Primary comparison: random, group-aware, stratified split   (~32 min)
 python -m app.evaluation.run_experiments \
-  --dataset unsw-nb15 --split temporal --seed 1337 --persist
+  --dataset unsw-nb15 --split stratified_group --seed 1337 --persist \
+  --max-seconds 3600
+
+# Distribution shift: chronological split over the same corpus  (~32 min)
+python -m app.evaluation.run_experiments \
+  --dataset unsw-nb15 --split temporal --seed 1337 --persist \
+  --max-seconds 3600
 
 # Rules vs ML vs hybrid, on the only corpus that can exercise the rules
 python -m app.evaluation.run_experiments \
@@ -92,8 +98,33 @@ python -m app.evaluation.run_experiments \
 
 # Variance across seeds (bootstrap intervals need at least three)
 python -m app.evaluation.run_experiments \
-  --dataset unsw-nb15 --seeds 3 --persist
+  --dataset unsw-nb15 --seeds 3 --persist --max-seconds 10800
 ```
+
+**Measured runtime [MEASURED, V8].** The temporal run above was timed end to
+end at the V8 checkpoint on an Apple Silicon laptop (macOS 26.6.2 arm64,
+Python 3.11.16, scikit-learn 1.7.2):
+
+| Stage | Wall clock |
+| --- | --- |
+| Rules | 1.1 s |
+| Isolation Forest | 267.8 s |
+| Supervised (HGB) | 535.1 s |
+| Hybrid | 204.8 s |
+| Hybrid (risk) | 265.4 s |
+| Ablation (rules 0.6 s + 3 configurations) | 618.6 s |
+| Corpus load, feature extraction, leakage audit, report write | 18.3 s |
+| **Total** | **1,911.07 s (31 min 51 s)** |
+
+So the 900 s default is **2.1× too small** and 3600 s leaves ~1.9× headroom.
+`--seeds 3` repeats the baseline suite three times and wants ~3 hours, hence
+`--max-seconds 10800` above.
+
+Nothing partial is produced when the ceiling fires: the report is written once,
+at the end, so a watchdog kill leaves **no artifact at all** rather than a
+half-populated one. That is the intended failure mode — a truncated report that
+looked complete would be far worse — but it does mean a run that dies at 900 s
+costs the full 900 s and returns nothing.
 
 Correlation, AI analyst, threat intelligence and degraded mode:
 
@@ -139,11 +170,17 @@ Every CLI accepts `--max-seconds` (default 900; `0` disables). On expiry it
 exits 142 with thread stacks rather than hanging silently — the V3 deadlock
 taught that lesson.
 
-> **The default is too small for the UNSW suite.** Measured in V5 Phase A on an
-> Apple Silicon laptop: Isolation Forest takes ~220s and the supervised
-> reference ~610s, so the watchdog fires mid-suite and **no report is written**.
-> Pass `--max-seconds 3600` for any full UNSW run. This is why no V4 experiment
-> artifacts existed on disk at the V5 handoff.
+> **The default is too small for the UNSW suite.** First observed in V5 Phase A;
+> **timed end to end in V8 at 1,911 s** for the full temporal run (§4). The
+> watchdog fires mid-suite and **no report is written**. Pass
+> `--max-seconds 3600` for any full UNSW run — it is written into the §4
+> commands for exactly this reason. This is why no V4 experiment artifacts
+> existed on disk at the V5 handoff.
+>
+> The default is left at 900 s deliberately. It is correct for the adaptation
+> experiments and for CI, and raising it globally would mean a genuinely hung
+> run burns an hour before anyone is told. The cost of the current design is
+> that the ceiling must be passed explicitly for the one suite that exceeds it.
 
 ## 5. Verify you reproduced it
 
@@ -234,9 +271,24 @@ alembic upgrade head && alembic downgrade 0003_v3_hybrid && alembic upgrade head
 alembic upgrade head && alembic downgrade base && alembic upgrade head
 ```
 
-Measured at the V6 checkpoint: **688 backend tests**, **50 frontend tests**,
-ruff/eslint/tsc clean, `vite build` passing with a pre-existing chunk-size
-warning, migrations round-tripping to head `0009_v5_proposals`.
+Measured at the **V8** checkpoint: **835 backend tests** collected and passing
+(`pytest` exit 0; 15 of them are the PostgreSQL module, which skips and says so
+when `AEGISX_TEST_POSTGRES_URL` is unset), **56 frontend tests**, ruff/eslint/tsc
+clean, `vite build` passing with a pre-existing chunk-size warning, migrations
+round-tripping to head `0011_v7_approval_governance`.
 
-**PostgreSQL remains unverified.** Every figure in this document is SQLite on a
-laptop. Docker was unavailable throughout V5 and V6.
+*(V6 measured 688 backend / 50 frontend at head `0009_v5_proposals`. Those
+figures stood in this document until V8 and are kept here as history.)*
+
+**PostgreSQL was validated in V7** — 11 migrations, CHECK constraints, foreign
+keys, `ON DELETE SET NULL`, JSONB path queries, transactional rollback and the
+approval state transitions, against PostgreSQL 16.15. It needs Docker:
+
+```bash
+docker compose -f infrastructure/docker-compose.yml up -d postgres
+AEGISX_TEST_POSTGRES_URL=postgresql+psycopg://aegisx:aegisx@localhost:5432/aegisx pytest
+```
+
+Every *research* figure in this document is still SQLite on a laptop; the
+PostgreSQL validation covers the schema and the transactional behaviour, not the
+experiments.
