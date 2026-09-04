@@ -175,10 +175,16 @@ class SyntheticTelemetrySource(TelemetrySource):
             if isinstance(produced, list):
                 if not produced:
                     continue
+                # Stamped before queueing, so a campaign's later records carry
+                # the campaign's name rather than that of whatever draw
+                # happens to release them.
+                for record in produced:
+                    record.scenario = scenario
                 for record in produced[1:][: self.MAX_PENDING - len(self._pending)]:
                     self._pending.append(record)
                 yield produced[0]
             else:
+                produced.scenario = scenario
                 yield produced
 
     @property

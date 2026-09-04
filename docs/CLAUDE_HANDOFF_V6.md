@@ -73,12 +73,19 @@ What V6 found is that **the substrate those measurements sat on was
 misconfigured**. V4 and V5 established their static baseline by re-fitting an
 Isolation Forest on the labelled evaluation corpus, whose fit split is **40%
 malicious** — and whose own provenance already said it was *"out of distribution
-for the anomaly model trained on the runtime telemetry generator"*. Production
-does not fit that corpus; `train_anomaly_model` fits unlabelled runtime
-telemetry at roughly 12% suspicious.
+for the anomaly model trained on the runtime telemetry generator"*.
 
 So the comparator that made adaptation look like a 6× improvement was wrong by
-roughly 17×, and most of what "adaptation" achieved was contamination repair.
+roughly 17×.
+
+**§13 corrects part of this report's own reasoning.** V6 originally said
+production trains at roughly 12% suspicious, and built the contrast on that.
+Measured at the scenario level it is **42.7%** — the 12% came from eyeballing
+normalized `event_type` names and missed two attack scenarios. Both corpora are
+~40% malicious, so contamination cannot be what distinguishes them, and **§5's
+gap is currently unexplained**. The contamination effect itself replicates on an
+independent corpus (§13.3), and at 42.6% a fresh corpus reproduces the
+near-inert baseline (F1 0.0352 against V5's 0.0389).
 
 | Configuration | F1 |
 | --- | --- |
@@ -155,6 +162,7 @@ was rewritten to look better.
 | V5 Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedbackDatasetId` as metadata and **never used it** |
 | **V6 §3.3, mine** | Said the corpus violates the `contamination` *parameter* "by a factor of 5". Direction right, mechanism wrong — `contamination` never reaches `anomaly_score`. Corrected in place with a visible note |
 | **V6 §7.3, mine** | Recommended an aggregate recall floor. §8 measured that it cannot work. §8 supersedes it |
+| **V6 §4.1 / §5.1, mine** | Said production's training corpus runs at ~12% suspicious and built an argument on the contrast. It is **42.7%**. Both corpora are ~40% malicious, so contamination cannot explain §5's gap; the measurement stands, the explanation does not (§13.2) |
 
 ---
 
@@ -244,8 +252,10 @@ Thirteen of the brief's twenty definition-of-done items are done (item 17,
 reproducibility documentation, was paid after this list was first written).
 **These seven are not** — items 5, 6, 7, 8, 9, 10 and 11 of the brief:
 
-1. **No telemetry-source integration.** `backend/app/telemetry/` is untouched —
-   0 files changed. Track 4 was never started.
+1. **No telemetry-source integration.** Track 4 was never started.
+   `backend/app/telemetry/` now has exactly one V6 change — `RawTelemetry.scenario`,
+   added in §13 so a corpus can be labelled from generator intent. It is
+   provenance and never reaches the normalized candidate, asserted by test.
 2. **No telemetry-source abstraction work.** The `TelemetrySource` ABC from V1
    is unchanged. **The Phase A audit found `telemetry/normalizer.py` hard-codes
    vendor schemas (`_normalize_defender` and friends); that leak is documented
@@ -293,15 +303,19 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Rebuild the evaluation substrate.** The V4/V5 corpus is a rule-testing
-   corpus that was pressed into service as ML training data. Until a corpus
-   exists whose contamination resembles production, every detection number on it
-   bounds an artefact.
-2. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
+1. **Explain §5's gap** (§13.2). Fitting on telemetry gives F1 0.6526 on the
+   eval test split; refitting on the eval corpus gives 0.0389 — at the *same*
+   contamination. This is now the most interesting open question in the project,
+   and it was hidden while the 12% figure made contamination look sufficient.
+2. **Migrate experiments onto the rebuilt substrate.**
+   `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
+   has been re-run on it. Until that happens the published numbers still sit on
+   the old corpus.
+3. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
    first, or adding a source deepens it.
-3. **Real analyst feedback**, still the highest-value thing available and still
+4. **Real analyst feedback**, still the highest-value thing available and still
    not done.
-4. PostgreSQL and one live provider, whenever the environment permits.
+5. PostgreSQL and one live provider, whenever the environment permits.
 
 **[INFERENCE]** Do *not* treat §3's table as a reason to abandon adaptation. It
 says the baseline was wrong, not that feedback is worthless — the redesigned

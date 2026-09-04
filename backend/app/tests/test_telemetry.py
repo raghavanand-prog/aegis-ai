@@ -121,3 +121,52 @@ def test_generated_timestamps_have_a_fixed_width() -> None:
                 lengths.add(len(value))
     assert lengths, "no generated record carried an ISO timestamp"
     assert len(lengths) == 1, f"timestamp width varies: {sorted(lengths)}"
+
+
+class TestScenarioProvenance:
+    """V6: the generator's scenario name travels with the record it produced.
+
+    Without it the scenario is unrecoverable downstream, because normalization
+    collapses distinct scenarios onto one `event_type` - `_dns_query` and
+    `_dns_rare_domain` both become `dns_query`. Labelling a corpus from
+    `event_type` would therefore erase exactly the distinction between ordinary
+    traffic and the deliberately-rare-but-benign behaviour, which is the
+    distinction a labelled telemetry corpus depends on.
+    """
+
+    def test_every_record_reports_the_scenario_that_produced_it(self) -> None:
+        from app.telemetry.sources.synthetic import SyntheticTelemetrySource
+
+        source = SyntheticTelemetrySource(seed=1337)
+        known = {name for _, name in SyntheticTelemetrySource.SCENARIOS}
+        records = list(source.collect(200))
+        assert records
+        for record in records:
+            assert record.scenario in known
+
+    def test_queued_campaign_records_keep_their_campaign_scenario(self) -> None:
+        """A campaign emits several related records. The queued ones must carry
+        the campaign's name, not the name of whatever draw released them."""
+        from app.telemetry.sources.synthetic import SyntheticTelemetrySource
+
+        source = SyntheticTelemetrySource(seed=99)
+        campaigns = {
+            name
+            for _, name in SyntheticTelemetrySource.SCENARIOS
+            if name.startswith("_campaign")
+        }
+        seen = [r.scenario for r in source.collect(600)]
+        assert campaigns & set(seen), "no campaign fired; widen the sample"
+        for scenario in seen:
+            assert scenario is not None
+
+    def test_the_scenario_is_provenance_not_a_label(self) -> None:
+        """It must not reach the normalized candidate: a detector that could
+        read the generating scenario would be scoring the answer key."""
+        from app.telemetry.normalizer import normalize
+        from app.telemetry.sources.synthetic import SyntheticTelemetrySource
+
+        record = next(iter(SyntheticTelemetrySource(seed=7).collect(1)))
+        candidate = normalize(record)
+        assert "scenario" not in candidate
+        assert "scenario" not in candidate.get("normalized_data", {})
