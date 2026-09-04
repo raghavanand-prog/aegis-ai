@@ -42,7 +42,8 @@ PostgreSQL validated for the first time in the project's history.
 V4 checkpoint:  65a8671
 V5 checkpoint:  52eea0d
 V6 checkpoint:  b7fa9cc   ← see the correction below
-V7 checkpoint:  <FILL: SHA>
+V7 implementation:  da0a8c6   feat(v7): operationalize the V6 foundation
+V7 checkpoint:      this commit — the child of da0a8c6, which adds this document
 ```
 
 **Correction to the V6 handoff.** It states "V6 checkpoint: `d8e54b4`" and
@@ -54,10 +55,17 @@ the branch was.
 
 This is benign, and it is the **third consecutive handoff to name the wrong
 checkpoint** — V4's audit found it, V5 did it, V6 warned about it and then did
-it again. The cause is structural: a handoff cannot contain the SHA of the commit
-that adds the handoff. §14 records the fix V7 used.
+it again. The cause is structural and no amount of care fixes it: **a document
+cannot contain the SHA of the commit that adds that document.** Every previous
+handoff tried to name one number and was therefore wrong by exactly one commit.
 
-**Push status:** `<FILL>`. **Working tree:** `<FILL>`.
+V7 names **two**: the implementation commit, which is a real SHA that can be
+checked out, and the handoff commit, identified by its relationship to it rather
+than by a number it cannot know. `git log --oneline -2` resolves both in one
+command. Decision 45 in §12.
+
+**Push status:** pushed to `origin/main`; `HEAD == origin/main`.
+**Working tree:** clean.
 Nothing amended, rebased or force-pushed.
 
 ---
@@ -460,6 +468,11 @@ V7 adds:
     would make a generated claim indistinguishable from a human's.
 44. **Do not backfill provenance that was never captured.** Guessing it
     retroactively rewrites the audit trail while looking like tidying.
+45. **A handoff names the implementation commit, not itself.** Three consecutive
+    handoffs named the wrong checkpoint because a document cannot contain the
+    SHA of the commit that adds it. Record the implementation SHA — which is
+    real, checkoutable, and known when the document is written — and identify
+    the handoff commit as its child.
 
 ---
 
