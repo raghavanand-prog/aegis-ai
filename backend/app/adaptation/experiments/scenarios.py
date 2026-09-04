@@ -147,6 +147,13 @@ class ScenarioResult:
     metrics: dict[str, Any]
     timings: dict[str, float] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    #: Raw test-set scores and labels. Additive in V6 so a comparison can be
+    #: recomputed at a matched operating point without reimplementing the arms -
+    #: V6 §15 measured that comparing these conditions at one frozen threshold
+    #: compares their calibrations as much as their detection. Nothing in the
+    #: V5 path reads these, so no measurement changes.
+    scores: list[float] = field(default_factory=list)
+    labels: list[bool] = field(default_factory=list)
 
 
 def run_condition(
@@ -193,6 +200,8 @@ def run_condition(
             metrics=_metrics(_matrix(scores, test_labels, DEFAULT_THRESHOLD), DEFAULT_THRESHOLD),
             timings=timings,
             notes=["Deployed model at the frozen threshold. No adaptation."],
+            scores=list(scores),
+            labels=list(test_labels),
         )
 
     # --- Feedback ----------------------------------------------------------
@@ -269,6 +278,8 @@ def run_condition(
         metrics=_metrics(_matrix(scores, test_labels, threshold), threshold),
         timings=timings,
         notes=notes,
+        scores=list(scores),
+        labels=list(test_labels),
     )
 
 

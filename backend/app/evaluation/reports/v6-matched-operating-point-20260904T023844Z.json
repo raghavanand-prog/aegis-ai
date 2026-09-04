@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-04T02:38:44.044103+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/adaptation/experiments/run_matched_operating_point_eval.py --seeds 12 --max-seconds 5400",
+  "question": "How much of V5's adaptation effect survives comparison at a matched operating point rather than a frozen 0.65?",
+  "protocol": {
+    "seeds": [
+      1337,
+      4242,
+      99,
+      2024,
+      7,
+      819369,
+      488509,
+      283395,
+      163476,
+      674128,
+      830686,
+      244994
+    ],
+    "frozenThreshold": 0.65,
+    "budgets": [
+      3,
+      20,
+      39,
+      78
+    ],
+    "datasetFingerprint": "c0f04f3ccb2a63b8",
+    "splitFingerprint": "d349ea18a04e06c0",
+    "testSamples": 390,
+    "testMalicious": 156
+  },
+  "environment": {
+    "python": "3.11.16",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "conditions": {
+    "static_v4": {
+      "f1AtFrozen": 0.021097,
+      "recallAtFrozen": 0.008013,
+      "frozenPercentile": 99.658333,
+      "rocAuc": 0.56253,
+      "bestF1": 0.57314,
+      "recallAtMatchedBudget": 0.009615
+    },
+    "threshold_only": {
+      "f1AtFrozen": 0.092725,
+      "recallAtFrozen": 0.049679,
+      "frozenPercentile": 99.658333,
+      "rocAuc": 0.56253,
+      "bestF1": 0.57314,
+      "recallAtMatchedBudget": 0.009615
+    },
+    "curation_only": {
+      "f1AtFrozen": 0.047765,
+      "recallAtFrozen": 0.024573,
+      "frozenPercentile": 99.015833,
+      "rocAuc": 0.732438,
+      "bestF1": 0.657436,
+      "recallAtMatchedBudget": 0.01015
+    },
+    "both_arms": {
+      "f1AtFrozen": 0.241849,
+      "recallAtFrozen": 0.142628,
+      "frozenPercentile": 99.015833,
+      "rocAuc": 0.732438,
+      "bestF1": 0.657436,
+      "recallAtMatchedBudget": 0.01015
+    },
+    "random_feedback": {
+      "f1AtFrozen": 0.096542,
+      "recallAtFrozen": 0.051816,
+      "frozenPercentile": 99.571667,
+      "rocAuc": 0.567022,
+      "bestF1": 0.571537,
+      "recallAtMatchedBudget": 0.009615
+    },
+    "no_feedback_retrain": {
+      "f1AtFrozen": 0.033492,
+      "recallAtFrozen": 0.012821,
+      "frozenPercentile": 99.486667,
+      "rocAuc": 0.579167,
+      "bestF1": 0.576101,
+      "recallAtMatchedBudget": 0.009615
+    }
+  },
+  "recallByBudget": {
+    "3": {
+      "static_v4": 0.018162,
+      "threshold_only": 0.018162,
+      "curation_only": 0.018697,
+      "both_arms": 0.018697,
+      "random_feedback": 0.018162,
+      "no_feedback_retrain": 0.018162
+    },
+    "20": {
+      "static_v4": 0.08547,
+      "threshold_only": 0.08547,
+      "curation_only": 0.114316,
+      "both_arms": 0.114316,
+      "random_feedback": 0.084936,
+      "no_feedback_retrain": 0.088675
+    },
+    "39": {
+      "static_v4": 0.158654,
+      "threshold_only": 0.158654,
+      "curation_only": 0.213141,
+      "both_arms": 0.213141,
+      "random_feedback": 0.16453,
+      "no_feedback_retrain": 0.167735
+    },
+    "78": {
+      "static_v4": 0.267628,
+      "threshold_only": 0.267628,
+      "curation_only": 0.392094,
+      "both_arms": 0.392094,
+      "random_feedback": 0.270833,
+      "no_feedback_retrain": 0.287927
+    }
+  },
+  "caveats": [
+    "threshold_only is identical to static_v4 on every threshold-free measure BY CONSTRUCTION: Arm 1 moves the operating point and does not change the model, so it cannot change a ranking. Its entire apparent gain at 0.65 is threshold placement.",
+    "curation_only and both_arms are likewise identical on threshold-free measures, for the same reason. All capability difference comes from Arm 2.",
+    "best-achievable F1 is an optimistic ceiling chosen with knowledge of the labels. It is used because it is comparable, not because any operator attains it.",
+    "A budget of 3 is the static baseline's own alert volume and is too small to discriminate - every condition is pinned near 0.018. Reported for completeness, not as a comparison.",
+    "The random-label control is retained. It is what decides whether a surviving effect is attributable to feedback content.",
+    "Feedback is simulated; the corpus is synthetic."
+  ]
+}
