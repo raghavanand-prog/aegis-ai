@@ -111,6 +111,7 @@ def run_campaign(
     noise_rate: float = 0.05,
     coverage: float = 0.5,
     global_ceiling: int = 10_000,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
     """Run a multi-cycle feedback campaign and record what the ceiling does."""
     if honest_history < 1:
@@ -120,7 +121,7 @@ def run_campaign(
             "model something the system does not permit"
         )
 
-    _, fit_samples, _ = _prepare(seed)
+    _, fit_samples, _ = _prepare(seed, None, substrate, 6000)
     fit_labels = [bool(sample.is_malicious) for sample in fit_samples]
 
     # History of admitted group counts, one entry per completed cycle. The
@@ -243,10 +244,11 @@ def measure_damage(
     honest_history: int = DEFAULT_HONEST_HISTORY,
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
+    substrate: str = "rule-testing",
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Train on the campaign's final batch and measure what it cost."""
-    features, fit_samples, test_samples = _prepare(seed)
+    features, fit_samples, test_samples = _prepare(seed, None, substrate, 6000)
     telemetry = [
         tuple(vector)
         for vector in build_corpus(seed=seed, samples=samples, span_days=span_days).vectors
@@ -258,6 +260,7 @@ def measure_damage(
         cycles=cycles,
         adversary_reach=adversary_reach,
         honest_history=honest_history,
+        substrate=substrate,
         **kwargs,
     )
     honest = run_campaign(
@@ -266,6 +269,7 @@ def measure_damage(
         cycles=cycles,
         adversary_reach=0.0,
         honest_history=honest_history,
+        substrate=substrate,
         **kwargs,
     )
 

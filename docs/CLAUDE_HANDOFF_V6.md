@@ -164,9 +164,13 @@ was rewritten to look better.
 | V5 §3 harness | `run_new_behaviour` never gives the loop feedback about the withheld category. Measured as benign in effect — the threshold clamp saturates in 256/260 runs — but the conclusion it supported was stronger than the harness allowed |
 | V5 Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedbackDatasetId` as metadata and **never used it** |
 | **V6 §3.3, mine** | Said the corpus violates the `contamination` *parameter* "by a factor of 5". Direction right, mechanism wrong — `contamination` never reaches `anomaly_score`. Corrected in place with a visible note |
+| **V6 §7.4, mine** | "Sparse feedback makes the model worse" — died on migration (§20.2); it helps there (+0.0149). §7 now has no surviving published conclusion |
+| **V6 §11.2, mine** | The allowance ratchet died on migration (§20.3) and is replaced by something worse: a target hiding in a high-volume group faces an allowance of ~597 at cycle zero and needs no ratchet at all |
 | **V6 §9, mine** | The per-group cap is **conditional on the grouping key isolating the target** (§19.2). Where a scenario owns its `event_type` the cap removes 96% of poison; where it hides among benign traffic sharing that key, 40%. §9.3 named this caveat and §19 measured it |
 | **V6 §7.3, mine** | Recommended an aggregate recall floor. §8 measured that it cannot work. §8 supersedes it |
 | **V6 §2.4, mine** | Said adaptation helps 4 of 13 novel categories. §17.2 measured the **opposite**: those three were already at AUC ≈0.997 under the static model and gained nothing, while MALWARE, RANSOMWARE and LATERAL_MOVEMENT — the ones called unhelpable — gain +0.19 to +0.21 AUC |
+| **V6 §7.4, mine** | "Sparse feedback makes the model worse" — died on migration (§20.2); it helps there (+0.0149). §7 now has no surviving published conclusion |
+| **V6 §11.2, mine** | The allowance ratchet died on migration (§20.3) and is replaced by something worse: a target hiding in a high-volume group faces an allowance of ~597 at cycle zero and needs no ratchet at all |
 | **V6 §9, mine** | The per-group cap is **conditional on the grouping key isolating the target** (§19.2). Where a scenario owns its `event_type` the cap removes 96% of poison; where it hides among benign traffic sharing that key, 40%. §9.3 named this caveat and §19 measured it |
 | **V6 §7.3, mine** | Said benign bias costs recall and that recall reveals the poisoning. §17.3 measured that benign bias has the **largest capability gain of any condition** and costs no recall at matched budget. The recommendation it produced was wrong twice over |
 | **V5 Arm 1 (threshold adaptation)** | Reported as working (F1 0.038 → 0.099). §16.2 measured it contributes **exactly zero** capability — identical ROC-AUC, best-F1 and recall-at-budget to static, by construction. Its entire effect was threshold placement |
@@ -314,11 +318,10 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Migrate §§2, 7 and 11.** §§18–19 carried Track 1 and the poisoning and
-   augmentation sections across; these three were re-scored threshold-free in
-   §17 but still run on the old corpus. Given §19.3 — where the *attack* proved
-   ~8× weaker on the rebuilt substrate — their magnitudes should be assumed
-   substrate-dependent.
+1. **Get real analyst feedback.** Every result rests on a simulator, and the
+   audit (§§14–20) has now established that magnitudes here are properties of
+   the corpus and threshold rather than of the system. This was V5's first
+   recommendation and it is now the only one that would change what is known.
    `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
    has been re-run on it. Until that happens the published numbers still sit on
    the old corpus.
