@@ -323,9 +323,67 @@ New package `backend/app/adaptation/`: `feedback/`, `drift/`,
 `active_learning/`, `candidates/`, `proposals/`, `deployment/`, `ai/`,
 `experiments/`.
 
+*(V6 adds `feedback/caps.py`, `feedback/augmentation.py` and
+`feedback/baseline_monitor.py` to that package — see "V6" below.)*
+
 New tables (migrations 0005–0009): `analyst_feedback`, `feedback_datasets`,
 `feedback_dataset_members`, `drift_measurements`, `adaptation_proposals`, plus a
 widened `ml_models.status` constraint. Candidate evaluation reuses V4's
 `evaluation_experiments` / `evaluation_runs` rather than duplicating them.
 
 Frontend: `features/adaptive/` at `/dashboard/adaptive`.
+
+---
+
+## V6: feedback reaches training, and is bounded
+
+**No new tables, no new migrations, no schema change.** Head is still
+`0009_v5_proposals`. No frontend change either — the V6 provenance below is
+recorded on the model and is **not yet surfaced in the UI**.
+
+V5's diagram above is unchanged in shape. What changed is the one arrow that was
+drawn but never connected: `train_candidate` accepted a `feedback_dataset_id`,
+recorded it as metadata, and **fitted on telemetry alone**. Feedback had never
+influenced production training.
+
+```
+feedback dataset (versioned)
+        │
+        ▼
+feedback/augmentation.py ── admission: verified-benign only
+        │                   vectors from the stored MLInference row
+        ▼
+feedback/caps.py ─────────── per-group cap, default `baseline_relative`
+        │                    baseline from PRIOR datasets, tolerance 1.5
+        ▼
+candidate training  ←─────── telemetry corpus + admitted rows
+        │
+        ├─▶ feedback/baseline_monitor.py ──▶ advisory flag on the candidate
+        ▼
+candidate evaluation ─────── per-category recall, not only aggregate
+        ▼
+safety gates ─────────────── + max_per_category_recall_drop
+        ▼
+        … unchanged from V5: proposal → human approval → activate_model
+```
+
+Three additions, each with a measured reason:
+
+| Component | Why it exists |
+| --- | --- |
+| `feedback/augmentation.py` | Arm 2 as V5 designed it could not run in production (§5.5). This is the inverted mechanism: add analyst-verified benign events to the telemetry corpus. |
+| `feedback/caps.py` | A global volume cap does not bound a **concentration** attack — 22 rows inside a 20% cap were enough to cost 0.2026 of one category's recall (§8). |
+| `feedback/baseline_monitor.py` | The cap bounds a patient campaign but cannot see one; every batch is within policy by construction (§11.5.4). Advisory. |
+| `candidates/gates.py` | Aggregate recall hides a single-category collapse beneath its own seed noise (§8.2). |
+
+**The invariant is unchanged.** `registry.activate_model`, behind an approved
+proposal, remains the only write into production detection state. Everything
+above produces evidence for a human decision. V5's deployment,
+registry-immutability and proposal suites pass unchanged.
+
+**Defaults.** With no `feedback_dataset_id` the fit set is telemetry alone,
+exactly as V5. `cap_policy` defaults to `baseline_relative`, which derives its
+baseline from prior datasets and **refuses a cold start** rather than degrading
+silently.
+
+Full reasoning and measurements: `docs/V6_RESEARCH_REPORT.md`.

@@ -24,8 +24,8 @@ before trusting anything else here**, and do the same to this document.
 
 **V6 is not complete against its own brief.** It answered the research questions
 it started with and then followed the evidence somewhere the brief did not
-anticipate. **Twelve of the brief's twenty definition-of-done items are done;
-eight are not**, two of those blocked on the environment. §9 lists them without
+anticipate. **Thirteen of the brief's twenty definition-of-done items are done;
+seven are not**, two of those blocked on the environment. §9 lists them without
 softening.
 
 ---
@@ -240,8 +240,9 @@ published every number from gitignored local files.
 
 ## 9. What V6 did NOT do **[LIMITATION]**
 
-Twelve of the brief's twenty definition-of-done items are done. **These eight
-are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
+Thirteen of the brief's twenty definition-of-done items are done (item 17,
+reproducibility documentation, was paid after this list was first written).
+**These seven are not** — items 5, 6, 7, 8, 9, 10 and 11 of the brief:
 
 1. **No telemetry-source integration.** `backend/app/telemetry/` is untouched —
    0 files changed. Track 4 was never started.
@@ -259,9 +260,15 @@ are not** — items 5, 6, 7, 8, 9, 10, 11 and 17 of the brief:
 7. **No dashboard work.** `frontend/` is untouched — 0 files changed. Adaptive
    SOC observability is exactly as V5 left it, and none of V6's new
    provenance (`perCategory`, `augmentation`) is visible in the UI.
-8. **Documentation debt.** Only `docs/V6_RESEARCH_REPORT.md` was added.
-   `REPRODUCIBILITY.md`, `ADAPTATION_CARD.md`, `MODEL_CARD.md` and
-   `ARCHITECTURE.md` now describe a system that has changed underneath them.
+8. ~~**Documentation debt.**~~ **Paid.** `MODEL_CARD.md` (Arm 2 corrected, the
+   misconfigured baseline flagged, the novel-behaviour claim struck through with
+   its correction), `ARCHITECTURE.md` (a V6 section and the amended flow),
+   `REPRODUCIBILITY.md` (the nine adaptation runners, the changed report
+   retention, current verification counts) and `ADAPTATION_CARD.md` (the
+   feedback-provenance fields an approver now reads) are current as of the V6
+   checkpoint. **`DETECTION.md`, `EVALUATION.md`, `EVALUATION_METHODOLOGY.md`,
+   `DATASET_CARD.md` and `README.md` were not reviewed** and may still carry
+   V4/V5 framing.
 
 Also unresolved, and load-bearing:
 
@@ -286,17 +293,15 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Pay the documentation debt** (§9.8) before more code lands. Four documents
-   currently describe a system that no longer exists.
-2. **Rebuild the evaluation substrate.** The V4/V5 corpus is a rule-testing
+1. **Rebuild the evaluation substrate.** The V4/V5 corpus is a rule-testing
    corpus that was pressed into service as ML training data. Until a corpus
    exists whose contamination resembles production, every detection number on it
    bounds an artefact.
-3. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
+2. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
    first, or adding a source deepens it.
-4. **Real analyst feedback**, still the highest-value thing available and still
+3. **Real analyst feedback**, still the highest-value thing available and still
    not done.
-5. PostgreSQL and one live provider, whenever the environment permits.
+4. PostgreSQL and one live provider, whenever the environment permits.
 
 **[INFERENCE]** Do *not* treat §3's table as a reason to abandon adaptation. It
 says the baseline was wrong, not that feedback is worthless — the redesigned

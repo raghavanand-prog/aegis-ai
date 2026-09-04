@@ -34,6 +34,41 @@ of the row, not a separate artifact that can drift from it.
 
 ---
 
+## Feedback provenance (V6)
+
+Where the candidate was trained with a feedback dataset, the model's
+`parameters.augmentation` block carries what that feedback contributed and what
+was refused. An approver reads these beside the fields above; none of it is
+inferable from the proposal row alone.
+
+| Field | Notes |
+| --- | --- |
+| `admitted` | Rows that reached the fit set |
+| `groupCounts` | Admitted rows per `event_type` |
+| `capPolicy` | `baseline_relative` by default; `global` is an explicit opt-out that V6 §9 measured does **not** stop a targeted attack |
+| `baselineRatesDerived` | Whether the per-group baseline was learned from prior datasets or supplied by the caller |
+| `skipped.notBenign` | Refused: the label did not project benign |
+| `skipped.nonEvent` | Incidents and sequences have no single feature vector |
+| `skipped.noInference` / `.incompleteVector` | No stored vector, or one missing a feature — refused, never padded |
+| `skipped.byCap` | Rows the per-group cap declined |
+| `baselineAssessment` | Advisory campaign check (below) |
+
+### Reading `baselineAssessment`
+
+`flagged` names event types whose benign-labelled **submissions** far exceed
+their own history — the signature of a campaign feeding the baseline rather than
+fighting the cap (V6 §12).
+
+- **It blocks nothing.** The cap does the bounding; this exists because a
+  patient campaign is otherwise invisible, every batch being within policy.
+- **An empty `flagged` list is a result**, not a missing check. Where the
+  monitor could not run, `unavailableReason` says why and training proceeded.
+- **A flag is not a finding of fact.** Investigate the analysts contributing to
+  the group. And note V6 §12.4.1: the bands were calibrated against a *greedy*
+  adversary, so a slower campaign may not flag at all.
+
+---
+
 ## Worked example — the V5 Phase L cycle **[MEASURED]**
 
 | Field | Value |
@@ -64,3 +99,8 @@ survive in the row.
    row in the table.
 4. **The approver is a person.** Actors prefixed `ai:`, `system:` or
    `automation:` are refused at the service layer.
+5. **What feedback contributed is recorded, including what was refused** (V6).
+   A candidate whose dataset contributed a third of what its sample count
+   implies has a training provenance the card would otherwise state wrongly.
+6. **An advisory check that did not run says so.** `unavailableReason` rather
+   than a missing field: absent evidence must not read as clean evidence.
