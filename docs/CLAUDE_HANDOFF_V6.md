@@ -108,9 +108,10 @@ that the measurement is sound.
 All from committed artifacts under `backend/app/evaluation/reports/`.
 Corpus `c0f04f3ccb2a63b8`, split `d349ea18a04e06c0` unless stated.
 
-**Track 1 — the V5 effect at 50 seeds.** It survives and sharpens. **§16
-later re-scored this at matched operating points and found the magnitude
-inflated ~7× by threshold placement — see below.**
+**Track 1 — the V5 effect at 50 seeds.** It survives and sharpens. **Two later
+sections revise this substantially: §16 found the magnitude inflated ~7× by
+threshold placement, and §18 found the effect nearly vanishes (ΔAUC +0.1740 →
++0.0058) on a corpus that is not pathologically contaminated.**
 
 | Condition (5% noise) | F1 | sd | CI95 |
 | --- | --- | --- | --- |
@@ -167,7 +168,7 @@ was rewritten to look better.
 | **V6 §2.4, mine** | Said adaptation helps 4 of 13 novel categories. §17.2 measured the **opposite**: those three were already at AUC ≈0.997 under the static model and gained nothing, while MALWARE, RANSOMWARE and LATERAL_MOVEMENT — the ones called unhelpable — gain +0.19 to +0.21 AUC |
 | **V6 §7.3, mine** | Said benign bias costs recall and that recall reveals the poisoning. §17.3 measured that benign bias has the **largest capability gain of any condition** and costs no recall at matched budget. The recommendation it produced was wrong twice over |
 | **V5 Arm 1 (threshold adaptation)** | Reported as working (F1 0.038 → 0.099). §16.2 measured it contributes **exactly zero** capability — identical ROC-AUC, best-F1 and recall-at-budget to static, by construction. Its entire effect was threshold placement |
-| **V5's headline, 6.3×** | Real and attributable to feedback, but **~7× inflated** by the frozen threshold. Defensible figure: **1.31× (AUC), 1.46× (recall at fixed alert budget)** (§16.5) |
+| **V5's headline, 6.3×** | Real and attributable to feedback, but **~7× inflated** by the frozen threshold (§16.5), and **~30× smaller again on a correctly-built corpus** — ΔAUC +0.0058 against a control of +0.0031 (§18.2). The most defensible reading is that the V5 programme was **contamination repair** |
 | **V6 §6, mine** | Described the redesigned Arm 2 as "trading recall for precision". §15.3 measured it is **strictly better** at matched operating points (AUC +0.033, best-F1 +0.015); the apparent trade is the calibration shift |
 | **V6 §5, mine** | Read the production configuration's F1 0.6526 as a better-configured detector. §14 measured that 82.6% of the gap is threshold placement, and that its advantage is partly an artefact of the eval corpus being *out of distribution* for it |
 | **V6 §4.1 / §5.1, mine** | Said production's training corpus runs at ~12% suspicious and built an argument on the contrast. It is **42.7%**. Both corpora are ~40% malicious, so contamination cannot explain §5's gap; the measurement stands, the explanation does not (§13.2) |
@@ -311,9 +312,10 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Migrate experiments onto the rebuilt substrate** (§13). Every result in
-   this project still runs on the V4/V5 corpus; §13.3 showed a correctly-built
-   one can differ materially. This is the last systematic confound left.
+1. **Re-run §§2 and 6–11 on the rebuilt substrate.** §18 migrated Track 1 and
+   found the adaptation effect nearly vanishes there (ΔAUC +0.1740 → +0.0058).
+   The remaining sections were re-scored threshold-free in §17 but still run on
+   the old corpus, and §18 suggests that matters more than expected.
    `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
    has been re-run on it. Until that happens the published numbers still sit on
    the old corpus.

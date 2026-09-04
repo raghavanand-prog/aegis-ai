@@ -33,6 +33,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="run_matched_operating_point_eval")
     parser.add_argument("--seeds", type=int, default=20)
     parser.add_argument("--budgets", type=int, nargs="+", default=list(DEFAULT_BUDGETS))
+    parser.add_argument(
+        "--substrate",
+        choices=list(scenarios.SUBSTRATES),
+        default="rule-testing",
+        help=(
+            "which labelled corpus to run on. 'rule-testing' is the V4/V5 corpus "
+            "whose fit split is 40%% malicious; 'telemetry' is V6 §13's rebuild, "
+            "drawn from the distribution production fits with prevalence set "
+            "deliberately"
+        ),
+    )
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     add_timeout_argument(parser)
@@ -49,14 +60,18 @@ def main(argv: list[str] | None = None) -> int:
         }
         per_seed_runs: list[dict[str, Any]] = []
         for seed in seed_plan:
-            corpus = scenarios.prepare_corpus(seed=seed)
+            corpus = scenarios.prepare_corpus(seed=seed, substrate=args.substrate)
             results = {}
             for condition in mop.DEFAULT_CONDITIONS:
                 result = scenarios.run_condition(corpus, condition=condition, seed=seed)
                 cache[condition].append((result.scores, result.labels))
                 results[condition] = result
             per_seed_runs.append(
-                mop.run(seed=seed, conditions=mop.DEFAULT_CONDITIONS)
+                mop.run(
+                    seed=seed,
+                    conditions=mop.DEFAULT_CONDITIONS,
+                    substrate=args.substrate,
+                )
             )
             print(f"  seed {seed} done", flush=True)
 
@@ -87,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
             ),
             "protocol": {
                 "seeds": seed_plan,
+                "substrate": args.substrate,
+                "fitContamination": per_seed_runs[0]["fitContamination"],
                 "frozenThreshold": scenarios.DEFAULT_THRESHOLD,
                 "budgets": args.budgets,
                 "datasetFingerprint": per_seed_runs[0]["datasetFingerprint"],

@@ -57,14 +57,52 @@ class Corpus:
         return len(self.fit_vectors) + len(self.test_vectors)
 
 
-def prepare_corpus(*, seed: int = 1337, samples_per_class: int | None = None) -> Corpus:
+#: Which labelled corpus an experiment runs on.
+#:
+#: ``rule-testing`` is the V4/V5 corpus - built to exercise rule thresholds, fit
+#: split 40% malicious, and by its own provenance out of distribution for the
+#: anomaly model. It remains the default so no published result moves.
+#:
+#: ``telemetry`` is V6 §13's rebuild: drawn from the runtime telemetry generator
+#: production actually fits, labelled from that generator's scenario intent, with
+#: prevalence set deliberately rather than inherited.
+SUBSTRATES = ("rule-testing", "telemetry")
+
+
+def prepare_corpus(
+    *,
+    seed: int = 1337,
+    samples_per_class: int | None = None,
+    substrate: str = "rule-testing",
+    samples: int = 6000,
+    malicious_rate: float | None = None,
+) -> Corpus:
     """Extract features once chronologically, then split with the V4 splitter.
 
     Features are extracted over the whole corpus in time order before splitting,
     because the behavioural features are stateful: extracting per split would
     give each split a different view of history than production has.
+
+    ``substrate`` selects the corpus. The default is unchanged.
     """
-    dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
+    if substrate not in SUBSTRATES:
+        raise ValueError(f"unknown substrate {substrate!r}; known: {list(SUBSTRATES)}")
+
+    if substrate == "telemetry":
+        from app.evaluation.datasets.telemetry_labelled import (
+            DEFAULT_MALICIOUS_RATE,
+            telemetry_labelled_dataset,
+        )
+
+        dataset = telemetry_labelled_dataset(
+            seed=seed,
+            samples=samples,
+            malicious_rate=(
+                DEFAULT_MALICIOUS_RATE if malicious_rate is None else malicious_rate
+            ),
+        )
+    else:
+        dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
     ordered = sorted(dataset.samples, key=lambda sample: sample.timestamp)
 
     extractor = FeatureExtractor()

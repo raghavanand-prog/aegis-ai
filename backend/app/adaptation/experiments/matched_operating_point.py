@@ -84,9 +84,14 @@ def run(
     budget: int | None = None,
     noise_rate: float = 0.05,
     coverage: float = 0.5,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
-    """Score every condition at matched operating points."""
-    corpus = scenarios.prepare_corpus(seed=seed)
+    """Score every condition at matched operating points.
+
+    ``substrate`` selects the corpus (V6 §18). The default is the V4/V5
+    rule-testing corpus, so no published result moves.
+    """
+    corpus = scenarios.prepare_corpus(seed=seed, substrate=substrate)
     if budget is not None and budget > len(corpus.test_vectors):
         raise ValueError(
             f"alert budget {budget} exceeds the {len(corpus.test_vectors)}-sample "
@@ -133,6 +138,8 @@ def run(
 
     return {
         "seed": seed,
+        "substrate": substrate,
+        "fitContamination": round(sum(corpus.fit_labels) / len(corpus.fit_labels), 6),
         "budget": budget,
         "testSamples": len(corpus.test_vectors),
         "testMalicious": sum(corpus.test_labels),
