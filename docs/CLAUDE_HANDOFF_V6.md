@@ -162,6 +162,7 @@ was rewritten to look better.
 | V5 Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedbackDatasetId` as metadata and **never used it** |
 | **V6 §3.3, mine** | Said the corpus violates the `contamination` *parameter* "by a factor of 5". Direction right, mechanism wrong — `contamination` never reaches `anomaly_score`. Corrected in place with a visible note |
 | **V6 §7.3, mine** | Recommended an aggregate recall floor. §8 measured that it cannot work. §8 supersedes it |
+| **V6 §5, mine** | Read the production configuration's F1 0.6526 as a better-configured detector. §14 measured that 82.6% of the gap is threshold placement, and that its advantage is partly an artefact of the eval corpus being *out of distribution* for it |
 | **V6 §4.1 / §5.1, mine** | Said production's training corpus runs at ~12% suspicious and built an argument on the contrast. It is **42.7%**. Both corpora are ~40% malicious, so contamination cannot explain §5's gap; the measurement stands, the explanation does not (§13.2) |
 
 ---
@@ -303,10 +304,11 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Explain §5's gap** (§13.2). Fitting on telemetry gives F1 0.6526 on the
-   eval test split; refitting on the eval corpus gives 0.0389 — at the *same*
-   contamination. This is now the most interesting open question in the project,
-   and it was hidden while the 12% figure made contamination look sufficient.
+1. **Audit every fixed-threshold comparison** (§14.5). A frozen 0.65 is not
+   comparable across models fitted on different data, and V4/V5's
+   static-vs-adapted comparison does not satisfy that condition because the
+   adapted arm refits. Threshold-free measures should sit beside every
+   fixed-threshold one.
 2. **Migrate experiments onto the rebuilt substrate.**
    `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
    has been re-run on it. Until that happens the published numbers still sit on
