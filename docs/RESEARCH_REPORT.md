@@ -540,15 +540,110 @@ running" never render identically.
 
 ```bash
 python -m app.evaluation.datasets.unsw_nb15.fetch
-python -m app.evaluation.run_experiments --dataset unsw-nb15 --split stratified_group --seeds 3 --persist
-python -m app.evaluation.run_experiments --dataset unsw-nb15 --split stratified_group --group-by features --persist
-python -m app.evaluation.run_experiments --dataset aegisx-synthetic --persist
+
+# --max-seconds 3600 is required, not optional: the 900s default cannot finish
+# a UNSW run and the run then writes nothing. Measured at 1,911s. See
+# docs/REPRODUCIBILITY.md §4.
+python -m app.evaluation.run_experiments --dataset unsw-nb15 \
+  --split stratified_group --seed 1337 --persist --max-seconds 3600
+python -m app.evaluation.run_experiments --dataset unsw-nb15 \
+  --split temporal --seed 1337 --persist --max-seconds 3600
+python -m app.evaluation.run_experiments --dataset unsw-nb15 \
+  --split stratified_group --group-by features --seed 1337 --persist --max-seconds 3600
+python -m app.evaluation.run_experiments --dataset aegisx-synthetic \
+  --seed 1337 --include-registered --persist
+
+# §§5-8. Needs a schema: alembic upgrade head against an empty database first.
 python -m app.evaluation.run_system_eval
 ```
+
+`--include-registered` on the synthetic run needs a registered, active model
+(`python -m app.ml.training.train_anomaly_model`); without one the run logs the
+reason and omits that row rather than substituting the fitted model.
 
 Verify: dataset fingerprint `f24e4a1e47b7753e`, synthetic fingerprint
 `c0f04f3ccb2a63b8`, ruleset fingerprint `da203c91430a47a1`, feature schema
 `1.0`. See `docs/REPRODUCIBILITY.md` for tolerances.
+
+### 9.1 Provenance audit — what backs each result **[MEASURED, V8]**
+
+Every section below was checked against the artifact that produced it, at the
+V8 checkpoint. Status is one of:
+
+- **REPRODUCED** — re-run in V8; the artifact matches field for field.
+- **VERIFIED** — not re-run, but every published figure was checked back
+  against a committed artifact.
+- **UNREPRODUCED** — published from a run whose artifact is not committed.
+
+| § | Result | Corpus / fingerprint | Split (fingerprint, seed) | Artifact | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1, 2, 2.1–2.5 | UNSW, source grouping | unsw-nb15 `f24e4a1e47b7753e` | `stratified_group` `a74749098152ca3c`, 1337 | `…unsw-nb15-stratified_group-source-20260903T033255Z` | **VERIFIED** |
+| 2.6 | UNSW, temporal | unsw-nb15 `f24e4a1e47b7753e` | `temporal` `c3a3830a9db1bce2`, 1337 | V6 `…20260903T040811Z` + V8 `…20260904T081318Z` | **REPRODUCED** |
+| 3 | UNSW, feature-vector grouping | unsw-nb15 `36ff61fc57cc77d3` (see 9.1.1) | `stratified_group` `f21e897527b0f499`, 1337 | `…unsw-nb15-stratified_group-features-20260904T091903Z` | **REPRODUCED** |
+| 4 | Synthetic, fitted detectors | aegisx-detection-eval `c0f04f3ccb2a63b8` | `stratified_group`, 1337 | V6 `…aegisx-synthetic-…20260903T041133Z` + V8 `…20260904T083546Z` | **REPRODUCED** |
+| 4.1 | Synthetic, registered artifact `016c6dbf37f53d03…` | as §4; model trained on `f0fbefc8d38a8a53` | as §4 | as §4 | **REPRODUCED** |
+| 5–8 | Correlation, AI analyst, threat intel, degraded mode | injected campaigns + synthetic telemetry | n/a | `v4-system-eval-20260904T085205Z` | **REPRODUCED** |
+
+**§3 had no committed artifact before V8 either**, and its numbers had never
+been re-run since first publication. It was re-run in V8 and reproduced exactly:
+78,265 distinct feature-vector groups, split fingerprint `f21e897527b0f499`,
+train 123,876 / validation 39,607 / test 37,043 at 9.92% positive, **0.00%
+leakage on both validation and test**, supervised F1 0.9741 (the rise from
+0.970 that is §3's whole point), Isolation Forest ROC-AUC 0.423 flagging
+everything, hybrid MCC 0.0526, and the same collision warning — 44 groups, 300
+samples, 92 irreducible errors, 0.046%.
+
+#### 9.1.1 The dataset fingerprint is not invariant under `--group-by features`
+
+Reproducing §3 surfaced a documentation defect. This report's §9 and
+`docs/REPRODUCIBILITY.md` §5 both tell a reader to check the run against dataset
+fingerprint `f24e4a1e47b7753e`. The feature-grouped run produces
+**`36ff61fc57cc77d3`**, and that is correct: `EvaluationDataset.fingerprint()`
+deliberately hashes each sample's *grouping* as well as its identity and label,
+because "two loads that agree on samples but disagree on how duplicates are
+grouped will produce different splits, and must not claim to be the same
+dataset". `--group-by features` rewrites every group key before the report is
+written, so a different fingerprint is the design working.
+
+The defect is the instruction, not the code: a reader following §9 and checking
+§5's reference value would see a mismatch and conclude the corpus had changed,
+when the corpus is identical — same 200,526 samples, same source rows, same
+schema. Both fingerprints are now recorded above and in `REPRODUCIBILITY.md` §5.
+
+**§§5–8 had no committed artifact before V8.** The V6 retention policy
+(`docs/REPRODUCIBILITY.md` §7) committed the experiment reports that existed at
+the time; the system evaluation was never re-run, so every figure in §§5–8 was
+published from a file `.gitignore` excluded. It was re-run in V8 and every
+substantive figure reproduced exactly: campaigns 15/24 (62.5%), credential
+8/8 at 70.7% purity, lateral 4/8 at 27.8%, host intrusion 3/8 at 48.4%,
+26 sequences, 1 spurious (3.9%), mean purity 54.31%, alert reduction 10.08×,
+AI analyst 5/5 grounded with 0 warnings, SSRF 6/6 refused, and all five
+degraded-mode scenarios at 60/60 normalized with 15 detections.
+
+**Latency figures are the documented exception and do not reproduce.**
+`docs/REPRODUCIBILITY.md` §6 states they never do — they are hardware-dependent.
+Measured in V8: correlation mean 1.138 ms / p95 2.856 ms / p99 3.621 ms against
+§5's published 1.75 / 4.19 / 4.95, and AI analyst mean 1.79 ms against §6's
+1.85 ms. **The published latency numbers are kept as originally measured** and
+are not restated here, because replacing a figure measured on one machine with a
+figure measured on another machine would not be a correction. Every
+non-latency figure in those sections is the same number.
+
+### 9.2 Known provenance gaps **[LIMITATION]**
+
+1. **The V4 deployed artifact `053d1ff3…` is unreproducible and gone.** It
+   predates the determinism fix, was overwritten during a database rebuild
+   before V5 closed that hole, and cannot be regenerated from current code. Any
+   V4-era statement about "the deployed model" refers to an artifact that no
+   longer exists. The current `isolation_forest@1.0` (`016c6dbf37f53d03…`) *is*
+   reproducible — verified byte-for-byte in V8 — and is what §4.1 evaluates.
+2. **Model artifacts are not committed** (`app/ml/artifacts/.gitignore`), so
+   reproducing §4.1 means retraining first. That is sound — a 700 KB pickle is
+   not a source artifact — but it means the digest, not the file, is the
+   published identity.
+3. **`--include-registered` has never been run on UNSW-NB15.** §4.1.
+4. **Seed variance is measured only for §2.3**, on three seeds. No other section
+   carries an interval.
 
 ---
 

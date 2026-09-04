@@ -62,6 +62,15 @@ The choice is declared in the split plan, recorded on the experiment, and made
 scores materially worse; reporting only the flattering one would be dishonest,
 so both are run.
 
+**Both are now also published.** That sentence was aspirational until V8: the
+temporal run existed and its artifact was committed at V6, but its detector
+results appeared in no report, so in practice only the flattering split was
+readable. They are in `docs/RESEARCH_REPORT.md` §2.6, and they are worse — the
+production risk path ranks *below chance* under shift, and the Isolation
+Forest's MCC at the frozen threshold is negative while its ROC-AUC improves.
+That combination is what a misplaced threshold looks like, and it is the reason
+this document insists the split strategy is chosen before the metrics are seen.
+
 **Group integrity is non-negotiable.** Every sample sharing a group key lands in
 exactly one split. On UNSW-NB15, 46% of rows are exact duplicates of another
 row; without this, a detector would be tested on flows it had already memorised.

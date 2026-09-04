@@ -1,0 +1,620 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-04T08:52:04.454781+00:00",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/evaluation/run_system_eval.py --output-dir /private/tmp/claude-501/-Users-raghavanand-Desktop/73ddb0a4-e1ca-46e4-b19e-4dd259ed7611/scratchpad/v8-system",
+  "correlation": {
+    "schemaVersion": "1.0",
+    "generatedAt": "2026-09-04T08:52:04.411399+00:00",
+    "campaigns": [
+      {
+        "kind": "_campaign_credential_attack",
+        "injected": 8,
+        "detected": 8,
+        "detectionRate": 1.0,
+        "meanPurity": 0.7073
+      },
+      {
+        "kind": "_campaign_lateral_movement",
+        "injected": 8,
+        "detected": 4,
+        "detectionRate": 0.5,
+        "meanPurity": 0.2779
+      },
+      {
+        "kind": "_campaign_host_intrusion",
+        "injected": 8,
+        "detected": 3,
+        "detectionRate": 0.375,
+        "meanPurity": 0.4841
+      }
+    ],
+    "totals": {
+      "campaignsInjected": 24,
+      "campaignsDetected": 15,
+      "campaignDetectionRate": 0.625,
+      "backgroundEvents": 200,
+      "eventsIngested": 315,
+      "sequencesOpened": 26,
+      "sequencesMatched": 25,
+      "spuriousSequences": 1,
+      "spuriousSequenceRate": 0.0385,
+      "meanSequencePurity": 0.5431,
+      "meanSequenceSize": 10.08,
+      "meanConfidence": 0.6292,
+      "eventsInSequences": 262,
+      "alertReductionFactor": 10.08
+    },
+    "latency": {
+      "measured": "correlate_event() including its database queries",
+      "samples": 315,
+      "meanMs": 1.138,
+      "p50Ms": 0.8013,
+      "p95Ms": 2.8557,
+      "p99Ms": 3.6214,
+      "maxMs": 15.5778
+    },
+    "sequences": [
+      {
+        "sequenceId": "SEQ-000001",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 32,
+        "confidence": 0.95,
+        "riskScore": 28,
+        "matchedCampaign": "_campaign_credential_attack-001",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.2188,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000002",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 23,
+        "confidence": 0.95,
+        "riskScore": 28,
+        "matchedCampaign": "_campaign_credential_attack-005",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.3043,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000003",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 22,
+        "confidence": 0.95,
+        "riskScore": 28,
+        "matchedCampaign": "_campaign_credential_attack-004",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.3182,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000004",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 18,
+        "confidence": 0.95,
+        "riskScore": 28,
+        "matchedCampaign": "_campaign_credential_attack-006",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.3889,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000005",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 13,
+        "confidence": 0.95,
+        "riskScore": 28,
+        "matchedCampaign": "_campaign_credential_attack-003",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.5385,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000006",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-007",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000007",
+        "pattern": "COR-HOST-001",
+        "eventCount": 11,
+        "confidence": 0.66,
+        "riskScore": 20,
+        "matchedCampaign": "_campaign_lateral_movement-000",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.0909,
+        "membersFromCampaign": 1
+      },
+      {
+        "sequenceId": "SEQ-000008",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-001",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000009",
+        "pattern": "COR-AUTH-001",
+        "eventCount": 12,
+        "confidence": 0.84,
+        "riskScore": 25,
+        "matchedCampaign": "_campaign_credential_attack-000",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.3333,
+        "membersFromCampaign": 4
+      },
+      {
+        "sequenceId": "SEQ-000010",
+        "pattern": "COR-HOST-001",
+        "eventCount": 12,
+        "confidence": 0.66,
+        "riskScore": 20,
+        "matchedCampaign": "_campaign_lateral_movement-002",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.0833,
+        "membersFromCampaign": 1
+      },
+      {
+        "sequenceId": "SEQ-000011",
+        "pattern": "COR-NET-001",
+        "eventCount": 5,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-002",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 5
+      },
+      {
+        "sequenceId": "SEQ-000012",
+        "pattern": "COR-NET-001",
+        "eventCount": 4,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": null,
+        "matchedCampaignKind": null,
+        "purity": 0.0,
+        "membersFromCampaign": 0
+      },
+      {
+        "sequenceId": "SEQ-000013",
+        "pattern": "COR-HOST-001",
+        "eventCount": 9,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_lateral_movement-001",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.1111,
+        "membersFromCampaign": 1
+      },
+      {
+        "sequenceId": "SEQ-000014",
+        "pattern": "COR-HOST-001",
+        "eventCount": 4,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_host_intrusion-006",
+        "matchedCampaignKind": "_campaign_host_intrusion",
+        "purity": 0.5,
+        "membersFromCampaign": 2
+      },
+      {
+        "sequenceId": "SEQ-000015",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-003",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000016",
+        "pattern": "COR-NET-001",
+        "eventCount": 5,
+        "confidence": 0.4,
+        "riskScore": 12,
+        "matchedCampaign": "_campaign_credential_attack-000",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 0.8,
+        "membersFromCampaign": 4
+      },
+      {
+        "sequenceId": "SEQ-000017",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-006",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000018",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-005",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000019",
+        "pattern": "COR-HOST-001",
+        "eventCount": 6,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_lateral_movement-000",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.1667,
+        "membersFromCampaign": 1
+      },
+      {
+        "sequenceId": "SEQ-000020",
+        "pattern": "COR-HOST-001",
+        "eventCount": 10,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_lateral_movement-000",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.1,
+        "membersFromCampaign": 1
+      },
+      {
+        "sequenceId": "SEQ-000021",
+        "pattern": "COR-NET-001",
+        "eventCount": 5,
+        "confidence": 0.48,
+        "riskScore": 14,
+        "matchedCampaign": "_campaign_lateral_movement-002",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.8,
+        "membersFromCampaign": 4
+      },
+      {
+        "sequenceId": "SEQ-000022",
+        "pattern": "COR-HOST-001",
+        "eventCount": 3,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_host_intrusion-005",
+        "matchedCampaignKind": "_campaign_host_intrusion",
+        "purity": 0.6667,
+        "membersFromCampaign": 2
+      },
+      {
+        "sequenceId": "SEQ-000023",
+        "pattern": "COR-HOST-001",
+        "eventCount": 7,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_host_intrusion-002",
+        "matchedCampaignKind": "_campaign_host_intrusion",
+        "purity": 0.2857,
+        "membersFromCampaign": 2
+      },
+      {
+        "sequenceId": "SEQ-000024",
+        "pattern": "COR-NET-001",
+        "eventCount": 5,
+        "confidence": 0.45,
+        "riskScore": 13,
+        "matchedCampaign": "_campaign_lateral_movement-006",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.8,
+        "membersFromCampaign": 4
+      },
+      {
+        "sequenceId": "SEQ-000025",
+        "pattern": "COR-NET-001",
+        "eventCount": 7,
+        "confidence": 0.35,
+        "riskScore": 10,
+        "matchedCampaign": "_campaign_credential_attack-004",
+        "matchedCampaignKind": "_campaign_credential_attack",
+        "purity": 1.0,
+        "membersFromCampaign": 7
+      },
+      {
+        "sequenceId": "SEQ-000026",
+        "pattern": "COR-HOST-001",
+        "eventCount": 14,
+        "confidence": 0.76,
+        "riskScore": 23,
+        "matchedCampaign": "_campaign_lateral_movement-000",
+        "matchedCampaignKind": "_campaign_lateral_movement",
+        "purity": 0.0714,
+        "membersFromCampaign": 1
+      }
+    ],
+    "notes": [
+      "Ground truth is campaign membership, not a per-event label: the question is whether the correlator recovered the attack, not whether it flagged each event.",
+      "A sequence is attributed to the campaign contributing most of its members; purity is the fraction of members that actually belong to that campaign.",
+      "Spurious sequences are reported as a rate, not counted as errors. A sequence over background traffic can be legitimate.",
+      "AEGISX correlation is hand-written, entity-scoped and time-bounded. These figures measure recovery of campaigns this project generated; they are NOT evidence about real attacks and NOT comparable to learned attack-graph inference.",
+      "Purity is depressed partly by the evaluation setup, not only by the correlator: the synthetic generator draws from a small pool of users and hosts, so background traffic legitimately shares an entity with a campaign and an entity-scoped correlator cannot separate the two. The figure is a lower bound on purity and an upper bound on how well entity scoping can ever do on a namespace this small.",
+      "Latency includes database access and was measured on a development machine against SQLite. It is not a production throughput claim."
+    ]
+  },
+  "aiAnalyst": {
+    "provider": "mock",
+    "isTemplateProvider": true,
+    "resultLabel": "MOCK - generated by the built-in deterministic template analyst, not a language model. Measures the evidence/grounding pipeline only.",
+    "cases": [
+      {
+        "caseId": "AI-000-analyze",
+        "incident": "INC-1001",
+        "status": "completed",
+        "kind": "analyze",
+        "grounded": true,
+        "groundingWarnings": [],
+        "citedTechniques": [
+          {
+            "technique": "T1110",
+            "provenance": "inferred",
+            "rationale": "Inferred from the shape of the sequence by Credential attack sequence"
+          }
+        ],
+        "confidence": "low",
+        "evidenceFingerprint": "567ab3eb3f2d709a689452a03c1acdbd",
+        "promptVersion": "1.0",
+        "latencyMs": 2.83
+      },
+      {
+        "caseId": "AI-001-analyze",
+        "incident": "INC-1002",
+        "status": "completed",
+        "kind": "analyze",
+        "grounded": true,
+        "groundingWarnings": [],
+        "citedTechniques": [
+          {
+            "technique": "T1110",
+            "provenance": "inferred",
+            "rationale": "Inferred from the shape of the sequence by Credential attack sequence"
+          }
+        ],
+        "confidence": "low",
+        "evidenceFingerprint": "09855902232063fc44d0d108790fa431",
+        "promptVersion": "1.0",
+        "latencyMs": 1.71
+      },
+      {
+        "caseId": "AI-002-analyze",
+        "incident": "INC-1003",
+        "status": "completed",
+        "kind": "analyze",
+        "grounded": true,
+        "groundingWarnings": [],
+        "citedTechniques": [
+          {
+            "technique": "T1110",
+            "provenance": "inferred",
+            "rationale": "Inferred from the shape of the sequence by Credential attack sequence"
+          }
+        ],
+        "confidence": "low",
+        "evidenceFingerprint": "653fbe0a1db468992a2a1755b4de0735",
+        "promptVersion": "1.0",
+        "latencyMs": 1.68
+      },
+      {
+        "caseId": "AI-003-analyze",
+        "incident": "INC-1004",
+        "status": "completed",
+        "kind": "analyze",
+        "grounded": true,
+        "groundingWarnings": [],
+        "citedTechniques": [
+          {
+            "technique": "T1110",
+            "provenance": "inferred",
+            "rationale": "Inferred from the shape of the sequence by Credential attack sequence"
+          }
+        ],
+        "confidence": "low",
+        "evidenceFingerprint": "5b4be87bfc182934d979153e0c94f9a4",
+        "promptVersion": "1.0",
+        "latencyMs": 1.53
+      },
+      {
+        "caseId": "AI-004-analyze",
+        "incident": "INC-1005",
+        "status": "completed",
+        "kind": "analyze",
+        "grounded": true,
+        "groundingWarnings": [],
+        "citedTechniques": [
+          {
+            "technique": "T1110",
+            "provenance": "inferred",
+            "rationale": "Inferred from the shape of the sequence by Credential attack sequence"
+          }
+        ],
+        "confidence": "low",
+        "evidenceFingerprint": "783f285be5ad02ad1a6ebc5224f237b7",
+        "promptVersion": "1.0",
+        "latencyMs": 1.18
+      }
+    ],
+    "totals": {
+      "cases": 5,
+      "completed": 5,
+      "failed": 0,
+      "groundedAnalyses": 5,
+      "groundingRate": 1.0,
+      "ungroundedAnalyses": 0,
+      "unsupportedTechniqueWarnings": 0,
+      "unresolvedReferenceWarnings": 0,
+      "overconfidentAnalyses": 0,
+      "latency": {
+        "meanMs": 1.79,
+        "p95Ms": 2.83,
+        "maxMs": 2.83
+      },
+      "note": "An ungrounded analysis is stored and shown with its warnings, never silently dropped or silently accepted. These counts are of warnings raised by the production grounding verifier, not of a human judgement about whether the prose reads well."
+    },
+    "unavailableReason": null
+  },
+  "threatIntelligence": {
+    "provider": "none",
+    "configured": false,
+    "enrichmentMeasured": false,
+    "unavailableReason": "No live threat-intelligence provider is configured, so enrichment success, cache hit rate and provider latency are NOT AVAILABLE. They are not estimated.",
+    "ssrfValidation": {
+      "probes": [
+        {
+          "type": "ip",
+          "value": "203.0.113.10",
+          "context": "RFC 5737 documentation range (synthetic telemetry)",
+          "accepted": false,
+          "refusalReason": "203.0.113.10 is in a documentation range (RFC 5737/3849). AEGISX's synthetic telemetry uses these addresses, and looking one up would ask a real provider about an address that does not exist."
+        },
+        {
+          "type": "ip",
+          "value": "198.51.100.42",
+          "context": "RFC 5737 documentation range (synthetic telemetry)",
+          "accepted": false,
+          "refusalReason": "198.51.100.42 is in a documentation range (RFC 5737/3849). AEGISX's synthetic telemetry uses these addresses, and looking one up would ask a real provider about an address that does not exist."
+        },
+        {
+          "type": "ip",
+          "value": "10.0.0.5",
+          "context": "RFC 1918 private address",
+          "accepted": false,
+          "refusalReason": "10.0.0.5 is a private or reserved address. Sending internal addressing to a third party leaks the estate's topology, and no provider has anything useful to say about it."
+        },
+        {
+          "type": "ip",
+          "value": "127.0.0.1",
+          "context": "loopback",
+          "accepted": false,
+          "refusalReason": "127.0.0.1 is a loopback, link-local or multicast address; it is never sent to an external provider"
+        },
+        {
+          "type": "ip",
+          "value": "169.254.169.254",
+          "context": "link-local cloud metadata endpoint",
+          "accepted": false,
+          "refusalReason": "169.254.169.254 is a loopback, link-local or multicast address; it is never sent to an external provider"
+        },
+        {
+          "type": "domain",
+          "value": "not a domain",
+          "context": "malformed value",
+          "accepted": false,
+          "refusalReason": "Indicator contains whitespace or control characters"
+        }
+      ],
+      "allRefused": true,
+      "note": "Documentation-range addresses are refused by design. This is why enrichment stays silent on purely synthetic telemetry, and it is a measured behaviour rather than an assumed one."
+    },
+    "notes": [
+      "No live provider call has ever been made from this repository. Any figure about VirusTotal's accuracy would be fabricated.",
+      "Synthetic IP addresses are not real indicators, and calling a lookup against them 'threat intelligence' would misrepresent both."
+    ]
+  },
+  "degradedModes": {
+    "scenarios": [
+      {
+        "scenario": "ml_never_loaded",
+        "description": "No model has been loaded. The engine must decline with a stated reason.",
+        "subsystemState": {
+          "available": false,
+          "reason": "No anomaly model has been loaded yet. Train one with `python -m app.ml.training.train_anomaly_model`.",
+          "scoreReturned": null
+        },
+        "eventsNormalized": 60,
+        "ruleDetections": 15,
+        "ingestionSurvived": true
+      },
+      {
+        "scenario": "ml_artifact_corrupt",
+        "description": "A corrupt artifact must be refused, not loaded and scored with.",
+        "subsystemState": {
+          "loaded": false,
+          "refused": true,
+          "reason": "ModelUnavailable"
+        },
+        "eventsNormalized": 60,
+        "ruleDetections": 15,
+        "ingestionSurvived": true
+      },
+      {
+        "scenario": "ml_digest_mismatch",
+        "description": "An artifact whose digest does not match must refuse to load.",
+        "subsystemState": {
+          "loaded": false,
+          "refused": true,
+          "reason": "Model artifact digest mismatch for model.joblib: registry has 000000000000, file is b5cd4fff7635. Refusing to load."
+        },
+        "eventsNormalized": 60,
+        "ruleDetections": 15,
+        "ingestionSurvived": true
+      },
+      {
+        "scenario": "threat_intel_unconfigured",
+        "description": "With no provider, enrichment must be absent with a reason, not an error.",
+        "subsystemState": {
+          "enabled": true,
+          "provider": "none",
+          "configured": false,
+          "supports": [],
+          "cacheTtlHours": 24,
+          "failureRetryMinutes": 15,
+          "budget": {
+            "day": null,
+            "used": 0,
+            "limit": 400,
+            "remaining": 400
+          }
+        },
+        "eventsNormalized": 60,
+        "ruleDetections": 15,
+        "ingestionSurvived": true
+      },
+      {
+        "scenario": "ai_state",
+        "description": "The AI analyst must always report availability and a reason when absent.",
+        "subsystemState": {
+          "enabled": true,
+          "available": true,
+          "provider": "mock",
+          "model": "aegisx-template-analyst-1.0",
+          "reason": null,
+          "isTemplateProvider": true,
+          "sendsDataExternally": false,
+          "promptVersion": "1.0",
+          "analysisVersion": "1.0",
+          "maxEvidenceEvents": 25,
+          "budget": {
+            "day": "2026-09-04",
+            "used": 5,
+            "limit": 200,
+            "remaining": 195
+          }
+        },
+        "eventsNormalized": 60,
+        "ruleDetections": 15,
+        "ingestionSurvived": true
+      }
+    ],
+    "ingestionSurvivedEveryScenario": true,
+    "everyUnavailableStateCarriesAReason": true,
+    "note": "The guarantee under test is architectural: an optional subsystem failing must degrade to a stated reason, never stop ingestion. 'Empty with a reason' and 'empty because nothing was found' are different facts and must not render identically."
+  }
+}
