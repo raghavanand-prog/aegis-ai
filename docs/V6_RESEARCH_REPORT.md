@@ -1402,7 +1402,90 @@ prevalence**; ROC-AUC is the figure to carry between them.
 5. **Nothing has been migrated onto it.** The V4/V5 experiments still run on the
    old corpus; this is the substrate, not a re-run of everything on it.
 
-## 14. Reproducing
+## 14. §5's gap, explained **[MEASURED]**
+
+§13.2 established that contamination cannot explain §5's 17× gap — both corpora
+are ~40% malicious — and left it open. This closes it, and the answer reaches
+further than §5.
+
+### 14.1 The score scale is relative to each model's own fit set
+
+`IsolationForestDetector.anomaly_score` is a logistic squash of the raw score
+about `_raw_offset`, and **`_raw_offset` is the median of the training scores**.
+So 0.5 means *"typical of this model's own training data"* — not "half as
+anomalous as the maximum". Verified: a model scores its own fit set at a median
+of exactly **0.500**.
+
+A frozen 0.65 therefore names a **different operating point for every model**.
+
+### 14.2 The decomposition
+
+Both models scoring the identical eval test split, seed 1337:
+
+| | ROC-AUC | F1 @ 0.65 | best F1 | at threshold | where 0.65 sits |
+| --- | --- | --- | --- | --- | --- |
+| telemetry-fit | 0.7438 | **0.6409** | 0.6761 | 0.634 | **53.6th pct** |
+| eval-corpus-fit | 0.5242 | **0.0377** | 0.5714 | 0.414 | **99.2nd pct** |
+
+| | ratio |
+| --- | --- |
+| at the frozen 0.65 | **17.0×** |
+| at each model's own best threshold | **1.18×** |
+| **share of the gap from threshold placement** | **82.6%** |
+
+**The eval-fitted model flags almost nothing because 0.65 sits at the 99.2nd
+percentile of its scores.** That is the entire "near-inert baseline" V4 and V5
+measured everything against. It is not a model that cannot separate — its best
+achievable F1 is 0.571 — it is a model whose operating point was set by a
+constant that means something different for it.
+
+### 14.3 The irony
+
+The telemetry-fitted model scores well at 0.65 **partly because the eval corpus
+is out of distribution for it**. Everything looks somewhat unusual, its whole
+score distribution shifts up (median 0.635 against 0.503), and 0.65 lands
+usefully mid-range.
+
+**Its apparent superiority at that threshold is in part an artefact of the
+corpus being unfamiliar to it.** §5 read that as production being better
+configured. It is better *calibrated for this threshold on this corpus*, by
+accident.
+
+### 14.4 What this does and does not overturn
+
+| Claim | Status |
+| --- | --- |
+| §4: contamination degrades the detector | **Stands.** Threshold-free: ROC-AUC 0.53 → 0.93 and best-F1 0.571 → 0.841 as contamination falls |
+| §4's F1 column | **Understates the effect.** 0.65 sits above the 80th percentile at *every* level of that sweep, so every F1 there is depressed |
+| §5: the production configuration reaches F1 0.6526 | **Stands as a measurement** |
+| §5: that reflects a better-configured detector | **Mostly wrong.** 82.6% of it is threshold placement |
+| The V4/V5 static baseline was a bad comparator | **Stands, with a better reason** — not "wrong corpus" but "a threshold that flags 0.8% of events" |
+
+### 14.5 The consequence that matters **[INFERENCE]**
+
+**A fixed threshold is not comparable across models fitted on different data**,
+and AEGISX compares models at a frozen 0.65 in several places. Any such
+comparison is confounded by calibration unless both models were fitted on the
+same distribution — which is exactly the case V4/V5's static-vs-adapted
+comparison did *not* satisfy, since the adapted arm refits.
+
+Two things follow:
+
+1. **V5's Arm 1 was doing more than it appeared.** Threshold adaptation reads as
+   a minor operating-point nudge; here, moving from 0.65 to a model's own best
+   threshold is worth **+0.53 F1** on the eval-fitted model. Much of what V5
+   attributed to adaptation may be Arm 1 repairing a calibration mismatch that
+   the experiment created by refitting.
+2. **Report threshold-free measures alongside any fixed-threshold one.** ROC-AUC
+   and best-achievable F1 are portable; F1 at a constant is not. §3 already used
+   AUC for exactly this reason, and that choice turns out to have been load-
+   bearing.
+
+**[LIMITATION]** Best-achievable F1 is an optimistic ceiling — it is chosen with
+knowledge of the labels and no operator gets it. It is used here as a
+*comparable* quantity, not an achievable one.
+
+## 15. Reproducing
 
 ```bash
 cd backend
