@@ -164,6 +164,8 @@ was rewritten to look better.
 | V5 Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedbackDatasetId` as metadata and **never used it** |
 | **V6 §3.3, mine** | Said the corpus violates the `contamination` *parameter* "by a factor of 5". Direction right, mechanism wrong — `contamination` never reaches `anomaly_score`. Corrected in place with a visible note |
 | **V6 §7.3, mine** | Recommended an aggregate recall floor. §8 measured that it cannot work. §8 supersedes it |
+| **V6 §2.4, mine** | Said adaptation helps 4 of 13 novel categories. §17.2 measured the **opposite**: those three were already at AUC ≈0.997 under the static model and gained nothing, while MALWARE, RANSOMWARE and LATERAL_MOVEMENT — the ones called unhelpable — gain +0.19 to +0.21 AUC |
+| **V6 §7.3, mine** | Said benign bias costs recall and that recall reveals the poisoning. §17.3 measured that benign bias has the **largest capability gain of any condition** and costs no recall at matched budget. The recommendation it produced was wrong twice over |
 | **V5 Arm 1 (threshold adaptation)** | Reported as working (F1 0.038 → 0.099). §16.2 measured it contributes **exactly zero** capability — identical ROC-AUC, best-F1 and recall-at-budget to static, by construction. Its entire effect was threshold placement |
 | **V5's headline, 6.3×** | Real and attributable to feedback, but **~7× inflated** by the frozen threshold. Defensible figure: **1.31× (AUC), 1.46× (recall at fixed alert budget)** (§16.5) |
 | **V6 §6, mine** | Described the redesigned Arm 2 as "trading recall for precision". §15.3 measured it is **strictly better** at matched operating points (AUC +0.033, best-F1 +0.015); the apparent trade is the calibration shift |
@@ -309,11 +311,9 @@ Also unresolved, and load-bearing:
 
 Argue with the ordering; it is a judgement, not a finding.
 
-1. **Re-run §§2 and 6–11 at matched operating points.** §16 did Track 1 and
-   found V5's effect real but ~7× smaller than published. The poisoning
-   sections rest on per-category recall and admitted-row counts rather than F1,
-   so they are less exposed, but they have not been checked.
-2. **Migrate experiments onto the rebuilt substrate.**
+1. **Migrate experiments onto the rebuilt substrate** (§13). Every result in
+   this project still runs on the V4/V5 corpus; §13.3 showed a correctly-built
+   one can differ materially. This is the last systematic confound left.
    `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
    has been re-run on it. Until that happens the published numbers still sit on
    the old corpus.

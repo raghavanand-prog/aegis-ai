@@ -75,9 +75,9 @@ def honest_baseline_rates(*, seeds: tuple[int, ...], noise_rate: float = 0.05,
 
 
 @lru_cache(maxsize=8)
-def _prepare(seed: int):
+def _prepare(seed: int, samples_per_class: int | None = None):
     """Corpus with categories retained, so damage can be located per category."""
-    dataset = synthetic_dataset(seed=seed)
+    dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
     ordered = sorted(dataset.samples, key=lambda sample: sample.timestamp)
     extractor = FeatureExtractor()
     features = {
@@ -106,13 +106,19 @@ def measure(
     per_group_ceiling: int | None = None,
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
+    samples_per_class: int | None = None,
 ) -> dict[str, Any]:
     """Poison one category's feedback; measure where the damage actually lands.
+
+    ``samples_per_class`` enlarges the corpus. V4's ``roc_auc`` refuses fewer
+    than 20 observations a side, and the default corpus leaves too few held-out
+    samples of one category for a threshold-free figure - so ``targetAuc`` is
+    ``None`` unless this is raised. The guard is respected rather than weakened.
 
     ``adversary_reach`` is the share of the target category's reviewed events the
     adversary manages to mislabel - their budget, not their intent.
     """
-    features, fit_samples, test_samples = _prepare(seed)
+    features, fit_samples, test_samples = _prepare(seed, samples_per_class)
 
     if not any(s.category == target_category for s in fit_samples):
         raise ValueError(
@@ -175,6 +181,24 @@ def measure(
     honest_admitted = admit(honest)
     attacked_admitted = admit(attacked)
 
+    def target_auc(detector) -> float | None:
+        """Threshold-free separation of the targeted category from benign.
+
+        V6 §15 established that comparing differently-fitted models at a frozen
+        threshold compares their calibrations. The honest and poisoned arms are
+        fitted on different feedback, so recall alone cannot say whether the
+        attack cost capability or merely moved the operating point.
+        """
+        malicious = [
+            s for s in test_samples if s.is_malicious and s.category == target_category
+        ]
+        benign = [s for s in test_samples if not s.is_malicious]
+        if len(malicious) < 2 or len(benign) < 2:
+            return None
+        scores = [detector.anomaly_score(features[s.id]) for s in malicious + benign]
+        labels = [True] * len(malicious) + [False] * len(benign)
+        return roc_auc(scores, labels)
+
     def recall_for(detector, predicate) -> float | None:
         chosen = [s for s in test_samples if predicate(s)]
         malicious = [s for s in chosen if s.is_malicious]
@@ -196,6 +220,7 @@ def measure(
         aggregate["rocAuc"] = roc_auc(scores, labels)
         return {
             "aggregate": aggregate,
+            "targetAuc": target_auc(detector),
             "targetRecall": recall_for(detector, lambda s: s.category == target_category),
             "nonTargetRecall": recall_for(
                 detector, lambda s: s.category != target_category
@@ -234,6 +259,12 @@ def measure(
         "targetRecall": {
             "baseline": clean["targetRecall"],
             "poisoned": poisoned["targetRecall"],
+        },
+        # Threshold-free: whether the attack cost capability, or only moved the
+        # operating point (V6 §15).
+        "targetAuc": {
+            "baseline": clean["targetAuc"],
+            "poisoned": poisoned["targetAuc"],
         },
         "nonTargetRecall": {
             "baseline": clean["nonTargetRecall"],
