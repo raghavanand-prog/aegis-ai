@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models.enums import AuditAction, IncidentStatus
+from app.incidents import lifecycle
+from app.models.enums import AuditAction, IncidentStatus, UserRole
 from app.models.event import Event
 from app.models.incident import Incident
 from app.models.user import User
@@ -26,6 +27,13 @@ class IncidentError(Exception):
     """Raised for invalid incident operations (e.g. promoting twice)."""
 
 
+#: States an incident may be created in. Everything else is reached by a
+#: transition, which is authorised on its own terms - see `create_incident`.
+ENTRY_STATUSES: frozenset[IncidentStatus] = frozenset(
+    {IncidentStatus.OPEN, IncidentStatus.TRIAGED, IncidentStatus.INVESTIGATING}
+)
+
+
 def _timeline_entry(action: str, actor: str, detail: str) -> dict:
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -33,6 +41,46 @@ def _timeline_entry(action: str, actor: str, detail: str) -> dict:
         "actor": actor,
         "detail": detail,
     }
+
+
+def _lifecycle_actor(user: User | None) -> str:
+    """The identity the lifecycle checks, which is not the one the UI shows.
+
+    Two separate jobs. The timeline wants a display name; the lifecycle wants a
+    stable identity it can test against the non-human actor prefixes.
+
+    Passing the display name would let a person called ``system`` or an account
+    whose full name began ``ai:`` be judged on their name rather than on what
+    they are, and - the direction that actually matters - a call with no user at
+    all resolved to the bare string ``"system"``, which does **not** match the
+    ``system:`` prefix and so read as a human. An unauthenticated internal
+    caller would have been allowed to close incidents. The prefix is applied
+    here so that cannot depend on how somebody spells a name.
+    """
+    if user is None:
+        return "system:aegisx"
+    return user.email
+
+
+def _resolved_at_for(incident: Incident, target: IncidentStatus) -> datetime | None:
+    """When this incident was resolved, after moving to ``target``.
+
+    Through V8 this was ``now() if target is RESOLVED else None``, so **closing
+    a resolved incident erased when it had been resolved** - the one transition
+    that most obviously should preserve it. The rule is not "is the new state
+    RESOLVED" but "is the incident still finished":
+
+    * moving to ``Resolved`` stamps it, first time or on a re-resolve;
+    * moving to ``Closed`` keeps whatever is there, because closing seals a
+      resolution rather than replacing it;
+    * anything else means the incident is being worked again, and a resolution
+      timestamp on an incident under investigation is a false statement.
+    """
+    if target is IncidentStatus.RESOLVED:
+        return datetime.now(timezone.utc)
+    if target is IncidentStatus.CLOSED:
+        return incident.resolved_at
+    return None
 
 
 def _broadcast(incident: Incident, message_type: str) -> None:
@@ -103,6 +151,18 @@ def create_incident(
     user: User | None = None,
     broadcast: bool = True,
 ) -> Incident:
+    if payload.status not in ENTRY_STATUSES:
+        # Otherwise creation is a way around the transition rules entirely: an
+        # actor holding only `incidents:create` could produce an incident
+        # already `Closed`, or one asserting `Contained`, without ever holding
+        # the authority those transitions require.
+        allowed = ", ".join(sorted(status.value for status in ENTRY_STATUSES))
+        raise IncidentError(
+            f"An incident cannot be created as {payload.status.value!r}. A new "
+            f"incident starts in one of: {allowed}. Reaching any other state is "
+            "a transition, and transitions are authorised individually."
+        )
+
     events = event_repository.get_many_by_event_ids(db, payload.event_ids)
     missing = set(payload.event_ids) - {event.event_id for event in events}
     if missing:
@@ -219,6 +279,28 @@ def update_incident(
     actor = (user.full_name or user.email) if user else "system"
     timeline = list(incident.timeline or [])
 
+    # Validate the transition BEFORE touching anything.
+    #
+    # The router rolls back on a refusal, so relying on that would also work
+    # today. It would stop working the moment a worker, a CLI command or a test
+    # called this function without one, and the failure mode is a half-applied
+    # PATCH: the title edited, the status not, and nothing to say so. A service
+    # that is only safe when its caller remembers to clean up is not safe.
+    status_change: tuple[str, IncidentStatus, str | None] | None = None
+    if payload.status is not None and payload.status.value != incident.status:
+        # An unchanged status is short-circuited above rather than validated:
+        # the UI sends the whole object back, and a PATCH re-stating the current
+        # status while editing a title is not a self-transition.
+        reason = (payload.status_reason or "").strip() or None
+        _, target = lifecycle.validate_transition(
+            incident.status,
+            payload.status,
+            actor=_lifecycle_actor(user),
+            actor_role=user.role if user else UserRole.ADMIN.value,
+            reason=reason,
+        )
+        status_change = (incident.status, target, reason)
+
     if payload.title is not None:
         incident.title = payload.title
     if payload.description is not None:
@@ -231,21 +313,32 @@ def update_incident(
         )
         incident.severity = payload.severity.value
 
-    if payload.status is not None and payload.status.value != incident.status:
-        timeline.append(
-            _timeline_entry("status_changed", actor, f"{incident.status} -> {payload.status.value}")
-        )
-        incident.status = payload.status.value
-        incident.resolved_at = (
-            datetime.now(timezone.utc) if payload.status == IncidentStatus.RESOLVED else None
-        )
+    if status_change is not None:
+        previous_status, target, reason = status_change
+
+        detail = f"{previous_status} -> {target.value}"
+        if reason:
+            detail = f"{detail}: {reason}"
+        timeline.append(_timeline_entry("status_changed", actor, detail))
+
+        incident.status = target.value
+        incident.resolved_at = _resolved_at_for(incident, target)
+
         audit_service.record(
             db,
             action=AuditAction.INCIDENT_STATUS_CHANGED,
             user=user,
             target_type="incident",
             target_id=incident.incident_id,
-            details={"status": incident.status},
+            details={
+                # Both ends, not just the destination. "status: Resolved" tells
+                # a reader where an incident ended up and not what was undone to
+                # get there, and the reopen edges are the ones worth auditing.
+                "from": previous_status,
+                "to": target.value,
+                "reason": reason,
+                "actorRole": user.role if user else "system",
+            },
         )
 
     if payload.analyst is not None and payload.analyst != incident.analyst:

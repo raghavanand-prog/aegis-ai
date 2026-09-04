@@ -45,6 +45,13 @@ class IncidentUpdate(CamelModel):
     description: str | None = None
     severity: Severity | None = None
     status: IncidentStatus | None = None
+    #: Why the status is changing. Required by the lifecycle for any transition
+    #: that ends recorded work (`-> Resolved`, `-> Closed`) or undoes it (a
+    #: reopen), and ignored when the request does not change the status. The
+    #: requirement is enforced in the domain layer rather than by making this
+    #: field mandatory here, because whether a reason is needed depends on
+    #: which two states are involved and this schema cannot see the current one.
+    status_reason: str | None = Field(default=None, max_length=500)
     analyst: str | None = Field(default=None, max_length=120)
     assignee_id: int | None = None
 
