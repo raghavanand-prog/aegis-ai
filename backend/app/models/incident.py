@@ -24,8 +24,13 @@ class Incident(Base, TimestampMixin):
         CheckConstraint(
             "severity IN ('Low', 'Medium', 'High', 'Critical')", name="ck_incidents_severity"
         ),
+        # V9 widened this to the full lifecycle. The constraint guards the
+        # spelling only - which state may follow which is enforced in
+        # `app.incidents.lifecycle`, because a CHECK constraint can see the row
+        # it is writing and not the one it replaces.
         CheckConstraint(
-            "status IN ('Open', 'Investigating', 'Contained', 'Resolved')",
+            "status IN ('Open', 'Triaged', 'Investigating', 'Containment Pending', "
+            "'Contained', 'Resolved', 'Closed')",
             name="ck_incidents_status",
         ),
         CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="ck_incidents_risk_score"),

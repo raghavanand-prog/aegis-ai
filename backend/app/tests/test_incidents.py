@@ -108,13 +108,18 @@ def test_status_change_is_recorded_on_the_timeline(client: TestClient, auth_head
     event = ingest(client, auth_headers)
     incident = client.post(f"/api/v1/events/{event['id']}/promote", headers=auth_headers).json()
 
+    # V9: this used to go straight to "Contained", which the lifecycle now
+    # refuses - containment cannot be declared on an incident nobody has looked
+    # at. The assertion is unchanged in substance: one status change, recorded
+    # on the timeline and in the audit trail. The legal one-step move from
+    # "Open" is "Investigating".
     updated = client.patch(
         f"/api/v1/incidents/{incident['id']}",
-        json={"status": "Contained"},
+        json={"status": "Investigating"},
         headers=auth_headers,
     ).json()
 
-    assert updated["status"] == "Contained"
+    assert updated["status"] == "Investigating"
     assert any(entry["action"] == "status_changed" for entry in updated["timeline"])
 
     audit = client.get(
