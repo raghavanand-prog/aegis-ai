@@ -29,6 +29,13 @@ class RawTelemetry:
     raw_log: str
     received_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     is_synthetic: bool = True
+    #: For generated telemetry, the scenario that produced this record.
+    #: **Provenance, never a label.** Normalization deliberately does not carry
+    #: it onto the candidate: a detector able to read the generating scenario
+    #: would be scoring the answer key. It exists so a labelled corpus can be
+    #: built from the generator's own intent, which `event_type` cannot express -
+    #: distinct scenarios collapse onto one type after normalization.
+    scenario: str | None = None
 
 
 class TelemetrySource(ABC):

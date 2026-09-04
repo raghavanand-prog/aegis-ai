@@ -375,8 +375,16 @@ The labelled evaluation corpus's fit split is **40% malicious** (624 of 1,560).
 Three facts make that consequential:
 
 1. **The production model is not trained on it.** `train_anomaly_model` fits the
-   runtime telemetry generator's corpus, whose suspicious scenarios run at about
-   **12%** (238 of 2,000, from its scenario mix).
+   runtime telemetry generator's corpus instead.
+
+   > **Correction (§13).** This point originally said that corpus runs at about
+   > **12%** suspicious. **That was wrong.** The figure came from eyeballing
+   > normalized `event_type` names and missed `auth_failure` and `firewall_deny`,
+   > which are produced by `_entra_failed_logins` and `_firewall_port_scan` —
+   > both attacks. Labelled at the scenario level it is **42.7% malicious**
+   > (2,563 of 6,000). §4.5.3 did flag the 12% as an estimate rather than a
+   > measurement, but the conclusions drawn from it went further than that
+   > hedge. See §13.2 for what survives.
 2. **The corpus's own provenance says so** — *"out of distribution for the
    anomaly model trained on the runtime telemetry generator; ML metrics on this
    corpus are a lower bound."* It was built to exercise **rule** thresholds.
@@ -1273,7 +1281,128 @@ ordinary growth.
    depends entirely on somebody reading it.
 5. No live analyst feedback exists; exercised by tests and synthetic campaigns.
 
-## 13. Reproducing
+## 13. Rebuilding the evaluation substrate **[MEASURED]**
+
+§4 identified the substrate as the weakest link and §10.4 recommended replacing
+it before more detection work. This builds the replacement — and in doing so
+overturns one of this report's own central claims.
+
+### 13.1 What was built
+
+`app/evaluation/datasets/telemetry_labelled.py` draws from the **runtime
+telemetry generator** — the distribution `train_anomaly_model` actually fits —
+and labels it from that generator's own scenario intent.
+
+Three properties the old substrate lacked:
+
+| | |
+| --- | --- |
+| **In-distribution** | A model fitted here is not out-of-distribution for what production scores. |
+| **Explicit labels with stated reasons** | `SCENARIO_LABELS` is exhaustive over the generator's scenario list — a test fails if they diverge, so a scenario added later cannot silently default to benign. `LABEL_RATIONALE` gives the reason for each. |
+| **Controlled prevalence** | A design parameter, recorded on every corpus, so it cannot be mistaken for an observed base rate. |
+
+Carrying the scenario required one change to production telemetry:
+`RawTelemetry.scenario`. It is **provenance, never a label** — normalization
+deliberately does not carry it onto the candidate, asserted by test, because a
+detector able to read the generating scenario would be scoring the answer key.
+Without it the scenario is unrecoverable: normalization collapses `_dns_query`
+and `_dns_rare_domain` onto the same `event_type`, erasing exactly the
+distinction the labelling depends on.
+
+**Rare is not malicious.** Four scenarios exist to be anomalous *without* being
+attacks — the generator calls `_sysmon_rare_process` *"simply rare… not a
+LOLBin, not encoded, downloads nothing"* and `_dns_rare_domain` *"deliberately
+not a DGA label… merely unfamiliar"*. They are labelled **benign**, which makes
+this corpus **harder** than the one it complements: a density model flags them
+and is charged a false positive, as a real SOC would experience. Labelling them
+malicious would have fabricated ground truth in the one direction that flatters
+an anomaly detector.
+
+**The least clear-cut label is named as such.** `_entra_failed_logins` (5–60
+failed authentications from an external address at medium risk) is malicious
+here. A reader who disagrees should re-run with it flipped rather than discount
+the corpus. `label_map_digest()` hashes the judgement — currently
+`92c492a7dfea3d24` — so a result cannot be silently re-interpreted by editing a
+label.
+
+### 13.2 The correction: production's corpus is also ~43% malicious
+
+§4.1 and §5.1 said the production training corpus runs at about **12%**
+suspicious, and built an argument on the contrast with the labelled corpus's
+40%. **Measured properly at the scenario level, it is 42.7%.**
+
+The 12% came from eyeballing normalized `event_type` names and missed
+`auth_failure` and `firewall_deny` — produced by `_entra_failed_logins` and
+`_firewall_port_scan`, both attacks. §4.5.3 flagged it as an estimate; the
+conclusions drawn from it did not respect that hedge.
+
+**What survives, and what does not:**
+
+| Claim | Status |
+| --- | --- |
+| The labelled corpus's fit split is 40% malicious | **Stands** — measured directly, 624 of 1,560 |
+| Contamination degrades the detector badly | **Stands, and now replicated** — §13.3 |
+| The V4/V5 static baseline was a misconfigured comparator | **Stands** — F1 0.0389 against production configuration's 0.6526 |
+| *Production sits at a healthier contamination than the eval corpus* | **FALSE.** Both are ~40–43% |
+| *Contamination explains §5's gap* | **Unsupported.** Contamination is the same in both, so it cannot be the explanation |
+
+**§5's measurement stands; my explanation of it was wrong.** Fitting on
+telemetry gives F1 0.6526 on the eval test split and refitting on the eval
+corpus gives 0.0389, at the *same* contamination. Something other than
+contamination drives that gap — plausibly that the eval corpus's benign events
+include deliberate near-miss samples engineered to sit just under rule
+thresholds, which may produce a degenerate density estimate. **[LIMITATION]**
+That is a hypothesis, not a measurement, and the gap is **currently unexplained**.
+
+The practical consequence is that the rebuild is *more* necessary, not less: no
+existing corpus sits at a contamination an unsupervised density model can learn
+from, so prevalence has to be set deliberately.
+
+### 13.3 The contamination effect replicates
+
+Independent corpus, independent labels, 5 seeds, same splitter and frozen 0.65
+threshold:
+
+| prevalence | fit malicious | ROC-AUC | F1 @ 0.65 | precision | recall | FPR |
+| --- | --- | --- | --- | --- | --- | --- |
+| generator's own | 42.6% | 0.7392 | **0.0352** | 0.971 | 0.018 | 0.0006 |
+| 20% | 20.0% | 0.8176 | 0.1453 | 0.814 | 0.080 | 0.0046 |
+| 10% | 10.0% | 0.8295 | 0.1217 | 0.498 | 0.070 | 0.0070 |
+| 5% | 5.0% | **0.8462** | 0.1777 | 0.580 | 0.107 | 0.0046 |
+
+Two things worth stating plainly:
+
+**The §4 finding replicates on data it was not derived from.** ROC-AUC rises
+monotonically as contamination falls, 0.739 → 0.846. §4 measured the same
+direction on a different corpus with different labels.
+
+**At the generator's own 42.6%, F1 is 0.0352 — against the V4/V5 static
+baseline's 0.0389.** A near-inert detector reproduces on a completely different
+corpus at the same contamination. That is the strongest evidence available that
+contamination, not corpus identity, produced the baseline V5 measured everything
+against.
+
+**This corpus is harder, and AUC is the honest headline.** F1 at 0.65 stays low
+because the frozen threshold is not tuned for this distribution and because
+rare-but-benign events are correctly charged as false positives. **F1 is
+prevalence-dependent and is not comparable across corpora with different test
+prevalence**; ROC-AUC is the figure to carry between them.
+
+### 13.4 Limitations **[LIMITATION]**
+
+1. **The labelling is a judgement**, made from the generator's docstrings. It is
+   explicit, justified per scenario and digest-pinned, but a reader who disagrees
+   with `_entra_failed_logins` will get different numbers.
+2. **Prevalence is chosen, not observed.** 0.10 is a plausible SOC-like value,
+   not a measurement of anything. Every corpus records the value used.
+3. **Still synthetic.** This replaces one synthetic corpus with a better-
+   constructed synthetic corpus. It is not evidence about real traffic.
+4. **§5's gap is unexplained** (§13.2) and is now the most interesting open
+   question in this report.
+5. **Nothing has been migrated onto it.** The V4/V5 experiments still run on the
+   old corpus; this is the substrate, not a re-run of everything on it.
+
+## 14. Reproducing
 
 ```bash
 cd backend
