@@ -220,3 +220,37 @@ class TestPerCategoryEvaluation:
         )
         assert not check["advisory"]
         assert check["status"] in {"ok", "failed"}
+
+
+class TestDiscriminationIsMeasured:
+    def test_candidate_evaluation_reports_and_gates_on_roc_auc(
+        self, db, tmp_path_factory
+    ) -> None:
+        """V6 §15: without a threshold-free figure the gate cannot distinguish a
+        worse candidate from a differently-calibrated one."""
+        from app.adaptation.candidates import evaluation, training
+        from app.ml.registry import registry
+        from app.models.enums import MLModelStatus
+
+        directory = tmp_path_factory.mktemp("auc")
+        incumbent = training.train_candidate(
+            db, samples=600, seed=1337, directory=directory, created_by="test"
+        )
+        incumbent.status = MLModelStatus.APPROVED.value
+        db.flush()
+        registry.activate_model(db, incumbent)
+        db.flush()
+        candidate = training.train_candidate(
+            db, samples=600, seed=4242, directory=directory, created_by="test"
+        )
+
+        report = evaluation.evaluate_candidate(
+            db, candidate=candidate, samples_per_class=40
+        )
+        assert report["rocAuc"]["candidate"] is not None
+        assert report["rocAuc"]["baseline"] is not None
+        check = next(
+            c for c in report["gates"]["checks"] if c["name"] == "discrimination"
+        )
+        assert not check["advisory"]
+        assert check["status"] in {"ok", "failed"}
