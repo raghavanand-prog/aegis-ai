@@ -1587,7 +1587,111 @@ added in §10.
    §15.2 (0.053 across four seeds), deliberately tighter than that spread. It has
    not been tuned against a population of real candidates.
 
-## 16. Reproducing
+## 16. V5 re-run at matched operating points **[MEASURED]**
+
+§15.5 left this as the outstanding item: the audit fixed the production gate but
+did not re-run the confounded research. This does, through the **same
+`run_condition` code path** V5 used — the arms are V5's, only the scoring
+changed.
+
+```bash
+python -m app.adaptation.experiments.run_matched_operating_point_eval --seeds 20
+```
+
+Artifact: `app/evaluation/reports/v6-matched-operating-point-20260904T023844Z.json`.
+
+### 16.1 The comparison, four ways
+
+20 seeds. `F1@0.65` is what V5 reported; the rest a calibration shift cannot
+flatter.
+
+| condition | F1 @ 0.65 | 0.65 pct | ROC-AUC | best F1 | recall @ 20% budget |
+| --- | --- | --- | --- | --- | --- |
+| static V4 | 0.0273 | 99.5 | 0.5614 | 0.5742 | 0.2676 |
+| threshold only (Arm 1) | **0.1008** | 99.5 | **0.5614** | **0.5742** | **0.2676** |
+| curation only (Arm 2) | 0.0581 | 98.8 | **0.7339** | **0.6543** | **0.3921** |
+| **both arms** | **0.2652** | 98.8 | **0.7339** | **0.6543** | **0.3921** |
+| *random-label control* | 0.1107 | 99.4 | 0.5697 | 0.5739 | 0.2708 |
+| *no-feedback retrain* | 0.0354 | 99.4 | 0.5746 | 0.5757 | — |
+
+### 16.2 Arm 1 contributes exactly zero capability
+
+**`threshold_only` is identical to `static_v4` on every threshold-free measure**
+— ROC-AUC 0.5614, best F1 0.5742, recall at budget 0.2676. Not approximately:
+identically, **by construction**. Arm 1 moves the operating point and does not
+touch the model, so it cannot change a ranking.
+
+Its entire reported contribution — F1 0.0273 → **0.1008**, which V5 published as
+threshold adaptation working — **is threshold placement**. The same is true of
+the gap between `curation_only` (0.0581) and `both_arms` (0.2652): identical
+threshold-free measures, so **all of that 4.6× is Arm 1 moving where 0.65 sits**.
+
+### 16.3 Arm 2's effect is real, and the control still holds
+
+Everything that survives comes from **curation**:
+
+| | static | **curation / both arms** | *random control* |
+| --- | --- | --- | --- |
+| ROC-AUC | 0.5614 | **0.7339** | 0.5697 |
+| best F1 | 0.5742 | **0.6543** | 0.5739 |
+| recall @ 20% budget | 0.2676 | **0.3921** | 0.2708 |
+
+**The random-label control gets none of it** — 0.5697 against static's 0.5614 on
+AUC, 0.2708 against 0.2676 at matched budget. V5's most important control does
+its job under the corrected scoring, and **the effect remains attributable to
+feedback content**.
+
+The mechanism is §4's: curation reduces fit-set contamination from 40% to ~27%,
+and §4 measured that contamination is what degrades discrimination.
+
+### 16.4 The operationally honest statement
+
+At a **fixed alert budget** — the same analyst capacity, which is the constraint
+a SOC actually has:
+
+| budget | static | curation / both | random control |
+| --- | --- | --- | --- |
+| 3 (static's own) | 0.0182 | 0.0187 | 0.0182 |
+| 20 (5% of test) | 0.0855 | 0.1143 | 0.0849 |
+| 39 (10%) | 0.1587 | 0.2131 | 0.1645 |
+| 78 (20%) | 0.2676 | **0.3921** | 0.2708 |
+
+**Feedback-driven curation catches ~46% more attacks at the same analyst cost**
+(0.2676 → 0.3921 at a 20% budget). That is the claim this project can defend.
+
+The 3-alert row is degenerate — the static baseline is so inert that its own
+budget cannot discriminate anything — and is shown for completeness only.
+
+### 16.5 What this does to V5's headline
+
+| framing | static → both arms |
+| --- | --- |
+| **V5 as published** (F1 @ frozen 0.65) | 0.038 → 0.238, **6.3×** |
+| this re-run at 0.65, 20 seeds | 0.027 → 0.265, 9.7× |
+| **ROC-AUC** | 0.561 → 0.734, **1.31×** |
+| **best achievable F1** | 0.574 → 0.654, **1.14×** |
+| **recall @ 20% budget** | 0.268 → 0.392, **1.46×** |
+
+**V5's effect is real, attributable to feedback, and roughly a seventh of the
+size it was published at.** The 6.3× was a genuine measurement of a confounded
+comparison. The defensible figure is **1.3–1.5×**, depending on which matched
+measure you prefer, and 1.46× at fixed analyst cost is the one an operator
+should care about.
+
+### 16.6 Limitations **[LIMITATION]**
+
+1. **Best-achievable F1 is an optimistic ceiling** chosen with label knowledge.
+   Comparable, not attainable.
+2. **Only Track 1's matrix was re-run.** §§2, 6–11 remain scored at a frozen
+   threshold. §15.3 already re-read §6; the poisoning sections (§§8–11) compare
+   honest against attacked fit sets and are confounded in the same way, though
+   their *directional* conclusions rest on per-category recall and admitted-row
+   counts rather than on F1.
+3. The corpus is still the V4/V5 one, not §13's rebuild. Re-running on the
+   rebuilt substrate is a further step and would likely move these numbers again.
+4. Feedback remains simulated.
+
+## 17. Reproducing
 
 ```bash
 cd backend
