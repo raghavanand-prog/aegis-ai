@@ -45,6 +45,11 @@ class FeedbackRead(CamelModel):
     mitre_techniques: list[str]
     evidence_reference: str | None
     analyst: str
+    #: V7. Nullable: simulated and fixture feedback has no account behind it,
+    #: and the role is the one held when the claim was made, not the one the
+    #: author holds now.
+    analyst_id: int | None = None
+    analyst_role: str | None = None
     source: str
     feature_schema_version: str
     model_identity: str | None
@@ -178,13 +183,21 @@ class ProposalRead(CamelModel):
     rejected_by: str | None
     deployed_by: str | None
     rolled_back_by: str | None
-    #: Surfaced rather than prevented: with three roles an administrator can
-    #: propose and approve, and hiding that would be worse than showing it.
+    #: V7. The role each actor held when they acted - the authority a decision
+    #: was made under, not the authority its author holds today.
+    proposed_by_role: str | None = None
+    approved_by_role: str | None = None
+    rejected_by_role: str | None = None
+    #: Always False for anything approved from V7 onwards: `proposals.approve`
+    #: refuses a self-approval rather than flagging it. Kept because rows
+    #: written before V7 may carry True, and a reviewer looking at old history
+    #: should see what actually happened.
     self_approved: bool
     rejection_reason: str | None
     rollback_reason: str | None
     rollback_state: dict
     created_at: datetime
     approved_at: datetime | None
+    rejected_at: datetime | None = None
     deployed_at: datetime | None
     rolled_back_at: datetime | None

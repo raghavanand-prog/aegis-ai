@@ -38,7 +38,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.adaptation.feedback import caps
-from app.models.adaptation import FeedbackDataset, FeedbackDatasetMember
+from app.models.adaptation import AnalystFeedback, FeedbackDataset, FeedbackDatasetMember
 from app.models.event import Event
 from app.models.ml import MLInference
 
@@ -65,7 +65,12 @@ class AugmentationResult:
 
     vectors: list[tuple[float, ...]] = field(default_factory=list)
     group_counts: dict[str, int] = field(default_factory=dict)
+    #: V7. Admitted rows per submitting analyst - the second cap axis, and the
+    #: one that shows a single account contributing across many groups.
+    actor_counts: dict[str, int] = field(default_factory=dict)
     cap_policy: str = caps.POLICY_GLOBAL
+    #: ``None`` when the actor axis is off, which is the default.
+    actor_cap_policy: str | None = None
     skipped_not_benign: int = 0
     skipped_non_event: int = 0
     skipped_no_inference: int = 0
@@ -80,7 +85,9 @@ class AugmentationResult:
         return {
             "admitted": self.admitted,
             "groupCounts": dict(self.group_counts),
+            "actorCounts": dict(self.actor_counts),
             "capPolicy": self.cap_policy,
+            "actorCapPolicy": self.actor_cap_policy,
             "skipped": {
                 "notBenign": self.skipped_not_benign,
                 "nonEvent": self.skipped_non_event,
@@ -141,6 +148,7 @@ def build(
     tolerance: float = caps.DEFAULT_TOLERANCE,
     floor: int = caps.DEFAULT_FLOOR,
     max_feedback_fraction: float = DEFAULT_MAX_FEEDBACK_FRACTION,
+    actor_policy: caps.DimensionPolicy | None = None,
 ) -> AugmentationResult:
     """Vectors this dataset contributes to a candidate's fit set."""
     members = list(
@@ -156,8 +164,18 @@ def build(
     skipped_no_inference = 0
     skipped_incomplete = 0
 
-    #: (member id, event type, vector), before the cap is applied.
-    resolved: list[tuple[int, str, tuple[float, ...]]] = []
+    #: (member id, event type, analyst, vector), before the caps are applied.
+    #: The analyst is the V7 actor axis: it is read from the feedback row the
+    #: member was built from, because the member itself deliberately copies only
+    #: the label, and "who claimed this" is exactly what the actor cap bounds.
+    resolved: list[tuple[int, str, str | None, tuple[float, ...]]] = []
+    submitters = dict(
+        db.execute(
+            select(AnalystFeedback.id, AnalystFeedback.analyst).where(
+                AnalystFeedback.id.in_([member.feedback_id for member in members] or [-1])
+            )
+        ).all()
+    )
 
     for member in members:
         if member.binary_label is not False:
@@ -194,7 +212,9 @@ def build(
             skipped_incomplete += 1
             continue
 
-        resolved.append((member.id, str(event.event_type), vector))
+        resolved.append(
+            (member.id, str(event.event_type), submitters.get(member.feedback_id), vector)
+        )
 
     # The volume bound, expressed against the fit set this will join.
     if telemetry_rows is not None and max_feedback_fraction > 0:
@@ -205,25 +225,38 @@ def build(
         global_ceiling = len(resolved)
 
     kept = caps.apply(
-        [caps.CapCandidate(index=index, group=group) for index, group, _ in resolved],
+        [
+            caps.CapCandidate(index=index, group=group, actor=actor)
+            for index, group, actor, _ in resolved
+        ],
         policy=cap_policy,
         global_ceiling=global_ceiling,
         per_group_ceiling=per_group_ceiling,
         baseline_rates=baseline_rates,
         tolerance=tolerance,
         floor=floor,
+        actor_policy=actor_policy,
     )
     allowed = {candidate.index for candidate in kept}
 
-    vectors = [vector for index, _, vector in resolved if index in allowed]
+    vectors = [vector for index, _, _, vector in resolved if index in allowed]
     group_counts = dict(
-        Counter(group for index, group, _ in resolved if index in allowed)
+        Counter(group for index, group, _, _ in resolved if index in allowed)
+    )
+    actor_counts = dict(
+        Counter(
+            actor or caps.UNATTRIBUTED_ACTOR
+            for index, _, actor, _ in resolved
+            if index in allowed
+        )
     )
 
     result = AugmentationResult(
         vectors=vectors,
         group_counts=group_counts,
+        actor_counts=actor_counts,
         cap_policy=cap_policy,
+        actor_cap_policy=actor_policy.policy if actor_policy is not None else None,
         skipped_not_benign=skipped_not_benign,
         skipped_non_event=skipped_non_event,
         skipped_no_inference=skipped_no_inference,

@@ -115,25 +115,36 @@ class TestApproval:
 
     def test_approval_records_a_different_actor_from_the_proposer(self, db) -> None:
         proposal = self._pending(db)
-        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
         assert approved.status == ProposalStatus.APPROVED.value
         assert approved.approved_by == "admin@aegisx.dev"
         assert approved.proposed_by == "analyst@aegisx.dev"
         assert approved.approved_at is not None
 
-    def test_self_approval_is_recorded_not_hidden(self, db) -> None:
-        """Three roles means the same administrator can propose and approve.
-        That is a known limitation of the role model, so it is recorded on the
-        row rather than pretended away."""
-        proposal = self._pending(db, proposed_by="admin@aegisx.dev")
-        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+    def test_self_approval_is_refused(self, db) -> None:
+        """Inverted in V7.
 
-        assert approved.self_approved is True
+        This test used to assert that a self-approval succeeded and set
+        ``self_approved = True`` - the honest record of a real gap, which the V6
+        handoff named as "recorded, not prevented". V7 closed the gap, so the
+        assertion had to change with the behaviour rather than the behaviour
+        being bent to keep an old test green. The full invariant, including the
+        edges, lives in ``test_adaptation_four_eyes.py``.
+        """
+        proposal = self._pending(db, proposed_by="admin@aegisx.dev")
+
+        with pytest.raises(ValueError, match="cannot also approve"):
+            proposals.approve(
+                db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin"
+            )
+
+        assert proposal.status == ProposalStatus.PENDING.value
+        assert proposal.self_approved is False
 
     def test_approval_alone_does_not_deploy(self, db) -> None:
         proposal = self._pending(db)
-        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
         assert approved.status == ProposalStatus.APPROVED.value
         assert approved.deployed_at is None
@@ -143,7 +154,7 @@ class TestApproval:
         proposals.reject(db, proposal.id, rejected_by="admin@aegisx.dev", reason="Too risky.")
 
         with pytest.raises(ValueError, match="rejected"):
-            proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+            proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
     def test_rejection_requires_a_reason(self, db) -> None:
         proposal = self._pending(db)
@@ -158,7 +169,7 @@ class TestApproval:
             validation={"gates": {"passed": False, "failures": ["false positive rate"]}},
         )
         with pytest.raises(ValueError, match="gate"):
-            proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+            proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
 
 class TestDeployment:
@@ -174,7 +185,7 @@ class TestDeployment:
             evidence={"feedbackIds": [1]},
             proposed_by="analyst@aegisx.dev",
         )
-        return proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        return proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
     def test_only_an_approved_proposal_may_be_deployed(self, db) -> None:
         proposal = proposals.create(

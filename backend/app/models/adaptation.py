@@ -69,6 +69,19 @@ class AnalystFeedback(Base):
 
     # --- Provenance ---------------------------------------------------------
     analyst: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    #: The account behind the claim, where there was one (V7). Nullable because
+    #: simulated and fixture feedback has no account, and minting one for it
+    #: would make a generated claim indistinguishable from a human's.
+    #: ``SET NULL`` rather than cascade: deleting an account must not delete the
+    #: record of what that account concluded.
+    analyst_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: The role the analyst held **when the claim was made** (V7). Recorded on
+    #: the row rather than joined from ``users`` on read: roles change, and the
+    #: auditable fact is the authority a claim was made under at the time, not
+    #: the authority its author happens to hold today.
+    analyst_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
     #: How the claim arrived: an analyst working an alert, an active-learning
     #: review, or a simulation. Adaptation results must be separable by source.
     source: Mapped[str] = mapped_column(String(32), default="analyst", nullable=False)
@@ -319,8 +332,20 @@ class AdaptationProposal(Base):
     deployed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rolled_back_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    #: Recorded, not prevented. Three roles means an administrator can propose
-    #: and approve; hiding that would be worse than surfacing it.
+    #: The role each actor held **at the moment they acted** (V7). Recorded on
+    #: the row for the same reason feedback records it: roles change, and an
+    #: audit trail that resolved authority at read time would retroactively
+    #: restate every past decision in terms of today's permissions.
+    proposed_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    approved_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    rejected_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    #: **Prevented since V7, not merely recorded.** Through V6 this was a flag:
+    #: `approve` set it when the approver was the proposer and then carried on,
+    #: so four-eyes was a label on the row rather than a property of the system.
+    #: `proposals.approve` now refuses. The column is kept because rows written
+    #: before V7 may legitimately carry ``True``, and rewriting history to make
+    #: the guarantee look older than it is would be the more dishonest option.
     self_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -332,6 +357,9 @@ class AdaptationProposal(Base):
         DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: V7. Every other terminal decision recorded when it happened; a rejection
+    #: did not, so "when was this refused" was answerable only from the audit log.
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

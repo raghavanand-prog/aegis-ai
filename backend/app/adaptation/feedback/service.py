@@ -71,8 +71,17 @@ def submit(
     evidence_reference: str | None = None,
     source: str = SOURCE_ANALYST,
     model_identity: str | None = None,
+    analyst_id: int | None = None,
+    analyst_role: str | None = None,
 ) -> AnalystFeedback:
-    """Record one analyst claim. Never overwrites an existing one."""
+    """Record one analyst claim. Never overwrites an existing one.
+
+    ``analyst_id`` and ``analyst_role`` are V7 additions and are both optional:
+    simulated feedback has no account behind it, and recording one would make a
+    generated claim indistinguishable from a human's. The API supplies them
+    from the authenticated user, never from the request body - a claim able to
+    name its own author would not be evidence about anything.
+    """
     if source not in VALID_SOURCES:
         raise ValueError(f"Unknown feedback source {source!r}; expected one of {sorted(VALID_SOURCES)}")
 
@@ -85,6 +94,8 @@ def submit(
         mitre_techniques=_validate_techniques(mitre_techniques),
         evidence_reference=evidence_reference,
         analyst=analyst,
+        analyst_id=analyst_id,
+        analyst_role=analyst_role,
         source=source,
         feature_schema_version=FEATURE_SCHEMA_VERSION,
         model_identity=model_identity,
@@ -103,12 +114,18 @@ def correct(
     reason: str,
     confidence: float | None = None,
     comment: str | None = None,
+    analyst_id: int | None = None,
+    analyst_role: str | None = None,
 ) -> AnalystFeedback:
     """Supersede an earlier claim with a new one.
 
     The original row is left exactly as it was written. Only its
     ``superseded_by_id`` pointer changes, which is a statement about the claim's
     currency, not about its content.
+
+    Identity is taken from the *correcting* analyst, not inherited from the
+    original: a correction is a new claim by whoever made it, and attributing it
+    to the person being corrected would misreport who concluded what.
     """
     original = db.get(AnalystFeedback, feedback_id)
     if original is None:
@@ -129,6 +146,8 @@ def correct(
         mitre_techniques=[],
         evidence_reference=original.evidence_reference,
         analyst=analyst,
+        analyst_id=analyst_id,
+        analyst_role=analyst_role,
         source=original.source,
         feature_schema_version=FEATURE_SCHEMA_VERSION,
         model_identity=original.model_identity,

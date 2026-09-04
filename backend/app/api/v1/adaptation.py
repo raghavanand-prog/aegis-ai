@@ -65,6 +65,8 @@ def _read(db: Session, record: AnalystFeedback) -> FeedbackRead:
         mitre_techniques=list(record.mitre_techniques or []),
         evidence_reference=record.evidence_reference,
         analyst=record.analyst,
+        analyst_id=record.analyst_id,
+        analyst_role=record.analyst_role,
         source=record.source,
         feature_schema_version=record.feature_schema_version,
         model_identity=record.model_identity,
@@ -111,6 +113,8 @@ def submit_feedback(
             target_id=target_pk,
             label=payload.label,
             analyst=user.email,
+            analyst_id=user.id,
+            analyst_role=user.role,
             confidence=payload.confidence,
             comment=payload.comment,
             mitre_techniques=payload.mitre_techniques,
@@ -173,6 +177,8 @@ def correct_feedback(
             feedback_id=feedback_id,
             label=payload.label,
             analyst=user.email,
+            analyst_id=user.id,
+            analyst_role=user.role,
             reason=payload.reason,
             confidence=payload.confidence,
             comment=payload.comment,
@@ -423,6 +429,7 @@ def create_proposal(
         proposal = proposals.create(
             db,
             proposal_type=payload.proposal_type,
+            proposed_by_role=user.role,
             title=payload.title,
             reason=payload.reason,
             affected_component=payload.affected_component,
@@ -484,7 +491,9 @@ def approve_proposal(
     if proposals.get(db, proposal_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proposal not found")
     try:
-        proposal = proposals.approve(db, proposal_id, approved_by=user.email)
+        proposal = proposals.approve(
+            db, proposal_id, approved_by=user.email, approver_role=user.role
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
@@ -534,7 +543,11 @@ def reject_proposal(
         )
     try:
         proposal = proposals.reject(
-            db, proposal_id, rejected_by=user.email, reason=payload.reason
+            db,
+            proposal_id,
+            rejected_by=user.email,
+            reason=payload.reason,
+            rejector_role=user.role,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
