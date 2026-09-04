@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import type { Proposal } from "@/services/api/adaptation";
 
+import CandidateEvidence from "./CandidateEvidence";
+
 import { PROPOSAL_STATUS_STYLE, statusText } from "./adaptiveFormat";
 
 interface Props {
@@ -24,9 +26,15 @@ interface Props {
  * looking at a plausible title and a confident rationale has no other way to
  * tell that no evaluation was ever run.
  *
- * `selfApproved` is displayed rather than hidden. With three roles the same
- * administrator can propose and approve; showing it keeps the limitation
- * visible in the place where it matters.
+ * `selfApproved` is still displayed, but it now means something different.
+ * Through V6 an administrator could propose and approve, and this badge was the
+ * only thing saying so. V7 refuses the transition outright, so the badge can
+ * only appear on rows decided before V7 — it is a marker on history rather than
+ * a live limitation, and removing it would hide what those rows recorded.
+ *
+ * The acting roles and the evidence panel are the V7 additions. An approver
+ * previously saw a title, a rationale and a pass/fail badge, which is precisely
+ * the amount of information that makes a safety gate ceremonial.
  *
  * Rejection and rollback require a typed reason before the button does
  * anything, because the reason is the part that is worth reading later.
@@ -93,11 +101,26 @@ export default function ProposalQueue({
             <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <div>
                 <dt className="text-slate-500">Proposed by</dt>
-                <dd className="font-mono text-slate-300">{proposal.proposedBy}</dd>
+                <dd className="font-mono text-slate-300">
+                  {proposal.proposedBy}
+                  {proposal.proposedByRole && (
+                    <span className="text-slate-500"> ({proposal.proposedByRole})</span>
+                  )}
+                </dd>
               </div>
               <div>
-                <dt className="text-slate-500">Approved by</dt>
-                <dd className="font-mono text-slate-300">{proposal.approvedBy ?? "n/a"}</dd>
+                <dt className="text-slate-500">
+                  {proposal.rejectedBy ? "Rejected by" : "Approved by"}
+                </dt>
+                <dd className="font-mono text-slate-300">
+                  {proposal.rejectedBy ?? proposal.approvedBy ?? "n/a"}
+                  {(proposal.rejectedByRole ?? proposal.approvedByRole) && (
+                    <span className="text-slate-500">
+                      {" "}
+                      ({proposal.rejectedByRole ?? proposal.approvedByRole})
+                    </span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500">Before</dt>
@@ -124,12 +147,20 @@ export default function ProposalQueue({
                   Safety gates failed — cannot be approved
                 </span>
               )}
+              {proposal.approvedBy && !proposal.selfApproved && (
+                <span
+                  className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-300"
+                  title="A second authorised actor approved this. Enforced since V7, not merely recorded."
+                >
+                  Four-eyes satisfied
+                </span>
+              )}
               {proposal.selfApproved && (
                 <span
                   className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-300"
-                  title="The same person proposed and approved this adaptation."
+                  title="The same person proposed and approved this adaptation. Only possible for decisions recorded before V7 enforced four-eyes."
                 >
-                  Self-approved
+                  Self-approved (pre-V7)
                 </span>
               )}
               {proposal.proposedBy.startsWith("ai:") && (
@@ -142,6 +173,8 @@ export default function ProposalQueue({
             {proposal.riskAssessment && (
               <p className="mt-3 text-xs text-slate-400">{proposal.riskAssessment}</p>
             )}
+
+            <CandidateEvidence proposal={proposal} />
 
             {(canDecide || canDeploy) && proposal.status !== "rolled_back" && (
               <div className="mt-4 flex flex-wrap items-center gap-2">

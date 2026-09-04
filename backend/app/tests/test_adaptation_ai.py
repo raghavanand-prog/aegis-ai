@@ -104,7 +104,7 @@ class TestAiCannotApproveOrDeploy:
         )
 
         with pytest.raises(ValueError, match="human"):
-            proposals.approve(db, proposal.id, approved_by="ai:stub")
+            proposals.approve(db, proposal.id, approved_by="ai:stub", approver_role="admin")
 
     def test_an_ai_proposal_still_requires_a_human_approver(self, db) -> None:
         from app.adaptation.proposals import service as proposals
@@ -113,7 +113,7 @@ class TestAiCannotApproveOrDeploy:
         proposal = ai_proposals.propose_threshold_change(
             db, provider=provider, current_threshold=0.65, observed_false_positive_rate=0.53
         )
-        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        approved = proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
         assert approved.status == ProposalStatus.APPROVED.value
         assert approved.approved_by == "admin@aegisx.dev"

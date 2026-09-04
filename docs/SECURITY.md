@@ -186,7 +186,8 @@ controls rather than relaxing them.
 | --- | --- |
 | No autonomous production change | `registry.activate_model` refuses any model not in a servable state; a candidate reaches production only through an approved proposal |
 | Human approval is human | `proposals.approve` refuses actors prefixed `ai:`, `system:`, `automation:` |
-| Separation of duties | Proposer and approver are distinct columns; `self_approved` is recorded when they match |
+| Separation of duties (V7) | `proposals.approve` **refuses** an approval whose actor is the proposer, compared case- and whitespace-insensitively. Through V6 this was recorded in `self_approved` and allowed; the V6 handoff stated it plainly as "self_approved is still recorded, not prevented". Since activation is reachable only through `mark_deployed` on an APPROVED proposal, refusing here is what makes the separation real |
+| Approval authority (V7) | The acting role is checked against the permission matrix in `proposals.approve` itself, not only in the FastAPI dependency. The API is one caller; an experiment harness, a CLI and eventually an agent are others |
 | No training over HTTP | No endpoint trains a model or builds a dataset; asserted by test |
 | Artifact immutability | `reserve_artifact_path` refuses an existing path; `next_version` consults disk as well as the database |
 | Artifact integrity | Digest verified before evaluation and before deployment; a mismatch refuses and leaves the incumbent serving |

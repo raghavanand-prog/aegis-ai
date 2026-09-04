@@ -51,6 +51,49 @@ volume justifies it.
 Detection is pure and I/O free, so rules are unit-testable without a database and
 can later be swapped for, or compared against, a model.
 
+## Telemetry sources (V7)
+
+```
+TelemetrySource -> RawTelemetry -> adapter -> CanonicalEvent -> normalizer -> detection
+```
+
+Until V7 the second and third steps were one thing: `telemetry/normalizer.py`
+held seven vendor mappings inline behind a dict keyed on the source's display
+name, so every new source meant editing the module every event passes through.
+The V6 audit named this and left it: *"telemetry/normalizer.py hard-codes vendor
+schemas; that leak is documented and unfixed."*
+
+Now the two halves are separate and each has one job:
+
+| Piece | Owns | Must not |
+| --- | --- | --- |
+| `telemetry/sources/` | Getting raw records from somewhere - a generator, a file, eventually an API | Know the canonical schema |
+| `telemetry/adapters/` | Mapping one vendor's shape onto `CanonicalEvent` | Score, label, or touch the database |
+| `telemetry/canonical.py` | The contract detection depends on | Carry a vendor-specific field |
+| `telemetry/normalizer.py` | Resolving an adapter and attaching provenance | Know any vendor |
+
+`CanonicalEvent` is a frozen dataclass with a fixed field set, so "a vendor key
+leaked into the contract" is a checkable condition rather than a code review
+question. Vendor detail is preserved verbatim in `vendor_fields` and surfaces as
+`normalized_data`: the canonical fields are what detection may *depend* on, and
+`vendor_fields` is what an analyst may *read*.
+
+**Adding a source is now adding a file**, plus one registry entry. Adding a
+source no longer touches the shared normalization path, so it cannot change how
+any existing source is parsed - a property pinned by digest in
+`test_telemetry_normalizer_characterization.py`.
+
+**Resolution is recorded.** An adapter is chosen by source name (`exact`) or, if
+the source is unregistered, by telemetry class (`fallback`). V6 fell back too and
+never said so, which meant an unknown vendor could be parsed by a foreign
+product's mapper and produce confident, plausible, wrong events with nothing
+anywhere recording it. Adapters added since V7 declare no fallback class, so a
+new source is refused rather than guessed at.
+
+This is also the seam a future agent's `DataSource` tool needs: a source is a
+collector plus an adapter, and the live version of a source replaces only the
+collector half.
+
 ## Data model
 
 ```

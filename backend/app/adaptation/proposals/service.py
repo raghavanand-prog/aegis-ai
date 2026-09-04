@@ -12,6 +12,13 @@ There is no transition a machine may take on a proposal's behalf. Approval,
 deployment and rollback all require a named actor passed in by the caller, and
 the API layer supplies it from the authenticated user rather than from anything
 the request body says.
+
+**V7 made four-eyes real.** Until then `approve` recorded `self_approved` when
+the approver was the proposer and continued anyway, so separation of duties was
+a column rather than a rule. It now refuses, and the acting role is checked
+against the permission matrix here rather than only in the FastAPI dependency -
+the API is one caller, and a boundary enforced only at the HTTP edge is not a
+boundary for any other.
 """
 
 from __future__ import annotations
@@ -40,6 +47,7 @@ def create(
     after_state: dict,
     evidence: dict,
     proposed_by: str,
+    proposed_by_role: str | None = None,
     validation: dict | None = None,
     expected_impact: dict | None = None,
     risk_assessment: str | None = None,
@@ -75,6 +83,7 @@ def create(
         candidate_model_id=candidate_model_id,
         feedback_dataset_id=feedback_dataset_id,
         proposed_by=proposed_by,
+        proposed_by_role=proposed_by_role,
     )
     db.add(proposal)
     db.flush()
@@ -119,15 +128,72 @@ def _require(db: Session, proposal_id: int) -> AdaptationProposal:
 _NON_HUMAN_ACTOR_PREFIXES = ("ai:", "system:", "automation:")
 
 
-def approve(db: Session, proposal_id: int, *, approved_by: str) -> AdaptationProposal:
-    """Sign off a pending proposal. Does not deploy it."""
+def _same_actor(left: str, right: str | None) -> bool:
+    """Whether two actor strings name the same person.
+
+    Case- and whitespace-insensitive, because actors are email addresses and
+    ``Admin@Aegisx.dev`` is the same account as ``admin@aegisx.dev``. A
+    comparison that missed that would let four-eyes be defeated with a shift key.
+    """
+    return left.strip().casefold() == (right or "").strip().casefold()
+
+
+def _require_approver_authority(role: str | None) -> None:
+    """Check the acting role actually grants approval.
+
+    Enforced here rather than only at the HTTP edge. The API is one caller; an
+    experiment harness, a CLI, and eventually an agent are others, and a
+    security boundary that lives in a FastAPI dependency is a boundary only for
+    traffic that happens to arrive over HTTP. The permission matrix is reused
+    rather than restated so the two cannot drift apart.
+    """
+    from app.core.rbac import Permission, has_permission
+
+    if not role:
+        raise ValueError(
+            "An approval must state the role it was made under. Recording a "
+            "decision whose authority cannot be checked defeats the point of "
+            "recording who made it."
+        )
+    if not has_permission(role, Permission.ADAPTATION_APPROVE):
+        raise ValueError(
+            f"Role {role!r} does not hold {Permission.ADAPTATION_APPROVE.value} "
+            "and cannot approve an adaptation."
+        )
+
+
+def approve(
+    db: Session, proposal_id: int, *, approved_by: str, approver_role: str
+) -> AdaptationProposal:
+    """Sign off a pending proposal. Does not deploy it.
+
+    **Four-eyes is enforced here as of V7.** Through V6 this function set a
+    ``self_approved`` flag when the approver was the proposer and then carried
+    on, so separation of duties was a label on the row rather than a property of
+    the system. It now refuses. Because production detection state is reachable
+    only through ``mark_deployed`` on an approved proposal, refusing here is
+    what makes the separation real rather than advisory.
+
+    ``approver_role`` is required and not inferred: an approval whose authority
+    cannot be stated is not an approval.
+    """
     if any(approved_by.startswith(prefix) for prefix in _NON_HUMAN_ACTOR_PREFIXES):
         raise ValueError(
             f"{approved_by!r} is not a human actor and cannot approve an "
             "adaptation. AI may draft a proposal; only a person may accept one."
         )
 
+    _require_approver_authority(approver_role)
+
     proposal = _require(db, proposal_id)
+
+    if _same_actor(approved_by, proposal.proposed_by):
+        raise ValueError(
+            f"{approved_by!r} raised proposal {proposal_id} and cannot also "
+            "approve it. A change to what AEGISX detects needs a second person; "
+            "one actor doing both is not review, it is paperwork. Have another "
+            "authorised approver sign this off."
+        )
 
     if proposal.status == ProposalStatus.REJECTED.value:
         raise ValueError(
@@ -151,11 +217,13 @@ def approve(db: Session, proposal_id: int, *, approved_by: str) -> AdaptationPro
 
     proposal.status = ProposalStatus.APPROVED.value
     proposal.approved_by = approved_by
+    proposal.approved_by_role = approver_role
     proposal.approved_at = _now()
-    # Recorded, not blocked. The three-role model allows an administrator to
-    # propose and approve; surfacing it is more honest than pretending the
-    # separation exists.
-    proposal.self_approved = approved_by == proposal.proposed_by
+    # Always False from V7 onwards - the self-approval branch above returns
+    # before reaching here. Set explicitly rather than left to the column
+    # default so the row states the guarantee instead of merely defaulting into
+    # it. Rows written before V7 keep whatever they recorded.
+    proposal.self_approved = False
 
     # Approving a model proposal is the only route out of `candidate`. Without
     # it the deployment step would have to bypass the lifecycle gate to do its
@@ -166,8 +234,24 @@ def approve(db: Session, proposal_id: int, *, approved_by: str) -> AdaptationPro
     return proposal
 
 
-def reject(db: Session, proposal_id: int, *, rejected_by: str, reason: str) -> AdaptationProposal:
-    """Refuse a proposal, with a reason that is kept."""
+def reject(
+    db: Session,
+    proposal_id: int,
+    *,
+    rejected_by: str,
+    reason: str,
+    rejector_role: str | None = None,
+) -> AdaptationProposal:
+    """Refuse a proposal, with a reason and a time that are both kept.
+
+    A proposer *may* reject their own proposal - withdrawing something you
+    raised needs no second pair of eyes, because the outcome is that production
+    does not change. The asymmetry with ``approve`` is deliberate: four-eyes
+    guards the direction of travel that alters what AEGISX detects.
+
+    ``rejector_role`` is optional for the same reason. It is recorded when the
+    caller knows it, and no authority check gates a refusal.
+    """
     if not (reason or "").strip():
         raise ValueError(
             "A rejection needs a reason. A refused proposal without one tells the "
@@ -182,7 +266,9 @@ def reject(db: Session, proposal_id: int, *, rejected_by: str, reason: str) -> A
 
     proposal.status = ProposalStatus.REJECTED.value
     proposal.rejected_by = rejected_by
+    proposal.rejected_by_role = rejector_role
     proposal.rejection_reason = reason
+    proposal.rejected_at = _now()
     _sync_candidate_status(db, proposal, ProposalStatus.REJECTED)
     db.flush()
     return proposal
