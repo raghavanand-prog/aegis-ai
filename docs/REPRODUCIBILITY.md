@@ -101,6 +101,40 @@ Correlation, AI analyst, threat intelligence and degraded mode:
 python -m app.evaluation.run_system_eval
 ```
 
+### V5 and V6 adaptation experiments
+
+Every number in `docs/V6_RESEARCH_REPORT.md` comes from one of these, and each
+writes a committed artifact under `app/evaluation/reports/`.
+
+```bash
+export DATABASE_URL="sqlite:///aegisx.db"
+
+# §1  the V5 adaptation effect, 50 seeds
+python -m app.adaptation.experiments.run_adaptation_eval          --seeds 50 --max-seconds 5400
+# §2  novel behaviour, per category, feedback withheld vs supplied
+python -m app.adaptation.experiments.run_novel_behaviour_eval     --seeds 10 --max-seconds 3600
+# §3  detector class vs feature space (threshold-free, ROC-AUC)
+python -m app.adaptation.experiments.run_detector_comparison      --seeds 10 --max-seconds 5400
+# §4  fit-set contamination sweep
+python -m app.adaptation.experiments.run_contamination_eval       --seeds 10 --max-seconds 3600
+# §5  the baseline as production configures it
+python -m app.adaptation.experiments.run_production_baseline_eval --seeds 10 --max-seconds 3600
+# §6  the redesigned Arm 2
+python -m app.adaptation.experiments.run_arm2_eval                --seeds 10 --max-seconds 3600
+# §7  feedback quality, ten conditions
+python -m app.adaptation.experiments.run_feedback_quality_eval    --seeds 10 --max-seconds 5400
+# §8, §9  targeted poisoning, one run per cap policy
+python -m app.adaptation.experiments.run_targeted_poisoning_eval  --seeds 8 --max-seconds 5400 \
+    --targets MALWARE --cap-policy baseline_relative
+# §11 the patient adversary, and the tolerance sweep
+python -m app.adaptation.experiments.run_patient_poisoning_eval   --seeds 8 --max-seconds 5400
+```
+
+Total well under one CPU-hour. Seeds come from one standing plan
+(`app/adaptation/experiments/seeds.py`) in which a longer plan **extends** a
+shorter one, so `--seeds 3` still reproduces V5 exactly and every run stays
+comparable with the last.
+
 Every CLI accepts `--max-seconds` (default 900; `0` disables). On expiry it
 exits 142 with thread stacks rather than hanging silently — the V3 deadlock
 taught that lesson.
@@ -158,6 +192,14 @@ That is a finding worth investigating, not smoothing over.
 - **JSON reports** — `app/evaluation/reports/`, schema-versioned, one file per
   run plus a `latest-*.json` pointer per report family. These are the archival
   artifact.
+
+  > **Retention changed in V6.** Timestamped reports are now **committed to the
+  > repository**; only the mutable `latest-*` pointers are ignored. V4 and V5
+  > published every number from files that `.gitignore` excluded, so no
+  > published result could be checked against the run that produced it — against
+  > this document's own rule that a result must not depend on an undocumented
+  > local file. A pointer rewritten on every run is the opposite of an immutable
+  > artifact, which is why it stays ignored.
 - **Database** — `--persist` indexes results in `evaluation_datasets`,
   `evaluation_experiments` and `evaluation_runs`. The rows are an index over the
   files, not a replacement for them.
@@ -186,6 +228,15 @@ cd backend  && pytest                 # backend suite
 cd backend  && ruff check .
 cd frontend && npm run verify         # eslint + tsc + vitest + build
 
-# migrations
+# migrations: partial downgrade exercises the V4/V5 revisions in isolation
 alembic upgrade head && alembic downgrade 0003_v3_hybrid && alembic upgrade head
+# full round-trip exercises every revision
+alembic upgrade head && alembic downgrade base && alembic upgrade head
 ```
+
+Measured at the V6 checkpoint: **688 backend tests**, **50 frontend tests**,
+ruff/eslint/tsc clean, `vite build` passing with a pre-existing chunk-size
+warning, migrations round-tripping to head `0009_v5_proposals`.
+
+**PostgreSQL remains unverified.** Every figure in this document is SQLite on a
+laptop. Docker was unavailable throughout V5 and V6.

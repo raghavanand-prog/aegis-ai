@@ -168,34 +168,81 @@ activated without an approved proposal — enforced in `registry.activate_model`
 Analyst labels cannot train an unsupervised model. Two mechanisms use them
 without changing what the detector is:
 
-- **Threshold adaptation.** Labels choose an operating point on the existing
-  score distribution, clamped to `MAX_THRESHOLD_STEP = 0.05`.
-- **Training-corpus curation.** Isolation Forest assumes its fit set is mostly
-  normal; feedback identifies which observed events were genuinely malicious, so
-  the fit set can be purified.
+- **Threshold adaptation (Arm 1).** Labels choose an operating point on the
+  existing score distribution, clamped to `MAX_THRESHOLD_STEP = 0.05`.
+- **Feedback augmentation (Arm 2, redesigned in V6).** Analyst-verified
+  **benign** observed events are added to the training corpus, teaching the
+  density model that this traffic is normal.
 
 Neither makes this model supervised. Where a supervised model appears in
-evaluation it is the V4 reference model and is not deployable.
+evaluation it is a reference or a diagnostic ceiling, and is not deployable.
+
+> **Correction (V6 §5.5).** Arm 2 was previously described here as
+> *training-corpus curation* — removing analyst-identified malicious rows from
+> the fit set. **That could not run in production.** Curation purifies the fit
+> set, and production's fit set is the unlabelled runtime telemetry corpus, not
+> observed events, so analyst labels had nothing there to purify. Worse,
+> `train_candidate` recorded `feedback_dataset_id` as metadata and never used
+> it, so feedback had never influenced production training at all. V6 §6
+> inverted the mechanism to the one described above and wired it in (§10).
+
+**Bounds on what feedback may contribute** (V6 §§9, 11):
+
+- Admission is positive-listed: only training-eligible, benign-projecting
+  labels. `confirmed_malicious`, `true_positive`, `suspicious` and `uncertain`
+  are refused.
+- A per-group cap (`baseline_relative`, tolerance **1.5**) bounds how far any
+  one `event_type` may exceed its own history. A global volume cap alone does
+  not stop a targeted attack — measured.
+- `feedback/baseline_monitor.py` flags a group whose submissions dwarf its
+  history, and is **advisory**: it blocks nothing.
 
 ### Measured effect **[MEASURED]**
 
-On `aegisx-detection-eval` (fingerprint `c0f04f3ccb2a63b8`, split
-`d349ea18a04e06c0`), 3 seeds, 5% simulated label noise:
+> **Read V6 §4 and §5 before quoting the V5 table below.** The static baseline
+> it compares against was produced by re-fitting this detector on a corpus whose
+> fit split is **40% malicious**, and which its own provenance calls out of
+> distribution for this model. Production does not fit that corpus. The
+> comparator was wrong by roughly 17×.
 
-| | Precision | Recall | F1 | FPR |
+**The baseline as production actually configures it** (V6 §5, 10 seeds, same
+corpus and split, same frozen 0.65 threshold, fitted on 6,000 unlabelled
+telemetry rows):
+
+| | Precision | Recall | F1 | FPR | ROC-AUC |
+| --- | --- | --- | --- | --- | --- |
+| Production configuration | 0.590 | 0.731 | **0.6526** | 0.340 | 0.7615 |
+| + redesigned Arm 2 | 0.634 | 0.679 | 0.6554 | **0.2624** | 0.7862 |
+
+Arm 2's effect is a **23% relative reduction in false positives** (d −1.81),
+trading recall for precision. Reporting it as an F1 result would misdescribe it.
+
+**The V5 experimental comparison, retained as measured** (fingerprint
+`c0f04f3ccb2a63b8`, split `d349ea18a04e06c0`, 5% simulated label noise) — now at
+50 seeds (V6 §1) rather than 3:
+
+| | Precision | Recall | F1 | CI95 |
 | --- | --- | --- | --- | --- |
-| Static | 1.000 | 0.019 | 0.038 | 0.000 |
-| Both arms | 0.815 | 0.141 | 0.238 | 0.017 |
-| *Random-label control* | 0.798 | 0.058 | 0.107 | 0.013 |
+| Static (misconfigured baseline) | 0.996 | 0.020 | 0.0389 | [0.0365, 0.0411] |
+| Both arms | 0.862 | 0.152 | 0.2570 | [0.2406, 0.2726] |
+| *Random-label control* | 0.691 | 0.058 | 0.1068 | [0.0997, 0.1145] |
 
-**Two thirds of the gain is attributable to feedback content and one third to
-the mechanism.** F1 varies 0.117–0.333 across seeds; three seeds cannot settle
-the effect size.
+The effect over the control is real and now settled: **Cohen's d 3.43**,
+non-overlapping intervals, mechanism 31% / feedback content 69%. What V6 changed
+is not whether the effect exists but what it was measured against — fitting at
+production-like contamination reaches F1 0.2653 with **no adaptation at all**.
 
 ### Known limitations added in V5 **[LIMITATION]**
 
-- Adaptation does **not** improve detection of behaviour the model has never
-  seen (recall 0.000 → 0.0085 on withheld categories, 1 of 9 runs).
+- ~~Adaptation does **not** improve detection of behaviour the model has never
+  seen (recall 0.000 → 0.0085 on withheld categories, 1 of 9 runs).~~
+  **Corrected in V6 §2.4.** Measured across all thirteen attack categories
+  rather than three, adaptation helps on **4 of 13** — PORT_SCAN recall
+  0.2575 → 0.9500, SUSPICIOUS_DNS 0.0744 → 0.5685, BRUTE_FORCE 0.0292 → 0.4236 —
+  and cannot help on the other nine, whose events the detector scores inside or
+  below the benign mass. V5's three categories were never recorded, so its
+  0.0085 figure is **not reproducible**. The nine-category failure is a
+  representation limit, not a feedback limit (V6 §3).
 - All feedback in the published results is **simulated**.
 - The artifact shipped as the V4 deployed model (`053d1ff3…`) is not
   reproducible from current code; it predates the determinism fix.
