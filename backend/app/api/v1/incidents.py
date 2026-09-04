@@ -15,7 +15,12 @@ from app.models.enums import AuditAction, IncidentStatus, Severity
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.incident import IncidentCreate, IncidentRead, IncidentUpdate
-from app.services import audit_service, incident_service, notification_service
+from app.services import (
+    audit_service,
+    decision_service,
+    incident_service,
+    notification_service,
+)
 from app.services.serializers import incident_to_schema
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
@@ -95,6 +100,25 @@ def update_incident(
 
     try:
         incident_service.update_incident(db, incident, payload, user=user)
+    except decision_service.EvidenceDriftError as exc:
+        # 409, same as an illegal transition: the request is well-formed and
+        # the caller is authorised - the world moved underneath it. The refusal
+        # is audited, because a decision attempted against stale evidence is
+        # worth seeing even though nothing changed.
+        db.rollback()
+        audit_service.record(
+            db,
+            action=AuditAction.DECISION_EVIDENCE_STALE,
+            user=user,
+            target_type="incident",
+            target_id=incident_id,
+            details={
+                "attemptedStatus": payload.status.value if payload.status else None,
+                "reviewedDigest": (payload.expected_evidence_digest or "")[:64],
+            },
+        )
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except lifecycle.LifecycleError as exc:
         # Three refusals, three codes, because they tell the caller to do three
         # different things: change what you asked for, get an authority, or

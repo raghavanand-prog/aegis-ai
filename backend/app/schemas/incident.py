@@ -52,6 +52,12 @@ class IncidentUpdate(CamelModel):
     #: field mandatory here, because whether a reason is needed depends on
     #: which two states are involved and this schema cannot see the current one.
     status_reason: str | None = Field(default=None, max_length=500)
+    #: The evidence manifest the caller reviewed before deciding. Optional,
+    #: and when supplied a consequential transition is refused if the evidence
+    #: has moved since - which is the window between rendering a page and
+    #: clicking on it. Omitting it keeps the pre-V9 behaviour and gets no
+    #: protection; that is a deliberate compatibility choice, not an oversight.
+    expected_evidence_digest: str | None = Field(default=None, max_length=64)
     analyst: str | None = Field(default=None, max_length=120)
     assignee_id: int | None = None
 

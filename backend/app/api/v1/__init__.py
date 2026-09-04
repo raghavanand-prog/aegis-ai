@@ -8,6 +8,7 @@ from app.api.v1 import (
     analytics,
     audit,
     auth,
+    decisions,
     detection,
     evaluation,
     events,
@@ -31,6 +32,9 @@ api_router.include_router(incidents.router)
 # V9: investigation evidence, mounted under the incidents prefix because
 # every question about evidence starts from an incident.
 api_router.include_router(evidence.router)
+# V9: what evidence each consequential decision was taken on, and whether
+# it still holds.
+api_router.include_router(decisions.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)

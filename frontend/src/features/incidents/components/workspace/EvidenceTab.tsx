@@ -5,10 +5,12 @@ import RiskBreakdown from "@/features/detection/components/RiskBreakdown";
 import type { SignalKind } from "@/features/detection/signalVocabulary";
 import { SignalLegend } from "@/features/detection/components/SignalBadge";
 import UnavailablePanel from "@/features/detection/components/UnavailablePanel";
+import type { ApiDecisionList } from "@/services/api/decisions";
 import type { ApiEvidenceSet } from "@/services/api/evidence";
 import type { IncidentMLFindings } from "@/services/api/ml";
 import type { ApiIncident } from "@/services/api/types";
 
+import DecisionIntegrity from "./DecisionIntegrity";
 import EvidenceProvenance from "./EvidenceProvenance";
 
 /**
@@ -26,6 +28,10 @@ interface EvidenceTabProps {
   evidence: ApiEvidenceSet | undefined;
   evidenceLoading: boolean;
   evidenceError: boolean;
+  /** V9: whether each recorded decision still rests on this evidence. */
+  decisions: ApiDecisionList | undefined;
+  decisionsLoading: boolean;
+  decisionsError: boolean;
 }
 
 export default function EvidenceTab({
@@ -34,6 +40,9 @@ export default function EvidenceTab({
   evidence,
   evidenceLoading,
   evidenceError,
+  decisions,
+  decisionsLoading,
+  decisionsError,
 }: EvidenceTabProps) {
   const presentKinds = Array.from(
     new Set((incident.riskSignals ?? []).map((signal) => signal.type)),
@@ -141,6 +150,13 @@ export default function EvidenceTab({
         evidence={evidence}
         isLoading={evidenceLoading}
         isError={evidenceError}
+      />
+
+      {/* --- Decision integrity (V9) -------------------------------------- */}
+      <DecisionIntegrity
+        decisions={decisions}
+        isLoading={decisionsLoading}
+        isError={decisionsError}
       />
     </div>
   );

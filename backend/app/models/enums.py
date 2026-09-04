@@ -199,6 +199,11 @@ class AuditAction(str, Enum):
     # V9: reading one specific evidence item and its provenance. The
     # evidence *list* is not audited - that is how the workspace opens.
     EVIDENCE_VIEWED = "evidence.viewed"
+    # V9: the evidence a consequential decision was taken on was recorded,
+    # and the refusal that fires when a decision would be taken against
+    # evidence that moved since the decider reviewed it.
+    DECISION_EVIDENCE_BOUND = "decision.evidence_bound"
+    DECISION_EVIDENCE_STALE = "decision.evidence_stale"
     DETECTION_EVALUATION_RUN = "detection.evaluation_run"
     # --- V3: AI / ML / enrichment -----------------------------------------
     ML_MODEL_TRAINED = "ml.model_trained"

@@ -19,6 +19,7 @@ import RiskBreakdown from "@/features/detection/components/RiskBreakdown";
 import { fetchAIAnalyses, fetchAIStatus, requestAIAnalysis } from "@/services/api/ai";
 import type { AIAnalysisKind } from "@/services/api/ai";
 import { api } from "@/services/api/client";
+import { fetchIncidentDecisions } from "@/services/api/decisions";
 import { fetchIncidentEvidence } from "@/services/api/evidence";
 import { fetchIncidentMLFindings, fetchMLStatus } from "@/services/api/ml";
 import {
@@ -99,6 +100,13 @@ export default function InvestigationWorkspace({
   const evidenceQuery = useQuery({
     queryKey: ["incident", incidentId, "evidence"],
     queryFn: () => fetchIncidentEvidence(incidentId as string),
+    enabled,
+  });
+
+  // V9: whether each recorded decision still rests on that evidence.
+  const decisionsQuery = useQuery({
+    queryKey: ["incident", incidentId, "decisions"],
+    queryFn: () => fetchIncidentDecisions(incidentId as string),
     enabled,
   });
 
@@ -350,6 +358,9 @@ export default function InvestigationWorkspace({
                   evidence={evidenceQuery.data}
                   evidenceLoading={evidenceQuery.isLoading}
                   evidenceError={evidenceQuery.isError}
+                  decisions={decisionsQuery.data}
+                  decisionsLoading={decisionsQuery.isLoading}
+                  decisionsError={decisionsQuery.isError}
                 />
               )}
 
