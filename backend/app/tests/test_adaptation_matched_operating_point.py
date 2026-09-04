@@ -61,3 +61,44 @@ class TestTheControlIsPreserved:
 
     def test_the_static_baseline_is_available(self) -> None:
         assert "static_v4" in mop.DEFAULT_CONDITIONS
+
+
+class TestSubstrateSelection:
+    """V6 §18: every result in this project runs on the V4/V5 rule-testing
+    corpus, whose fit split is 40% malicious. §13 built a corpus drawn from the
+    distribution production fits, with prevalence set deliberately. The
+    comparison can now be run on either."""
+
+    def test_the_default_substrate_is_unchanged(self) -> None:
+        """V5's corpus stays the default so no existing result moves."""
+        from app.adaptation.experiments import scenarios
+
+        corpus = scenarios.prepare_corpus(seed=1337)
+        assert corpus.name == "aegisx-detection-eval"
+
+    def test_the_rebuilt_substrate_is_selectable(self) -> None:
+        from app.adaptation.experiments import scenarios
+
+        corpus = scenarios.prepare_corpus(seed=1337, substrate="telemetry")
+        assert corpus.name == "aegisx-telemetry-labelled"
+
+    def test_the_rebuilt_substrate_is_not_dominated_by_attacks(self) -> None:
+        """The whole reason it exists. The V4/V5 fit split is 40% malicious."""
+        from app.adaptation.experiments import scenarios
+
+        corpus = scenarios.prepare_corpus(seed=1337, substrate="telemetry")
+        rate = sum(corpus.fit_labels) / len(corpus.fit_labels)
+        assert rate < 0.20, f"fit split is {rate:.1%} malicious"
+
+    def test_an_unknown_substrate_is_refused(self) -> None:
+        from app.adaptation.experiments import scenarios
+
+        with pytest.raises(ValueError, match="unknown substrate"):
+            scenarios.prepare_corpus(seed=1337, substrate="nope")
+
+    def test_conditions_run_on_the_rebuilt_substrate(self) -> None:
+        from app.adaptation.experiments import scenarios
+
+        corpus = scenarios.prepare_corpus(seed=1337, substrate="telemetry")
+        result = scenarios.run_condition(corpus, condition="both_arms", seed=1337)
+        assert result.scores and result.labels

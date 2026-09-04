@@ -1820,7 +1820,100 @@ Every section that made a threshold-dependent claim has now been re-scored. What
 remains untouched is the corpus: all of this still runs on the V4/V5 substrate
 rather than §13's rebuild, and §13.3 showed those can differ materially.
 
-## 18. Reproducing
+## 18. Migrated onto the rebuilt substrate **[MEASURED]**
+
+The last systematic confound. §13 built a corpus drawn from the distribution
+production fits; every result up to here still ran on the V4/V5 rule-testing
+corpus. `prepare_corpus` now takes a `substrate`, defaulting to the old one so
+no published result moves.
+
+**Preregistered prediction, recorded before running it.** §16 established that
+curation's entire effect is contamination reduction, 40% → ~27%. The rebuilt
+substrate starts at 10%. So there should be far less to repair, and **the
+adaptation effect should largely disappear.**
+
+```bash
+python -m app.adaptation.experiments.run_matched_operating_point_eval --seeds 8 --substrate telemetry
+```
+
+Artifacts: `v6-matched-operating-point-20260904T031523Z.json` (rule-testing) and
+`…T032222Z.json` (telemetry).
+
+### 18.1 The comparison, both substrates
+
+8 seeds. Budget is 20% of the test set.
+
+**V4/V5 rule-testing corpus — fit split 40.0% malicious**
+
+| condition | F1 @ 0.65 | ROC-AUC | best F1 | recall @ 20% |
+| --- | --- | --- | --- | --- |
+| static V4 | 0.0211 | 0.5594 | 0.5718 | 0.2732 |
+| threshold only | 0.0930 | 0.5594 | 0.5718 | 0.2732 |
+| curation / both arms | 0.2584 | **0.7334** | 0.6587 | **0.3974** |
+| *random control* | 0.0961 | 0.5646 | 0.5707 | 0.2756 |
+
+**Rebuilt telemetry corpus — fit split 10.0% malicious**
+
+| condition | F1 @ 0.65 | ROC-AUC | best F1 | recall @ 20% |
+| --- | --- | --- | --- | --- |
+| static V4 | 0.1789 | **0.8310** | 0.4379 | 0.6010 |
+| threshold only | 0.3539 | 0.8310 | 0.4379 | 0.6010 |
+| curation / both arms | 0.3844 | **0.8369** | 0.4555 | **0.6365** |
+| *random control* | 0.3556 | 0.8342 | 0.4456 | 0.6104 |
+
+### 18.2 The prediction holds
+
+| | rule-testing | **telemetry** |
+| --- | --- | --- |
+| fit contamination | 40.0% | 10.0% |
+| **static baseline ROC-AUC** | 0.5594 | **0.8310** |
+| **adaptation ΔAUC** | **+0.1740** | **+0.0058** |
+| adaptation Δrecall @ 20% | +0.1242 | +0.0354 |
+| *random control ΔAUC* | +0.0052 | +0.0031 |
+
+Two things, and the second is the finding.
+
+**The detector was never as blind as V4 and V5 measured.** On a corpus that is
+not pathologically contaminated, the *static* baseline reaches ROC-AUC **0.8310**
+against 0.5594. Nothing was adapted to achieve that; it is the same detector on
+sane fitting data.
+
+**The adaptation effect nearly vanishes: ΔAUC +0.1740 → +0.0058, a 30-fold
+reduction.** And at +0.0058 it is no longer clearly separable from the
+random-label control at +0.0031. On recall at a fixed budget the effect is
++0.0354 against a control of +0.0094, so something small survives — but the
+comfortable margin over the control that §16 documented does not.
+
+**[INFERENCE]** The most defensible reading of the whole V5 adaptation
+programme is now: **it was contamination repair.** It worked because the
+substrate was broken, and on a substrate that is not broken there is little left
+for it to do. That is not a failure of the adaptation machinery — the machinery
+does what it says, and §§8–9 show its safety controls work. It is a statement
+about what problem it was solving.
+
+### 18.3 Why best-F1 is *lower* on the better substrate
+
+An apparent contradiction worth resolving: best-achievable F1 falls from 0.5718
+to 0.4379 while ROC-AUC rises from 0.5594 to 0.8310.
+
+**F1 is prevalence-dependent; ROC-AUC is not.** The telemetry corpus is 10%
+malicious against the rule-testing corpus's 40%, and a fixed level of
+discriminative power yields a lower F1 at lower prevalence. §13.3 flagged this;
+it is why AUC is the figure carried between corpora and F1 is not.
+
+### 18.4 Limitations **[LIMITATION]**
+
+1. **8 seeds**, against §16's 20. The direction is large and unambiguous; the
+   precise ΔAUC of +0.0058 is not settled and could be zero.
+2. **Prevalence on the rebuilt substrate is chosen (10%), not observed.** A
+   different choice moves these numbers, and §13.3's sweep shows how much.
+3. **The labelling is a judgement** (§13.4.1), digest-pinned but arguable.
+4. Only the Track 1 matrix was migrated. §§2 and 6–11 were re-scored (§17) but
+   on the old corpus.
+5. Both corpora remain synthetic. This compares two synthetic substrates; it is
+   not evidence about real traffic.
+
+## 19. Reproducing
 
 ```bash
 cd backend
