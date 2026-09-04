@@ -24,6 +24,7 @@ from app.adaptation.candidates import gates
 from app.core.config import settings
 from app.evaluation.datasets.adapters import synthetic_dataset
 from app.evaluation.metrics.classification import ConfusionMatrix
+from app.evaluation.metrics.ranking import roc_auc
 from app.ml.features.extractor import FeatureExtractor
 from app.ml.models.isolation_forest import IsolationForestDetector
 from app.ml.registry import registry
@@ -77,6 +78,20 @@ def _score_per_category(
         else:
             matrix.false_negatives += 1
     return matrices
+
+
+def _roc_auc(
+    detector: IsolationForestDetector,
+    vectors: list[tuple[float, ...]],
+    labels: list[bool],
+) -> float | None:
+    """Threshold-free separation.
+
+    Every other figure here is read at one frozen threshold, which V6 §14
+    measured names a different operating point per model. This is what lets a
+    gate tell a worse candidate from a differently-calibrated one.
+    """
+    return roc_auc([detector.anomaly_score(vector) for vector in vectors], labels)
 
 
 def _score(
@@ -173,10 +188,12 @@ def evaluate_candidate(
     candidate_per_category = _score_per_category(
         candidate_detector, vectors, labels, categories, threshold
     )
+    candidate_auc = _roc_auc(candidate_detector, vectors, labels)
 
     baseline_matrix: ConfusionMatrix | None = None
     baseline_latency: float | None = None
     baseline_per_category: dict[str, ConfusionMatrix] | None = None
+    baseline_auc: float | None = None
     if baseline is not None:
         baseline_detector = _load(baseline)
         baseline_matrix, baseline_latency = _score(
@@ -185,6 +202,7 @@ def evaluate_candidate(
         baseline_per_category = _score_per_category(
             baseline_detector, vectors, labels, categories, threshold
         )
+        baseline_auc = _roc_auc(baseline_detector, vectors, labels)
 
     if baseline_matrix is None:
         gate_result = gates.GateResult(
@@ -208,6 +226,8 @@ def evaluate_candidate(
             candidate_dataset_fingerprint=dataset.fingerprint(),
             baseline_per_category=baseline_per_category,
             candidate_per_category=candidate_per_category,
+            baseline_roc_auc=baseline_auc,
+            candidate_roc_auc=candidate_auc,
             policy=policy,
         )
 
@@ -225,6 +245,7 @@ def evaluate_candidate(
     }
 
     return {
+        "rocAuc": {"candidate": candidate_auc, "baseline": baseline_auc},
         "perCategory": per_category_report,
         "dataset": {
             "name": dataset.name,
