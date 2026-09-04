@@ -39,6 +39,8 @@ const BASE: Proposal = {
   approvedByRole: null,
   rejectedByRole: null,
   selfApproved: false,
+  augmentation: null,
+  augmentationStatus: "not_recorded",
   rejectionReason: null,
   rollbackReason: null,
   rollbackState: {},
@@ -150,5 +152,101 @@ describe("CandidateEvidence", () => {
       "false",
     );
     expect(screen.queryByText("data_exfiltration")).toBeNull();
+  });
+});
+
+/**
+ * V8: the provenance an approver still could not see.
+ *
+ * V6 recorded `actorCounts`, `groupCounts` and `baselineAssessment` on the
+ * candidate *model's* parameters and the V7 handoff closed by naming it as
+ * outstanding: the evidence panel covered the evaluation blocks only. So an
+ * approver could see how a candidate *scored* and not what it was *trained
+ * on* — which is the half an adversary controls.
+ */
+describe("CandidateEvidence — augmentation provenance", () => {
+  const AUGMENTED: Proposal = {
+    ...FULL,
+    augmentationStatus: "recorded",
+    augmentation: {
+      admitted: 42,
+      capPolicy: "baseline_relative",
+      actorCapPolicy: null,
+      datasetFingerprint: "9f8e7d6c5b4a3021",
+      actorCounts: { "mallory@aegisx.dev": 33, "chidi@aegisx.dev": 9 },
+      groupCounts: { authentication: 30, process: 12 },
+      baselineAssessment: { flagged: ["authentication"], findings: {} },
+      skipped: {
+        byCap: 118,
+        notBenign: 4,
+        nonEvent: 0,
+        noInference: 2,
+        incompleteVector: 1,
+      },
+    },
+  };
+
+  it("shows who the fit set came from", async () => {
+    render(<CandidateEvidence proposal={AUGMENTED} />);
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+
+    // One actor supplying 33 of 42 admitted rows is the shape a compromised
+    // account makes. The cap bounds it; the panel is what makes it visible.
+    expect(screen.getByText(/Trained on — feedback admitted/i)).toBeInTheDocument();
+    expect(screen.getByText("mallory@aegisx.dev")).toBeInTheDocument();
+    expect(screen.getByText("33")).toBeInTheDocument();
+    expect(screen.getByText("78.6%")).toBeInTheDocument();
+  });
+
+  it("surfaces a flagged baseline rather than leaving it advisory and unseen", async () => {
+    render(<CandidateEvidence proposal={AUGMENTED} />);
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+
+    expect(screen.getByText(/Flagged: authentication/)).toBeInTheDocument();
+    expect(screen.getByText(/blocks nothing/i)).toBeInTheDocument();
+  });
+
+  it("reports what the cap refused", async () => {
+    render(<CandidateEvidence proposal={AUGMENTED} />);
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+
+    expect(screen.getByText(/Not admitted/i)).toBeInTheDocument();
+    expect(screen.getByText("118")).toBeInTheDocument();
+  });
+
+  it("distinguishes 'no model to describe' from 'nobody recorded it'", async () => {
+    // These are opposite facts and one shared dash would hide both.
+    const noModel: Proposal = {
+      ...FULL,
+      augmentation: null,
+      augmentationStatus: "no_candidate_model",
+    };
+    const { unmount } = render(<CandidateEvidence proposal={noModel} />);
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+    expect(screen.getByText(/does not train a model/i)).toBeInTheDocument();
+    unmount();
+
+    const notRecorded: Proposal = {
+      ...FULL,
+      augmentation: null,
+      augmentationStatus: "not_recorded",
+    };
+    render(<CandidateEvidence proposal={notRecorded} />);
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+    expect(screen.getByText(/fitted on telemetry alone/i)).toBeInTheDocument();
+  });
+
+  it("opens the panel for a proposal whose candidate model has vanished", async () => {
+    // The most important thing an approver can be told about this proposal is
+    // that it is unevidenced. Hiding the panel would present it as ordinary.
+    const orphaned: Proposal = {
+      ...BASE,
+      augmentation: null,
+      augmentationStatus: "candidate_model_unavailable",
+    };
+    render(<CandidateEvidence proposal={orphaned} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /show evidence/i }));
+    expect(screen.getByText(/no longer be read/i)).toBeInTheDocument();
   });
 });

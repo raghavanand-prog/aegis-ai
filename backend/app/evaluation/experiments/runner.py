@@ -410,6 +410,41 @@ def environment_metadata() -> dict[str, Any]:
     }
 
 
+#: Registry bookkeeping that records *when and where a row was written*, not
+#: *what the model is*. A faithful reproduction re-registers the byte-identical
+#: artifact into a rebuilt database and necessarily gets a new row id and new
+#: timestamps; hashing those made the experiment id unstable for exactly the
+#: detector whose identity matters most.
+#:
+#: Measured in V8: re-running the synthetic suite against the same artifact
+#: (``016c6dbf37f53d03…``) reproduced every metric to the last digit while the
+#: id moved ``EXP-2d582f5b6b84fcb7`` → ``EXP-b24021cee9b9a35c``. That breaks
+#: this project's own reproduction check (``docs/REPRODUCIBILITY.md`` §5), and
+#: it breaks it in the worst direction: a correct reproduction looked like a
+#: different experiment.
+#:
+#: Everything that identifies the model - ``identity``, ``version``,
+#: ``artifactSha256``, ``datasetFingerprint``, ``featureSchemaVersion``,
+#: ``parameters`` - is deliberately still hashed. A different artifact must
+#: still produce a different id.
+_VOLATILE_MODEL_KEYS = frozenset({"id", "trainedAt", "activatedAt"})
+
+
+def _stable_detector_description(description: dict[str, Any]) -> dict[str, Any]:
+    """``description`` with per-registration bookkeeping removed.
+
+    A no-op for fitted detectors, whose ``model`` block is ``None`` - so no
+    already-published id moves.
+    """
+    model = description.get("model")
+    if not isinstance(model, dict):
+        return description
+    return {
+        **description,
+        "model": {k: v for k, v in model.items() if k not in _VOLATILE_MODEL_KEYS},
+    }
+
+
 def experiment_id(
     *,
     dataset: EvaluationDataset,
@@ -425,7 +460,7 @@ def experiment_id(
             "datasetFingerprint": dataset.fingerprint(),
             "split": plan.strategy,
             "splitFingerprint": plan.fingerprint(),
-            "detector": detector_description,
+            "detector": _stable_detector_description(detector_description),
             "objective": objective,
             "seed": seed,
             "featureSchema": FEATURE_SCHEMA_VERSION,
