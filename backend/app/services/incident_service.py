@@ -16,7 +16,7 @@ from app.repositories.event_repository import event_repository
 from app.repositories.incident_repository import incident_repository
 from app.schemas.event import EventPromoteRequest
 from app.schemas.incident import IncidentCreate, IncidentUpdate
-from app.services import audit_service, notification_service
+from app.services import audit_service, decision_service, notification_service
 from app.services.serializers import incident_to_schema
 from app.ws.manager import manager
 
@@ -287,6 +287,7 @@ def update_incident(
     # PATCH: the title edited, the status not, and nothing to say so. A service
     # that is only safe when its caller remembers to clean up is not safe.
     status_change: tuple[str, IncidentStatus, str | None] | None = None
+    evidence_snapshot = None
     if payload.status is not None and payload.status.value != incident.status:
         # An unchanged status is short-circuited above rather than validated:
         # the UI sends the whole object back, and a PATCH re-stating the current
@@ -300,6 +301,24 @@ def update_incident(
             reason=reason,
         )
         status_change = (incident.status, target, reason)
+
+        # V9: bind the decision to the evidence it is being taken on.
+        #
+        # Only for transitions the lifecycle already treats as consequential -
+        # containment, closure, and every edge that must carry a reason. Routine
+        # forward progress concludes nothing, and collecting from seven
+        # providers on every ordinary PATCH would be a cost with no evidentiary
+        # return.
+        #
+        # One collection serves both the expected-digest check and the stored
+        # binding. Collecting twice would leave a window in which the evidence
+        # changes between the two, and the record would then describe evidence
+        # the decision was never actually checked against.
+        if decision_service.is_consequential(incident.status, target):
+            evidence_snapshot = decision_service.snapshot_for(db, incident)
+            decision_service.check_expected_digest(
+                evidence_snapshot, payload.expected_evidence_digest
+            )
 
     if payload.title is not None:
         incident.title = payload.title
@@ -324,6 +343,43 @@ def update_incident(
         incident.status = target.value
         incident.resolved_at = _resolved_at_for(incident, target)
 
+        binding = None
+        if evidence_snapshot is not None:
+            # Same transaction as the transition, deliberately: a decision whose
+            # binding did not write is a decision with no record of what it
+            # rested on, and that is worse than the transition failing.
+            binding = decision_service.bind(
+                db,
+                incident,
+                snapshot=evidence_snapshot,
+                from_state=previous_status,
+                to_state=target.value,
+                reason=reason,
+                decided_by=_lifecycle_actor(user),
+                decided_by_role=user.role if user else None,
+            )
+            audit_service.record(
+                db,
+                action=AuditAction.DECISION_EVIDENCE_BOUND,
+                user=user,
+                target_type="decision",
+                target_id=binding.decision_ref,
+                details={
+                    "incidentId": incident.incident_id,
+                    "from": previous_status,
+                    "to": target.value,
+                    "manifestDigest": binding.manifest_digest,
+                    "evidenceCount": binding.evidence_count,
+                    # A decision taken while a provider was unreachable was
+                    # taken on partial evidence. Recorded here so that fact
+                    # survives alongside the decision itself.
+                    "degradedProviders": [
+                        entry.get("provider")
+                        for entry in evidence_snapshot.degraded_providers
+                    ],
+                },
+            )
+
         audit_service.record(
             db,
             action=AuditAction.INCIDENT_STATUS_CHANGED,
@@ -338,6 +394,10 @@ def update_incident(
                 "to": target.value,
                 "reason": reason,
                 "actorRole": user.role if user else "system",
+                # The evidence this decision rested on, reachable from the audit
+                # trail without having to find the binding first.
+                "decisionRef": binding.decision_ref if binding else None,
+                "evidenceManifestDigest": binding.manifest_digest if binding else None,
             },
         )
 

@@ -69,6 +69,15 @@ class Incident(Base, TimestampMixin):
     events = relationship("Event", back_populates="incident", lazy="selectin")
     iocs = relationship("IOC", secondary=incident_iocs, back_populates="incidents", lazy="selectin")
     sequences = relationship("SecuritySequence", back_populates="incident", lazy="selectin")
+    # V9: what evidence each consequential decision on this incident was
+    # taken on. Append-only; ordered newest first for the workspace panel.
+    decision_bindings = relationship(
+        "DecisionEvidenceBinding",
+        back_populates="incident",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="DecisionEvidenceBinding.decided_at.desc()",
+    )
     ai_analyses = relationship(
         "AIAnalysis",
         back_populates="incident",

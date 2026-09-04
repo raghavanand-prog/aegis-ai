@@ -86,6 +86,17 @@ export interface UpdateIncidentInput {
   severity?: Severity;
   status?: IncidentStatus;
   analyst?: string;
+  /** Why the status is changing. Required by the backend lifecycle for any
+   *  transition that ends recorded work or undoes it. */
+  statusReason?: string;
+  /**
+   * The evidence manifest the analyst actually reviewed.
+   *
+   * Sent on consequential transitions so the backend can refuse the decision
+   * with 409 if the evidence moved between the page rendering and the click.
+   * Omitting it is accepted and gets no protection.
+   */
+  expectedEvidenceDigest?: string;
 }
 
 export async function updateIncident(
