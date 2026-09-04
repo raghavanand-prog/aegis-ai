@@ -29,6 +29,7 @@ from app.evaluation.experiments.detectors import (
 )
 from app.evaluation.experiments.runner import (
     ThresholdSweepPoint,
+    experiment_id,
     extract_features,
     leakage_audit,
     run_experiment,
@@ -304,3 +305,133 @@ def test_supervised_detector_emits_a_probability_and_the_anomaly_one_does_not() 
     assert "probability" not in anomaly.describe()["scoreKind"].replace(
         "NOT a probability", ""
     )
+
+
+# ------------------------------------------- registered-model experiment identity
+
+
+class TestRegisteredModelExperimentIdentity:
+    """The experiment id must name the model, not the moment it was registered.
+
+    ``docs/REPRODUCIBILITY.md`` §5 promises: "The same configuration always
+    produces the same id; if your id matches a published one, you ran the same
+    experiment." For fitted detectors that held. For the *registered* detector
+    it did not, and V8 measured it: re-registering the byte-identical artifact
+    ``016c6dbf37f53d03…`` and re-running the synthetic suite reproduced every
+    metric exactly while the id moved
+    ``EXP-2d582f5b6b84fcb7`` → ``EXP-b24021cee9b9a35c``.
+
+    The cause is that ``describe()`` embeds the whole registry row, so the
+    database row id and the training/activation timestamps - facts about when a
+    row was written, not about what the model is - were being hashed into the
+    identity. An id that changes when nothing about the model changed is worse
+    than no id: it makes a faithful reproduction look like a different
+    experiment.
+    """
+
+    @staticmethod
+    def _description(*, row_id: int, trained: str, activated: str) -> dict:
+        """A registered detector's description, as ``AnomalyDetector.describe``
+        builds it, differing only in volatile registry bookkeeping."""
+        return {
+            "name": "isolation_forest_registered",
+            "kind": "isolation-forest",
+            "scoreKind": "anomaly_score (ranking, NOT a probability)",
+            "provenance": "registered",
+            "contamination": 0.08,
+            "randomState": 1337,
+            "featureSchemaVersion": "1.0",
+            "featureCount": 45,
+            "trainingSamples": None,
+            "model": {
+                "id": row_id,
+                "identity": "isolation_forest@1.0",
+                "name": "isolation_forest",
+                "version": "1.0",
+                "artifactSha256": "016c6dbf37f53d03db41835e88adc80b3a787ba3386f38ab5db206bab8333fb8",
+                "datasetFingerprint": "f0fbefc8d38a8a53",
+                "featureSchemaVersion": "1.0",
+                "status": "active",
+                "trainedAt": trained,
+                "activatedAt": activated,
+            },
+        }
+
+    def _identity(self, dataset, plan, description) -> str:
+        return experiment_id(
+            dataset=dataset,
+            plan=plan,
+            detector_description=description,
+            objective="f1",
+            seed=1337,
+        )
+
+    def test_re_registering_the_same_artifact_keeps_the_experiment_id(
+        self, fixture_dataset: EvaluationDataset
+    ) -> None:
+        plan = build_split(fixture_dataset, strategy=STRATIFIED_GROUP, seed=7)
+        first = self._identity(
+            fixture_dataset,
+            plan,
+            self._description(
+                row_id=1,
+                trained="2026-09-03T04:09:56.576781+00:00",
+                activated="2026-09-03T04:09:56.578142+00:00",
+            ),
+        )
+        # The same artifact, registered again into a rebuilt database: a new row
+        # id and new timestamps, the same model.
+        second = self._identity(
+            fixture_dataset,
+            plan,
+            self._description(
+                row_id=42,
+                trained="2026-09-04T08:30:11.552091+00:00",
+                activated="2026-09-04T08:30:11.553540+00:00",
+            ),
+        )
+        assert first == second
+
+    def test_a_different_artifact_still_changes_the_experiment_id(
+        self, fixture_dataset: EvaluationDataset
+    ) -> None:
+        """The stability above must not be bought by ignoring the model."""
+        plan = build_split(fixture_dataset, strategy=STRATIFIED_GROUP, seed=7)
+        baseline = self._description(
+            row_id=1, trained="2026-09-03T04:09:56+00:00", activated="2026-09-03T04:09:56+00:00"
+        )
+        other = self._description(
+            row_id=1, trained="2026-09-03T04:09:56+00:00", activated="2026-09-03T04:09:56+00:00"
+        )
+        other["model"]["artifactSha256"] = "b32273e080a22fb2" + "0" * 48
+        assert self._identity(fixture_dataset, plan, baseline) != self._identity(
+            fixture_dataset, plan, other
+        )
+
+    def test_a_different_model_version_changes_the_experiment_id(
+        self, fixture_dataset: EvaluationDataset
+    ) -> None:
+        plan = build_split(fixture_dataset, strategy=STRATIFIED_GROUP, seed=7)
+        baseline = self._description(
+            row_id=1, trained="2026-09-03T04:09:56+00:00", activated="2026-09-03T04:09:56+00:00"
+        )
+        other = self._description(
+            row_id=1, trained="2026-09-03T04:09:56+00:00", activated="2026-09-03T04:09:56+00:00"
+        )
+        other["model"]["version"] = "2.0"
+        other["model"]["identity"] = "isolation_forest@2.0"
+        assert self._identity(fixture_dataset, plan, baseline) != self._identity(
+            fixture_dataset, plan, other
+        )
+
+    def test_a_fitted_detector_identity_is_untouched(
+        self, fixture_dataset: EvaluationDataset
+    ) -> None:
+        """A fitted detector carries no registry row, so nothing is normalised
+        away and its published ids must not move."""
+        plan = build_split(fixture_dataset, strategy=STRATIFIED_GROUP, seed=7)
+        fitted = AnomalyDetector(feature_names=FEATURE_NAMES, random_state=1337).describe()
+        assert fitted["model"] is None
+        assert self._identity(fixture_dataset, plan, fitted) == self._identity(
+            fixture_dataset, plan, dict(fitted)
+        )

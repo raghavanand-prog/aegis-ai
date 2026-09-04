@@ -193,6 +193,16 @@ class ProposalRead(CamelModel):
     #: written before V7 may carry True, and a reviewer looking at old history
     #: should see what actually happened.
     self_approved: bool
+    #: V8. How analyst feedback entered the candidate's fit set - admitted
+    #: count, per-group and per-actor composition, cap policy, and the baseline
+    #: monitor's assessment. Recorded on the candidate *model* since V6 and
+    #: invisible to approvers until now: an approver could see how a candidate
+    #: scored but not what it was trained on, which is the half an adversary
+    #: controls. ``None`` when there is no candidate model, when its row was
+    #: deleted, or when no feedback was admitted; ``augmentation_status`` says
+    #: which, because those are three different facts.
+    augmentation: dict | None = None
+    augmentation_status: str | None = None
     rejection_reason: str | None
     rollback_reason: str | None
     rollback_state: dict

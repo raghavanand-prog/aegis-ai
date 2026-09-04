@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { Proposal } from "@/services/api/adaptation";
+import type { AugmentationStatus, Proposal } from "@/services/api/adaptation";
 
 /**
  * The evidence a V6 evaluation recorded and no approver could see.
@@ -82,6 +82,70 @@ function formatDelta(
   return { text, tone: delta > 0 ? "text-emerald-300" : "text-rose-300" };
 }
 
+/**
+ * Why a proposal has no augmentation provenance, in the approver's language.
+ *
+ * Four causes, kept apart deliberately. "No feedback was admitted" and "nobody
+ * recorded what was admitted" are opposite situations — the first is a
+ * candidate trained on telemetry alone, the second is a blind spot — and one
+ * shared dash would make them look the same.
+ */
+const AUGMENTATION_ABSENCE: Record<Exclude<AugmentationStatus, "recorded">, string> = {
+  no_candidate_model:
+    "This proposal does not train a model, so there is no fit set to describe.",
+  candidate_model_unavailable:
+    "The candidate model row is gone, so what it was trained on can no longer be read. Treat this proposal as unevidenced.",
+  not_recorded:
+    "No feedback augmentation was recorded for this candidate — it was fitted on telemetry alone, or trained before the provenance existed.",
+};
+
+function CountTable({
+  title,
+  counts,
+  keyLabel,
+  note,
+}: {
+  title: string;
+  counts: Record<string, number>;
+  keyLabel: string;
+  note: string;
+}) {
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const total = rows.reduce((sum, [, n]) => sum + n, 0);
+  return (
+    <div>
+      <h5 className="text-xs font-medium text-slate-400">{title}</h5>
+      {rows.length === 0 ? (
+        <p className="mt-1 text-xs text-slate-500">None admitted.</p>
+      ) : (
+        <div className="mt-1 overflow-x-auto">
+          <table className="w-full min-w-[18rem] text-left text-xs">
+            <thead className="text-slate-500">
+              <tr>
+                <th className="pb-1 pr-3 font-normal">{keyLabel}</th>
+                <th className="pb-1 pr-3 text-right font-normal">Admitted</th>
+                <th className="pb-1 text-right font-normal">Share</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono text-slate-300">
+              {rows.map(([key, n]) => (
+                <tr key={key} className="border-t border-slate-800/70">
+                  <td className="py-1 pr-3 font-sans break-all text-slate-300">{key}</td>
+                  <td className="py-1 pr-3 text-right text-slate-100">{n}</td>
+                  <td className="py-1 text-right text-slate-500">
+                    {total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-1 text-xs text-slate-500">{note}</p>
+    </div>
+  );
+}
+
 export default function CandidateEvidence({ proposal }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -92,8 +156,18 @@ export default function CandidateEvidence({ proposal }: Props) {
   const threshold = validation.threshold as number | undefined;
 
   const categories = Object.entries(perCategory);
+  const augmentation = proposal.augmentation;
+  const augmentationStatus = proposal.augmentationStatus;
+
   const hasEvidence =
-    rocAuc.candidate !== undefined || categories.length > 0 || Boolean(dataset.name);
+    rocAuc.candidate !== undefined ||
+    categories.length > 0 ||
+    Boolean(dataset.name) ||
+    Boolean(augmentation) ||
+    // A proposal whose candidate model has vanished must still open: "this is
+    // unevidenced" is the single most important thing an approver can be told,
+    // and hiding the panel would present it as an ordinary proposal.
+    augmentationStatus === "candidate_model_unavailable";
 
   if (!hasEvidence) {
     return (
@@ -225,6 +299,122 @@ export default function CandidateEvidence({ proposal }: Props) {
               A result is only comparable against another produced on the same
               fingerprint at the same prevalence.
             </p>
+          </section>
+
+          <section>
+            <h4 className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Trained on — feedback admitted
+            </h4>
+
+            {!augmentation ? (
+              <p className="mt-2 text-xs text-slate-500">
+                {augmentationStatus && augmentationStatus !== "recorded"
+                  ? AUGMENTATION_ABSENCE[augmentationStatus]
+                  : "Not recorded."}
+              </p>
+            ) : (
+              <div className="mt-2 space-y-4">
+                <dl className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <div>
+                    <dt className="text-slate-500">Admitted</dt>
+                    <dd className="font-mono text-slate-100">
+                      {augmentation.admitted ?? "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Cap policy</dt>
+                    <dd className="font-mono text-slate-300">
+                      {augmentation.capPolicy ?? "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Actor cap</dt>
+                    <dd className="font-mono text-slate-300">
+                      {augmentation.actorCapPolicy ?? "off"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">Feedback fingerprint</dt>
+                    <dd className="font-mono text-slate-300">
+                      {augmentation.datasetFingerprint ?? "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                {augmentation.actorCounts && (
+                  <CountTable
+                    title="Per analyst"
+                    counts={augmentation.actorCounts}
+                    keyLabel="Analyst"
+                    note="One actor supplying most of a fit set is the shape a compromised account makes. The cap bounds it; this makes it visible."
+                  />
+                )}
+
+                {augmentation.groupCounts && (
+                  <CountTable
+                    title="Per group"
+                    counts={augmentation.groupCounts}
+                    keyLabel="Group"
+                    note="The per-group cap's key is partly attacker-influenced, so concentration here and concentration above are evaded by opposite behaviours."
+                  />
+                )}
+
+                {augmentation.baselineAssessment && (
+                  <div>
+                    <h5 className="text-xs font-medium text-slate-400">
+                      Baseline monitor
+                    </h5>
+                    {augmentation.baselineAssessment.unavailableReason ? (
+                      <p className="mt-1 text-xs text-amber-300/90">
+                        Not assessed: {augmentation.baselineAssessment.unavailableReason}
+                      </p>
+                    ) : augmentation.baselineAssessment.flagged?.length ? (
+                      <p className="mt-1 font-mono text-xs text-amber-300">
+                        Flagged: {augmentation.baselineAssessment.flagged.join(", ")}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-500">
+                        No group's feedback rate drifted beyond its band.
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Advisory, and it blocks nothing. A patient campaign stays
+                      within policy on every batch; this is where it becomes
+                      visible.
+                    </p>
+                  </div>
+                )}
+
+                {augmentation.skipped && (
+                  <div>
+                    <h5 className="text-xs font-medium text-slate-400">
+                      Not admitted
+                    </h5>
+                    <dl className="mt-1 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+                      {(
+                        [
+                          ["By cap", augmentation.skipped.byCap],
+                          ["Not benign", augmentation.skipped.notBenign],
+                          ["Non-event", augmentation.skipped.nonEvent],
+                          ["No inference", augmentation.skipped.noInference],
+                          ["Incomplete vector", augmentation.skipped.incompleteVector],
+                        ] as const
+                      ).map(([label, value]) => (
+                        <div key={label}>
+                          <dt className="text-slate-500">{label}</dt>
+                          <dd className="font-mono text-slate-300">{value ?? "—"}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <p className="mt-1 text-xs text-slate-500">
+                      A high &ldquo;by cap&rdquo; count means the cap was doing
+                      work on this batch — which is worth knowing before
+                      approving the next one.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}
