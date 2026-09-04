@@ -232,7 +232,11 @@ taught that lesson.
 Each result carries the identity of everything that could change it. Compare, in
 this order:
 
-1. **Dataset fingerprint** — different data, nothing else matters.
+1. **Dataset fingerprint** — different data, nothing else matters. One
+   exception, measured in V8 and easy to misread: the fingerprint hashes each
+   sample's *grouping* as well as its identity and label, so `--group-by
+   features` legitimately produces a different one over the identical corpus.
+   Both values are in the table below.
 2. **Split fingerprint** — same data, different partition.
 3. **Feature schema version** — different features, incomparable numbers.
 4. **Ruleset fingerprint** — the rules changed.
@@ -248,6 +252,7 @@ Reference values for the default configuration:
 | Property | Value |
 | --- | --- |
 | UNSW-NB15 dataset fingerprint (200k sample, salt `aegisx-v4`) | `f24e4a1e47b7753e` |
+| …the same corpus under `--group-by features` | `36ff61fc57cc77d3` |
 | Samples realised | 200,526 (22,325 malicious, 11.13%) |
 | Distinct duplicate groups | 136,075 |
 | Synthetic corpus fingerprint | `c0f04f3ccb2a63b8` |
