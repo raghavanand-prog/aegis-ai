@@ -1913,7 +1913,95 @@ it is why AUC is the figure carried between corpora and F1 is not.
 5. Both corpora remain synthetic. This compares two synthetic substrates; it is
    not evidence about real traffic.
 
-## 19. Reproducing
+## 19. §§6–9 on the rebuilt substrate **[MEASURED]**
+
+§18 migrated Track 1. This carries the poisoning and augmentation sections
+across. `targeted_poisoning` and `arm2` now take a `substrate`, defaulting to
+the old corpus so nothing published moves.
+
+**The headline is that §9.3's own caveat was right, and quantifiably so.**
+
+### 19.1 The grouping key really is coarser
+
+§9 caps feedback per `event_type`, and §9.3 warned that on the old corpus
+`event_type` tracks attack category almost perfectly, so the result "flatters
+the defence". On the rebuilt substrate that correspondence breaks:
+
+| event_type | scenarios it collapses | labels |
+| --- | --- | --- |
+| `malware_detected` | `_defender_malware` | one |
+| `process_creation` | `_sysmon_encoded_powershell`, `_sysmon_process`, `_sysmon_rare_process`, `_campaign_host_intrusion` | **mixed** |
+| `dns_query` | `_dns_beaconing`, `_dns_query`, `_dns_rare_domain` | **mixed** |
+| `auth_success` | six scenarios incl. three campaigns | **mixed** |
+
+Six event types collapse several scenarios; **four carry both labels**. An
+attacker can therefore choose a target that hides inside a large benign group.
+
+### 19.2 The defence works only where the key isolates the target
+
+3 seeds, 18,000-sample corpus (enlarged to clear V4's ROC-AUC guard):
+
+| target | its group | group size | target share | policy | poisoned rows | ΔAUC |
+| --- | --- | --- | --- | --- | --- | --- |
+| `_defender_malware` | `malware_detected` | 114 | **100%** | global | 47.3 | −0.0044 |
+| | | | | `baseline_relative` | **2.0** | +0.0059 |
+| `_sysmon_encoded_powershell` | `process_creation` | 2,960 | **2.6%** | global | 33.0 | −0.0082 |
+| | | | | `baseline_relative` | **19.7** | +0.0028 |
+
+**Where the target owns its event type the cap removes 96% of the poison
+(47.3 → 2.0). Where it hides among benign traffic the cap removes 40%
+(33.0 → 19.7)** — because the group's allowance is set by the volume of the
+2,884 benign rows it shares a key with, not by the attack.
+
+**§9's defence is therefore conditional on the grouping key isolating the
+target**, and §9.3 named exactly that. It is now measured rather than
+speculated.
+
+### 19.3 But the attack is also much weaker here
+
+The other half. Undefended damage falls from **ΔAUC −0.0685** on the old corpus
+(§17.4) to **−0.0082 and −0.0044** on the rebuilt one — despite *more* poisoned
+rows landing (33–47 against 22).
+
+**[INFERENCE]** The old corpus exaggerated both the threat and the defence. A
+larger, less contaminated fit set absorbs a few dozen mislabelled rows that a
+1,560-row 40%-malicious one could not. The security conclusion is not "the
+attack does not matter" — it is that **its magnitude was a property of the
+broken substrate**, like almost everything else in this report.
+
+### 19.4 §6's capability benefit survives; its FPR claim does not transfer
+
+| substrate | feedback rows | ΔROC-AUC | ΔFPR @ 0.65 |
+| --- | --- | --- | --- |
+| rule-testing | 420 | +0.0339 | −0.0684 |
+| **telemetry** | 1,500 *(cap binding)* | **+0.0421** | +0.0000 |
+
+**Arm 2's capability gain survives and is slightly larger** on the rebuilt
+substrate — the one V6 result claiming operational value holds up threshold-free.
+
+**Its false-positive claim cannot be evaluated there.** At the frozen 0.65 the
+model fires **2 alerts** on this corpus (baseline FPR 0.0000, recall 0.0167), so
+there is no false-positive rate to reduce. That is §14's threshold-portability
+problem once more: the fit corpus and the test corpus have different prevalence,
+so 0.65 lands in a different place again.
+
+### 19.5 What was not re-run **[LIMITATION]**
+
+Stated plainly rather than implied:
+
+1. **§2 (novel behaviour), §7 (feedback quality) and §11 (patient campaign) were
+   not migrated.** §17 re-scored all three threshold-free, but on the old corpus.
+   Given §18 and §19.3, their magnitudes should be assumed substrate-dependent.
+2. **3 seeds** for §19.2, and 6 for §19.4. Directions are clear; the point
+   estimates are not settled.
+3. Only two target scenarios were attacked — one that owns its event type and
+   one that does not. That is the contrast the section is about, not a survey.
+4. `arm2` fits `build_corpus` (~43% malicious, unresampled) and scores a
+   10%-prevalence test split, so §19.4 carries a fit/test prevalence mismatch.
+   That mismatch is what production has, but it is not a controlled comparison.
+5. Both corpora remain synthetic.
+
+## 20. Reproducing
 
 ```bash
 cd backend

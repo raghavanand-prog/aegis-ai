@@ -54,7 +54,8 @@ def _group_of(sample) -> str:
 
 
 def honest_baseline_rates(*, seeds: tuple[int, ...], noise_rate: float = 0.05,
-                          coverage: float = 0.5) -> dict[str, float]:
+                          coverage: float = 0.5,
+                          substrate: str = "rule-testing") -> dict[str, float]:
     """Mean admitted-benign rows per group under **honest** feedback.
 
     Computed from seeds other than the one under attack. A baseline learned from
@@ -63,7 +64,7 @@ def honest_baseline_rates(*, seeds: tuple[int, ...], noise_rate: float = 0.05,
     """
     totals: Counter[str] = Counter()
     for seed in seeds:
-        _, fit_samples, _ = _prepare(seed)
+        _, fit_samples, _ = _prepare(seed, None, substrate, 6000)
         labels = [bool(s.is_malicious) for s in fit_samples]
         verdicts = simulation.simulate_feedback(
             labels, seed=seed, noise_rate=noise_rate, coverage=coverage
@@ -74,10 +75,28 @@ def honest_baseline_rates(*, seeds: tuple[int, ...], noise_rate: float = 0.05,
     return {group: count / len(seeds) for group, count in totals.items()}
 
 
-@lru_cache(maxsize=8)
-def _prepare(seed: int, samples_per_class: int | None = None):
-    """Corpus with categories retained, so damage can be located per category."""
-    dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
+@lru_cache(maxsize=16)
+def _prepare(
+    seed: int,
+    samples_per_class: int | None = None,
+    substrate: str = "rule-testing",
+    samples: int = 6000,
+):
+    """Corpus with categories retained, so damage can be located per category.
+
+    ``substrate`` selects the corpus (V6 §19). On the rebuilt telemetry corpus
+    the category is the generator scenario, and several scenarios collapse onto
+    one ``event_type`` - which is the grouping key the §9 cap uses, and the
+    condition §9.3 warned would blunt it.
+    """
+    if substrate == "telemetry":
+        from app.evaluation.datasets.telemetry_labelled import (
+            telemetry_labelled_dataset,
+        )
+
+        dataset = telemetry_labelled_dataset(seed=seed, samples=samples)
+    else:
+        dataset = synthetic_dataset(seed=seed, samples_per_class=samples_per_class)
     ordered = sorted(dataset.samples, key=lambda sample: sample.timestamp)
     extractor = FeatureExtractor()
     features = {
@@ -107,6 +126,7 @@ def measure(
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
     samples_per_class: int | None = None,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
     """Poison one category's feedback; measure where the damage actually lands.
 
@@ -118,7 +138,9 @@ def measure(
     ``adversary_reach`` is the share of the target category's reviewed events the
     adversary manages to mislabel - their budget, not their intent.
     """
-    features, fit_samples, test_samples = _prepare(seed, samples_per_class)
+    features, fit_samples, test_samples = _prepare(
+        seed, samples_per_class, substrate, samples
+    )
 
     if not any(s.category == target_category for s in fit_samples):
         raise ValueError(
