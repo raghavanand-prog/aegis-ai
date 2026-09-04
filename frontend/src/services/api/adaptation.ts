@@ -108,6 +108,41 @@ export interface FeedbackDataset {
   notes: string | null;
 }
 
+export type AugmentationStatus =
+  | "recorded"
+  | "no_candidate_model"
+  | "candidate_model_unavailable"
+  | "not_recorded";
+
+/**
+ * The `augmentation` block a V6+ candidate records on its model parameters.
+ *
+ * Every field is optional because it is read from stored JSON written by
+ * possibly-older code, and a candidate trained before a field existed genuinely
+ * does not have it. Rendering a missing field as 0 would invent a measurement.
+ */
+export interface AugmentationProvenance {
+  admitted?: number;
+  groupCounts?: Record<string, number>;
+  actorCounts?: Record<string, number>;
+  capPolicy?: string;
+  actorCapPolicy?: string | null;
+  baselineRatesDerived?: boolean;
+  datasetFingerprint?: string;
+  skipped?: {
+    notBenign?: number;
+    nonEvent?: number;
+    noInference?: number;
+    incompleteVector?: number;
+    byCap?: number;
+  };
+  baselineAssessment?: {
+    flagged?: string[];
+    findings?: Record<string, unknown>;
+    unavailableReason?: string;
+  };
+}
+
 export interface Proposal {
   id: number;
   proposalType: string;
@@ -143,6 +178,20 @@ export interface Proposal {
    * should see what actually happened.
    */
   selfApproved: boolean;
+  /**
+   * V8. How analyst feedback entered the candidate's fit set. Recorded on the
+   * candidate model since V6 and invisible to approvers until now: an approver
+   * could see how a candidate *scored* but not what it was *trained on*, which
+   * is the half an adversary controls.
+   */
+  augmentation: AugmentationProvenance | null;
+  /**
+   * Why `augmentation` is null, when it is. "No candidate model" (a threshold
+   * change), "model unavailable" (its row was deleted) and "not recorded" (no
+   * feedback was admitted) are three different facts, and an approver who sees
+   * one dash for all three learns nothing.
+   */
+  augmentationStatus: AugmentationStatus | null;
   rejectionReason: string | null;
   rollbackReason: string | null;
   rollbackState: Record<string, unknown>;

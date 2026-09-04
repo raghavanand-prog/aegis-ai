@@ -400,8 +400,34 @@ def review_queue(
     )
 
 
+#: Why a proposal carries no augmentation provenance. Four distinct causes, and
+#: collapsing them to a null or an empty dict would let "nothing was admitted"
+#: and "nobody recorded it" render identically to an approver - V4's rule that a
+#: missing measurement and a zero are different facts, applied to provenance.
+_AUG_NO_CANDIDATE = "no_candidate_model"
+_AUG_MODEL_MISSING = "candidate_model_unavailable"
+_AUG_NOT_RECORDED = "not_recorded"
+_AUG_RECORDED = "recorded"
+
+
+def _augmentation_status(proposal) -> str:  # noqa: ANN001 - AdaptationProposal
+    if proposal.candidate_model_id is None:
+        return _AUG_NO_CANDIDATE
+    if proposal.candidate_model is None:
+        # The FK is SET NULL on delete, so a non-null id with no row means the
+        # model was deleted after the proposal was raised.
+        return _AUG_MODEL_MISSING
+    if proposal.augmentation is None:
+        # A candidate trained with no feedback augmentation at all, or one
+        # trained before V6 recorded the block.
+        return _AUG_NOT_RECORDED
+    return _AUG_RECORDED
+
+
 def _proposal_read(proposal) -> ProposalRead:
-    return ProposalRead.model_validate(proposal, from_attributes=True)
+    read = ProposalRead.model_validate(proposal, from_attributes=True)
+    read.augmentation_status = _augmentation_status(proposal)
+    return read
 
 
 @router.post(

@@ -329,9 +329,14 @@ it is the only one that can exercise the rules.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Rules only | — | 145 | 217 | 17 | 11 | 89.5% | 93.0% | 91.2% | 7.3% | 0.852 |
 | Isolation Forest (fitted) | 0.41 | 156 | 0 | 234 | 0 | 40.0% | 100.0% | 57.1% | 100.0% | — |
+| **Isolation Forest (registered)** | 0.64 | 116 | 156 | 78 | 40 | 59.8% | 74.4% | **66.3%** | **33.3%** | **0.402** |
 | Supervised (HGB) | 0.95 | 156 | 234 | 0 | 0 | 100.0% | 100.0% | 100.0% | 0.0% | 1.000 |
 | Hybrid (rules OR ML) | 0.65 | 145 | 217 | 17 | 11 | 89.5% | 93.0% | 91.2% | 7.3% | 0.852 |
 | Hybrid (production risk) | 30 | 145 | 217 | 17 | 11 | 89.5% | 93.0% | 91.2% | 7.3% | 0.852 |
+
+*(The registered row is **[MEASURED, V8]**. It was produced by the V6 run whose
+artifact this table cites — the run passed `--include-registered` and recorded
+the result — but it was never published here. §4.1.)*
 
 Ablation:
 
@@ -354,6 +359,81 @@ The ML contribution here is small (1.9% recall at the production threshold)
 because this corpus was built to exercise *rule thresholds* and is out of
 distribution for a model trained on the runtime generator. That is the same
 caveat V3 published, now measured under the V4 protocol.
+
+### 4.1 Fitted vs registered — the deployed artifact is not the fitted one
+
+**[MEASURED, V8]** Every Isolation Forest row published before V8 describes a
+model *fitted for the experiment* on the corpus's own training split. That is
+the right baseline for "could this detector class learn this data", and it is
+**not** the model AEGISX actually serves. The running system loads a registered
+artifact, digest-verified and never refitted.
+
+`--include-registered` evaluates that artifact. It was passed on the V6
+synthetic run and the result was recorded in the artifact — and then published
+nowhere, so the only Isolation Forest number a reader ever saw on this corpus
+was the fitted one at 100% FPR.
+
+| | Fitted | Registered (deployed) |
+| --- | --- | --- |
+| Provenance | refit on this corpus's train split | `isolation_forest@1.0`, loaded and digest-verified |
+| Artifact SHA-256 | — (never persisted) | `016c6dbf37f53d03…` |
+| Trained on | aegisx-detection-eval train split | runtime telemetry corpus `f0fbefc8d38a8a53`, 6,000 samples (4,800 fitted) |
+| Frozen threshold | 0.41 | 0.64 |
+| TP / TN / FP / FN | 156 / 0 / 234 / 0 | 116 / 156 / 78 / 40 |
+| Precision | 40.0% | **59.8%** |
+| Recall | 100.0% | 74.4% |
+| F1 | 57.1% | **66.3%** |
+| FPR | **100.0%** | **33.3%** |
+| MCC | — (undefined: no true negatives) | **0.402** |
+| ROC-AUC | 0.529 | **0.763** |
+| PR-AUC (baseline 0.400) | 0.4929 | **0.7417** |
+
+**The deployed artifact is the better detector here, on every threshold-free
+measure.** ROC-AUC 0.763 against 0.529 — the fitted model is barely
+distinguishable from random ranking on this corpus, and the deployed one is
+not. The fitted model is degenerate: it flags all 390 test events, earning 100%
+recall, 100% FPR and an undefined MCC.
+
+The reason is distributional, not a defect in either. The fitted model is asked
+to find rarity inside a corpus generated from per-class templates and made
+~40% malicious by construction — nothing is rare, so isolation has nothing to
+isolate. The registered artifact was fitted on the runtime telemetry generator,
+where the anomaly rate is 8%, and it carries a threshold (0.648 recommended,
+0.65 in production) calibrated against that distribution.
+
+**This does not rehabilitate the anomaly detector.** MCC 0.402 with a third of
+benign traffic flagged is not deployable on its own, the rules still beat it
+outright (MCC 0.852), and §2.6 shows the same artifact class ranking *below
+chance* through the production risk path on network flow. What it corrects is a
+narrower and more embarrassing thing: **the published table understated the
+model AEGISX actually ships**, because it reported a refit stand-in and never
+the artifact.
+
+#### A reproducibility defect found while checking this **[MEASURED, V8]**
+
+Re-running the suite against the byte-identical artifact reproduced every
+metric exactly — and produced a **different experiment id**,
+`EXP-2d582f5b6b84fcb7` → `EXP-b24021cee9b9a35c`. §5 of
+`docs/REPRODUCIBILITY.md` promises the opposite: "the same configuration always
+produces the same id; if your id matches a published one, you ran the same
+experiment."
+
+The cause was that the id hashed the whole registry row, including its database
+row id and its training and activation timestamps — facts about when a row was
+written, not about what the model is. Only the *registered* detector was
+affected; a fitted detector carries no registry row. Fixed in
+`experiments/runner.py` by normalising that bookkeeping out before hashing.
+Verified: registering the same artifact into a rebuilt database now yields the
+same id twice (`EXP-ea9af25f010b4144`), a different artifact digest or version
+still yields a different id, and **all five fitted detector ids are unchanged
+from the V6 artifact** — no published identity moved.
+
+**Not run [NOT RUN].** `--include-registered` has never been exercised on
+UNSW-NB15. The registered artifact speaks feature schema 1.0 and would load, but
+it was fitted on endpoint/identity telemetry and the run costs ~32 minutes; §2.6
+already establishes what the production risk path does on that corpus. This is
+recorded as not-run rather than inferred.
+
 
 ---
 

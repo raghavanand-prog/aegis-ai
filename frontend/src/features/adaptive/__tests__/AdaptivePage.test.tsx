@@ -121,6 +121,8 @@ const UNVALIDATED_PROPOSAL: Proposal = {
   approvedByRole: null,
   rejectedByRole: null,
   selfApproved: false,
+  augmentation: null,
+  augmentationStatus: "no_candidate_model",
   rejectionReason: null,
   rollbackReason: null,
   rollbackState: {},

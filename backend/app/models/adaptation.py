@@ -14,6 +14,7 @@ it.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -30,6 +31,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, JSONType, utcnow
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, avoids an import cycle
+    from app.models.ml import MLModel
 
 
 class AnalystFeedback(Base):
@@ -362,6 +366,39 @@ class AdaptationProposal(Base):
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    #: The candidate this proposal would deploy. Read-only and lazily loaded:
+    #: it exists so an approver can be shown what the candidate was *built
+    #: from*, not so anything can be written through it.
+    candidate_model: Mapped[MLModel | None] = relationship(
+        "MLModel",
+        foreign_keys=[candidate_model_id],
+        lazy="selectin",
+        viewonly=True,
+    )
+
+    @property
+    def augmentation(self) -> dict | None:
+        """How analyst feedback entered this candidate's fit set, or ``None``.
+
+        V6 recorded this block on the *model's* ``parameters`` and V7 closed by
+        noting it never reached the approver: "``actorCounts``, ``groupCounts``
+        and ``baselineAssessment`` live on the model's parameters, not the
+        proposal's validation". So an approver could see how a candidate
+        *scored* and not what it was *trained on* — which is the half an
+        adversary controls.
+
+        ``None`` has three distinct causes and they are not the same fact, so
+        none of them is flattened to an empty dict here: the proposal carries no
+        candidate model (a threshold change), the candidate model row was
+        deleted (``ON DELETE SET NULL``), or the candidate was trained with no
+        feedback augmentation at all. The API layer distinguishes them.
+        """
+        model = self.candidate_model
+        if model is None:
+            return None
+        block = (model.parameters or {}).get("augmentation")
+        return block if isinstance(block, dict) else None
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<AdaptationProposal {self.id} {self.proposal_type} {self.status}>"

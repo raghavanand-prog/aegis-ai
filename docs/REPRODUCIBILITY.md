@@ -161,6 +161,51 @@ python -m app.adaptation.experiments.run_targeted_poisoning_eval  --seeds 8 --ma
 python -m app.adaptation.experiments.run_patient_poisoning_eval   --seeds 8 --max-seconds 5400
 ```
 
+### V8: approval-workflow latency
+
+```bash
+python -m app.adaptation.experiments.run_approval_latency_eval --iterations 50
+```
+
+Runs in ~1 s against a temporary database it creates and discards, so it never
+writes probe proposals into a working database. Times
+`create → approve → deploy → rollback` through the service layer, plus the
+four-eyes refusal that sits on the approval path.
+
+Measured at the V8 checkpoint (50 iterations, macOS 26.6.2 arm64, SQLite,
+single process — milliseconds):
+
+| Stage | mean | p50 | p95 | max |
+| --- | --- | --- | --- | --- |
+| create | 0.3620 | 0.0782 | 0.1385 | 13.9706 |
+| refused self-approval | 0.0077 | 0.0020 | 0.0036 | 0.2835 |
+| approve | 0.0678 | 0.0558 | 0.0799 | 0.5372 |
+| deploy | 0.0579 | 0.0535 | 0.0671 | 0.1803 |
+| rollback | 0.0554 | 0.0518 | 0.0627 | 0.1765 |
+| **end-to-end (4 stages)** | 0.5431 | **0.2399** | 0.3638 | 14.8646 |
+
+**Read p50, not mean.** The first iteration pays SQLAlchemy's mapper warm-up —
+13.97 ms of the 14.86 ms end-to-end maximum — which inflates every mean and
+describes process start, not the workflow.
+
+The four-eyes refusal costs **~0.002 ms**, roughly 40× less than the `create`
+it prevents, because it fails before doing any work. A safety check that is
+cheaper than the operation it guards has no throughput argument against it.
+
+> **This is system processing latency, and only that.** Human analyst decision
+> latency — the number that actually governs how long an adaptation waits — is
+> **UNMEASURED**, as it was in V5, V6 and V7. No analyst population exists.
+> Timing the feedback simulator would report a property of the simulator, so it
+> was not done. Closing this needs a study against real analysts: instrument the
+> proposal queue in a deployment, record submit-to-decision wall time, and
+> report the distribution with the population size and selection effects stated.
+> The report file carries `humanLatencyStatus: "UNMEASURED"` so a reader cannot
+> mistake one for the other.
+
+**[LIMITATION]** Laptop, SQLite, single process, a database holding a handful of
+rows. It excludes HTTP, authentication, serialization and all contention: a
+floor, not a throughput claim.
+
 Total well under one CPU-hour. Seeds come from one standing plan
 (`app/adaptation/experiments/seeds.py`) in which a longer plan **extends** a
 shorter one, so `--seeds 3` still reproduces V5 exactly and every run stays
@@ -271,14 +316,16 @@ alembic upgrade head && alembic downgrade 0003_v3_hybrid && alembic upgrade head
 alembic upgrade head && alembic downgrade base && alembic upgrade head
 ```
 
-Measured at the **V8** checkpoint: **835 backend tests** collected and passing
+Measured at the **V8** checkpoint: **857 backend tests** collected and passing
 (`pytest` exit 0; 15 of them are the PostgreSQL module, which skips and says so
-when `AEGISX_TEST_POSTGRES_URL` is unset), **56 frontend tests**, ruff/eslint/tsc
+when `AEGISX_TEST_POSTGRES_URL` is unset), **61 frontend tests**, ruff/eslint/tsc
 clean, `vite build` passing with a pre-existing chunk-size warning, migrations
-round-tripping to head `0011_v7_approval_governance`.
+round-tripping base→head→base→head to `0011_v7_approval_governance`.
 
-*(V6 measured 688 backend / 50 frontend at head `0009_v5_proposals`. Those
-figures stood in this document until V8 and are kept here as history.)*
+*(V6 measured 688 backend / 50 frontend at head `0009_v5_proposals`; V7 measured
+835 / 56. Those figures stood in this document until V8 and are kept as
+history. V8 added 22 backend tests — experiment-id stability, augmentation
+provenance and approval latency — and 5 frontend.)*
 
 **PostgreSQL was validated in V7** — 11 migrations, CHECK constraints, foreign
 keys, `ON DELETE SET NULL`, JSONB path queries, transactional rollback and the
