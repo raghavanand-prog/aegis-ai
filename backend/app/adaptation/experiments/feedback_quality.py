@@ -134,13 +134,13 @@ CONDITIONS: dict[str, ConditionSpec] = {
 }
 
 
-def ground_truth(*, seed: int) -> list[bool]:
+def ground_truth(*, seed: int, substrate: str = "rule-testing") -> list[bool]:
     """The independent truth stream. Never written by an analyst."""
-    return list(prepare_corpus(seed=seed).fit_labels)
+    return list(prepare_corpus(seed=seed, substrate=substrate).fit_labels)
 
 
 def generate(
-    *, condition: str, seed: int
+    *, condition: str, seed: int, substrate: str = "rule-testing"
 ) -> tuple[list[simulation.SimulatedVerdict], list[bool]]:
     """Analyst verdicts under one condition, plus the truth they refer to."""
     try:
@@ -150,7 +150,7 @@ def generate(
             f"unknown condition {condition!r}; known: {sorted(CONDITIONS)}"
         ) from None
 
-    truth = ground_truth(seed=seed)
+    truth = ground_truth(seed=seed, substrate=substrate)
     reviewable = int(len(truth) * spec.reviewed_prefix)
 
     verdicts = simulation.simulate_feedback(
@@ -210,10 +210,11 @@ def measure(
     max_feedback_fraction: float = arm2.DEFAULT_MAX_FEEDBACK_FRACTION,
     samples: int = DEFAULT_SAMPLES,
     span_days: int = DEFAULT_SPAN_DAYS,
+    substrate: str = "rule-testing",
 ) -> dict[str, Any]:
     """Fit with and without this condition's feedback; score the same test split."""
-    verdicts, truth = generate(condition=condition, seed=seed)
-    observed = prepare_corpus(seed=seed)
+    verdicts, truth = generate(condition=condition, seed=seed, substrate=substrate)
+    observed = prepare_corpus(seed=seed, substrate=substrate)
     telemetry = build_corpus(seed=seed, samples=samples, span_days=span_days)
     telemetry_vectors = [tuple(vector) for vector in telemetry.vectors]
 
