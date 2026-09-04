@@ -1,32 +1,32 @@
 # AEGISX V6 → V7 HANDOFF
 
 > Written at the end of the V6 session for a **fresh Claude Code session**.
-> Every claim below was checked against the repository immediately before
-> writing, not recalled.
+> Every claim was checked against the repository immediately before writing, not
+> recalled.
 > **Trust the repository over this document.** Where they disagree, the code
 > wins.
 
-Claims are tagged:
-
-- **[MEASURED]** — a number from a committed, reproducible command, whose
-  artifact is committed beside it.
-- **[IMPLEMENTATION]** — a fact about the code, verifiable by reading it.
-- **[LIMITATION]** — something not established, not measured, or not true.
-- **[INFERENCE]** — a judgement. Argue with these freely.
+Claims are tagged **[MEASURED]**, **[IMPLEMENTATION]**, **[LIMITATION]**,
+**[INFERENCE]** — as in V4 and V5.
 
 ---
 
 ## 1. Read this first
 
-The V5 handoff named the wrong checkpoint and said the work was unpushed when it
-was not. The Phase A audit of V4 found the same class of error. **Verify §2
-before trusting anything else here**, and do the same to this document.
+**V6 did not go where its brief pointed.** It was scoped as ten tracks of new
+capability. It became an audit of V4 and V5's methodology, because the first
+thing it measured did not hold up, and neither did the thing after that.
 
-**V6 is not complete against its own brief.** It answered the research questions
-it started with and then followed the evidence somewhere the brief did not
-anticipate. **Thirteen of the brief's twenty definition-of-done items are done;
-seven are not**, two of those blocked on the environment. §9 lists them without
-softening.
+**Thirteen of the brief's twenty definition-of-done items are done. Seven are
+not** — §10 lists them without softening. Two of those are blocked on the
+environment; five were simply not reached.
+
+**The headline for a new session is §3, and §5 lists every correction.** Most quantitative claims in V4, V5 and
+V6 have been revised, several of them twice. What survived is listed in §4.
+
+Verify §2 and §7 yourself before trusting anything here. The V5 handoff named the
+wrong checkpoint and claimed the work was unpushed when it was not; the V4 audit
+found the same class of error before it.
 
 ---
 
@@ -35,346 +35,308 @@ softening.
 ```
 V4 checkpoint:  65a8671   ← intact, verified
 V5 checkpoint:  52eea0d   ← intact, verified
-V6 checkpoint:  055abfd
+V6 checkpoint:  d8e54b4
 ```
 
-**Pushed.** `origin/main` is at `055abfd`, identical to `HEAD`; working tree
-clean, no divergence. Fast-forward `52eea0d..055abfd`, nothing amended, rebased
-or force-pushed.
+**Pushed.** `origin/main` is at `d8e54b4`, identical to `HEAD`; working tree
+clean, no divergence. Nothing amended, rebased or force-pushed.
 
-**14 commits. 53 files changed, +48,367 / −34.** The insertion count is
-dominated by committed JSON experiment artifacts, which is deliberate — see §4.
-
-```
-5496a22  seed plan, and commit experiment artifacts as immutable evidence
-85b0f79  record per-seed results, intervals and control effect sizes
-8c56f21  track 1 - the V5 adaptation effect at 50 seeds
-47f1de8  track 3 - the novel-behaviour confound is benign, the V5 conclusion is not
-1a0e48c  hypothesis 5 - the detector class is the limit, not the features
-cb88972  fit-set contamination, not adaptation, explains most of the V5 gain
-be989d4  re-establish the baseline in the configuration production uses
-6ca75ef  redesign Arm 2 so it can act in the production configuration
-1af1b20  track 2 - feedback quality, and the metric that hides the poisoning
-c2e5618  targeted poisoning defeats the recall floor section 7.3 recommended
-a0eb01b  a per-group feedback cap that blunts targeted poisoning
-769a3a3  commit the three per-policy artifacts behind section 9.2
-593d325  move the feedback cap into production, add the per-category gate
-055abfd  wire the feedback augmentation and its cap into candidate training
-```
+**28 commits. 78 files changed, +53,784 / −54.** The insertion count is
+dominated by 25 committed JSON experiment artifacts — deliberate, see §7.
 
 ---
 
-## 3. The one thing to understand about V6
+## 3. What V6 found
 
-**Every V5 number reproduced exactly.** V5 was not dishonest and its results
-were not wrong as measurements.
+**Every V5 number reproduced exactly.** V5 was not dishonest and its
+measurements were not wrong. What V6 found is that **the substrate and the
+scoring method those measurements sat on were both broken**, in ways that
+inflated every magnitude in the report.
 
-What V6 found is that **the substrate those measurements sat on was
-misconfigured**. V4 and V5 established their static baseline by re-fitting an
-Isolation Forest on the labelled evaluation corpus, whose fit split is **40%
-malicious** — and whose own provenance already said it was *"out of distribution
-for the anomaly model trained on the runtime telemetry generator"*.
+Three compounding problems, each measured:
 
-So the comparator that made adaptation look like a 6× improvement was wrong by
-roughly 17×.
+**(a) The corpus.** V4 and V5 fitted an Isolation Forest on the labelled
+evaluation corpus, whose fit split is **40% malicious** and whose own provenance
+already said it was *"out of distribution for the anomaly model"*. It was built
+to exercise **rule thresholds**. §4 measured that contamination degrades
+discrimination badly (ROC-AUC 0.53 → 0.93 as it falls).
 
-**§13 corrects part of this report's own reasoning.** V6 originally said
-production trains at roughly 12% suspicious, and built the contrast on that.
-Measured at the scenario level it is **42.7%** — the 12% came from eyeballing
-normalized `event_type` names and missed two attack scenarios. Both corpora are
-~40% malicious, so contamination cannot be what distinguishes them, and **§5's
-gap is currently unexplained**. The contamination effect itself replicates on an
-independent corpus (§13.3), and at 42.6% a fresh corpus reproduces the
-near-inert baseline (F1 0.0352 against V5's 0.0389).
+**(b) The threshold.** `anomaly_score` is calibrated to the **median of each
+model's own training scores**, so a frozen 0.65 names a *different operating
+point for every model*. §14 measured 0.65 sitting at the 53.6th percentile for
+one model and the **99.2nd** for another. Comparing differently-fitted models at
+a fixed threshold compares their calibrations. **Ten of eleven comparison sites
+in this project did exactly that.**
 
-| Configuration | F1 |
+**(c) My own errors.** §13 corrected V6's claim that production trains at ~12%
+suspicious — it is **42.7%**. I had eyeballed normalized `event_type` names and
+missed two attack scenarios.
+
+**The consequence for V5's headline:**
+
+| framing | static → both arms |
 | --- | --- |
-| V5 static baseline, as reported | 0.0389 |
-| V5 both arms, 50 seeds | 0.2570 |
-| Refit at 12% contamination, **no adaptation** | 0.2653 |
-| **Production configuration, no adaptation** | **0.6526** |
+| **V5 as published** (F1 @ frozen 0.65) | 0.038 → 0.238, **6.3×** |
+| at matched operating points (§16) | **1.31×** AUC, 1.46× recall at fixed alert budget |
+| **on a corrected substrate** (§18) | **ΔAUC +0.0058**, against a random-label control of +0.0031 |
 
-**[MEASURED]** all four. The last independently reproduces V4 §19.12 (F1 0.663,
-33.3% FPR) by a different code path, which is the strongest evidence available
-that the measurement is sound.
-
-**[INFERENCE]** If you read one thing before changing code, read
-`docs/V6_RESEARCH_REPORT.md` §4 and §5. Everything after them is downstream.
+**[INFERENCE]** The most defensible reading is that **the V5 adaptation
+programme was contamination repair.** It worked because the substrate was
+broken. On one that is not, there is little left for it to do. That is not a
+failure of the machinery — §§8–9 show its safety controls genuinely work — it is
+a statement about which problem it was solving.
 
 ---
 
-## 4. Results **[MEASURED]**
+## 4. What survived **[MEASURED]**
 
-All from committed artifacts under `backend/app/evaluation/reports/`.
-Corpus `c0f04f3ccb2a63b8`, split `d349ea18a04e06c0` unless stated.
+Everything below survived both the threshold audit (§§14–17) and the substrate
+migration (§§18–20) in the research report.
 
-**Track 1 — the V5 effect at 50 seeds.** It survives and sharpens. **Two later
-sections revise this substantially: §16 found the magnitude inflated ~7× by
-threshold placement, and §18 found the effect nearly vanishes (ΔAUC +0.1740 →
-+0.0058) on a corpus that is not pathologically contaminated.**
+| Finding | Evidence |
+| --- | --- |
+| **Contamination degrades discrimination** | ROC-AUC 0.53 → 0.93 as fit-set malicious share falls 40% → 4%; replicated on an independent corpus (§13.3) |
+| **Adaptation helps where the detector is weakest** | Per-category ΔAUC largest on the hardest scenario, smallest on the easiest — on both corpora (§17.2, §20.1). The only substantive finding to survive everything |
+| **Targeted poisoning costs real capability** | Target-category ΔAUC −0.0685 undefended (§17.4) |
+| **The per-group cap defends — conditionally** | Neutralises the attack (ΔAUC +0.0002) **where the grouping key isolates the target**; removes only 40% of poison where it does not (§19.2, §20.3) |
+| **Arm 2 improves capability** | ΔROC-AUC +0.0339 → +0.0421 across substrates (§19.4). The one V6 result claiming operational value |
+| **V5's random-label control works** | It is what made every correction above detectable. The single best methodological decision in the project's history |
 
-| Condition (5% noise) | F1 | sd | CI95 |
-| --- | --- | --- | --- |
-| static V4 | 0.0389 | 0.0083 | [0.0365, 0.0411] |
-| both arms | 0.2570 | 0.0549 | [0.2406, 0.2726] |
-| random-label control | 0.1068 | 0.0271 | [0.0997, 0.1145] |
-
-Both arms vs control: Δ 0.1502, **Cohen's d 3.43**, non-overlapping intervals.
-V5's caution — a gap of ~1.5 sd over three seeds — is resolved. Mechanism/content
-split 31%/69%, against V5's 34%/66% by hand.
-
-**Contamination is the mechanism** behind most of it:
-
-| fit-set malicious % | ROC-AUC | F1 @ 0.65 |
-| --- | --- | --- |
-| 40% (as V4/V5 used it) | 0.5721 | 0.0237 |
-| 12% (production-like) | 0.9000 | 0.2653 |
-| 4% | 0.9547 | 0.3865 |
-
-**Production baseline**: AUC 0.7615, F1 0.6526, FPR 0.3397, fitted on 6,000
-unlabelled telemetry rows, scored on the same split and frozen 0.65 threshold.
-
-**Redesigned Arm 2**: FPR **0.3397 → 0.2624**, d −1.81, from 399 feedback rows
-(6.2% of the fit set). F1 moves +0.003 — it trades recall for precision, and
-reporting it as an F1 result would misdescribe it.
-
-**Targeted poisoning**: 22 rows of one event type cost 0.2026 of that category's
-recall while aggregate recall moved 0.0232 — **below its own seed noise of
-0.0426**. The `baseline_relative` cap cuts admitted poison to 4.0 rows and
-restores target recall, at no cost to honest feedback.
-
-**The patient adversary** (§11) feeds that cap rather than fighting it. Every
-batch stays within policy while the ceiling ratchets **3.5 → 27.5** over ten
-cycles; the honest control stays flat at 3.5, which is what makes the effect
-attributable. §9's defence is **delayed, not defeated** — it holds at one cycle
-and does not by three.
+**Died under audit:** V5's Arm 1 (contributes *exactly zero* capability —
+identical AUC to static by construction); §7.3, §7.4, §11.2, §11.3; and V6's own
+§2.4, §5, §6 and §9 framings. §5 below lists all fifteen corrections with what replaced them.
 
 ---
 
-## 5. Corrections to earlier documents
+## 5. Corrections made in V6 **[MEASURED]**
 
-V6 corrected four V5 conclusions and one of its own. In every case the original
-measurement is **retained** and the correction recorded **separately** — nothing
-was rewritten to look better.
+**Fifteen conclusions were corrected — six of V5's and nine of V6's own.** In
+every case the original measurement is retained and the correction recorded
+beside it; nothing was rewritten to look better.
+
+### V5's
 
 | Where | What changed |
 | --- | --- |
-| V5 §2.5 "label noise barely matters" | False at 50 seeds: F1 0.2826 → 0.2110 across 0–15% noise, d 1.44. And the attribution was backwards — curation degrades (d 0.75), threshold selection does not (d 0.03) |
-| V5 §3 "RQ4 answered no" | Too strong. Adaptation *does* help on 4 of 13 novel categories (PORT_SCAN 0.2575 → 0.9500). V5's three categories were never recorded, so its 0.0085 **cannot be reproduced** |
-| V5 §3 harness | `run_new_behaviour` never gives the loop feedback about the withheld category. Measured as benign in effect — the threshold clamp saturates in 256/260 runs — but the conclusion it supported was stronger than the harness allowed |
-| V5 Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedbackDatasetId` as metadata and **never used it** |
-| **V6 §3.3, mine** | Said the corpus violates the `contamination` *parameter* "by a factor of 5". Direction right, mechanism wrong — `contamination` never reaches `anomaly_score`. Corrected in place with a visible note |
-| **V6 §7.4, mine** | "Sparse feedback makes the model worse" — died on migration (§20.2); it helps there (+0.0149). §7 now has no surviving published conclusion |
-| **V6 §11.2, mine** | The allowance ratchet died on migration (§20.3) and is replaced by something worse: a target hiding in a high-volume group faces an allowance of ~597 at cycle zero and needs no ratchet at all |
-| **V6 §9, mine** | The per-group cap is **conditional on the grouping key isolating the target** (§19.2). Where a scenario owns its `event_type` the cap removes 96% of poison; where it hides among benign traffic sharing that key, 40%. §9.3 named this caveat and §19 measured it |
-| **V6 §7.3, mine** | Recommended an aggregate recall floor. §8 measured that it cannot work. §8 supersedes it |
-| **V6 §2.4, mine** | Said adaptation helps 4 of 13 novel categories. §17.2 measured the **opposite**: those three were already at AUC ≈0.997 under the static model and gained nothing, while MALWARE, RANSOMWARE and LATERAL_MOVEMENT — the ones called unhelpable — gain +0.19 to +0.21 AUC |
-| **V6 §7.4, mine** | "Sparse feedback makes the model worse" — died on migration (§20.2); it helps there (+0.0149). §7 now has no surviving published conclusion |
-| **V6 §11.2, mine** | The allowance ratchet died on migration (§20.3) and is replaced by something worse: a target hiding in a high-volume group faces an allowance of ~597 at cycle zero and needs no ratchet at all |
-| **V6 §9, mine** | The per-group cap is **conditional on the grouping key isolating the target** (§19.2). Where a scenario owns its `event_type` the cap removes 96% of poison; where it hides among benign traffic sharing that key, 40%. §9.3 named this caveat and §19 measured it |
-| **V6 §7.3, mine** | Said benign bias costs recall and that recall reveals the poisoning. §17.3 measured that benign bias has the **largest capability gain of any condition** and costs no recall at matched budget. The recommendation it produced was wrong twice over |
-| **V5 Arm 1 (threshold adaptation)** | Reported as working (F1 0.038 → 0.099). §16.2 measured it contributes **exactly zero** capability — identical ROC-AUC, best-F1 and recall-at-budget to static, by construction. Its entire effect was threshold placement |
-| **V5's headline, 6.3×** | Real and attributable to feedback, but **~7× inflated** by the frozen threshold (§16.5), and **~30× smaller again on a correctly-built corpus** — ΔAUC +0.0058 against a control of +0.0031 (§18.2). The most defensible reading is that the V5 programme was **contamination repair** |
-| **V6 §6, mine** | Described the redesigned Arm 2 as "trading recall for precision". §15.3 measured it is **strictly better** at matched operating points (AUC +0.033, best-F1 +0.015); the apparent trade is the calibration shift |
-| **V6 §5, mine** | Read the production configuration's F1 0.6526 as a better-configured detector. §14 measured that 82.6% of the gap is threshold placement, and that its advantage is partly an artefact of the eval corpus being *out of distribution* for it |
-| **V6 §4.1 / §5.1, mine** | Said production's training corpus runs at ~12% suspicious and built an argument on the contrast. It is **42.7%**. Both corpora are ~40% malicious, so contamination cannot explain §5's gap; the measurement stands, the explanation does not (§13.2) |
+| §2.5 "label noise barely matters" | False at 50 seeds: F1 0.2826 → 0.2110 across 0–15% noise, d 1.44. The attribution was also backwards — curation degrades (d 0.75), threshold selection does not (d 0.03) |
+| §3 "RQ4 answered no" | Too strong; and V5's three categories were never recorded, so its 0.0085 **cannot be reproduced** |
+| §3 harness | `run_new_behaviour` never gives the loop feedback about the withheld category. Measured benign in effect — the threshold clamp saturates — but the conclusion exceeded the harness |
+| Arm 2 | Not merely inapplicable in production: `train_candidate` recorded `feedback_dataset_id` and **never used it** |
+| **Arm 1** | Reported as working (F1 0.038 → 0.099). Contributes **exactly zero** capability — identical AUC, best-F1 and recall-at-budget to static, by construction |
+| **The 6.3× headline** | Real and attributable to feedback, but ~7× inflated by the frozen threshold (§16), and **~0 on a corrected substrate** (§18) |
+
+### V6's own
+
+| Where | What changed |
+| --- | --- |
+| §3.3 | Said the corpus violates the `contamination` *parameter*. Direction right, mechanism wrong — `contamination` never reaches `anomaly_score` |
+| §4.1 / §5.1 | Said production trains at ~12% suspicious. It is **42.7%**; I had eyeballed `event_type` names and missed two attack scenarios |
+| §5 | Read the production configuration's F1 0.6526 as a better-configured detector. **82.6% is threshold placement**, and its advantage is partly an artefact of the corpus being *out of distribution* for it |
+| §6 | Described Arm 2 as "trading recall for precision". At matched operating points it is **strictly better** on both threshold-free measures |
+| §2.4 | Said adaptation helps 4 of 13 novel categories. The **opposite**: those three were already at AUC ≈0.997 and gained nothing, while the "unhelpable" ones gain +0.19 to +0.21 |
+| §7.3 | Said benign bias costs recall and that recall reveals poisoning. At matched points it costs **no** recall and has the largest capability gain |
+| §7.4 | "Sparse feedback makes the model worse" — **died on migration**; it helps there (+0.0149). §7 now has no surviving published conclusion |
+| §9 | The per-group cap is **conditional on the grouping key isolating the target** — 96% of poison removed where a scenario owns its `event_type`, 40% where it hides |
+| §11.2 | The allowance ratchet **died on migration**, replaced by something worse: a hidden target faces an allowance of ~597 at cycle zero and needs no ratchet |
+
+**[INFERENCE]** The pattern is consistent and is the most useful thing V6 can
+hand forward: **findings about mechanism survived; findings about magnitude did
+not.** Every quantity in this project was, to some degree, a property of the
+corpus and the threshold it was measured with.
 
 ---
 
-## 6. What changed in the production path **[IMPLEMENTATION]**
+## 6. Architecture **[IMPLEMENTATION]**
 
-Three changes reach code a real candidate touches. Everything else in V6 is
-experiment harness.
+Still a modular monolith. **No new tables, no new migrations, no schema change** —
+head is `0009_v5_proposals`, nine migrations, unchanged from V5.
 
-1. **`app/adaptation/feedback/caps.py`** (moved from `experiments/`). Three cap
-   policies. `baseline_relative` is the one §9 measured as effective.
-2. **`app/adaptation/candidates/gates.py`** — `max_per_category_recall_drop`
-   (0.10) and `min_category_samples` (10), plus `_per_category_check`.
-   `evaluation.py` now scores per attack category and reports `perCategory`.
-   **Advisory when per-category data is absent**, a hard veto when supplied.
-3. **`app/adaptation/feedback/augmentation.py`** — turns a feedback dataset into
-   fittable rows; `train_candidate` appends them. Admission is positive-listed
-   on `binary_label is False`; vectors come from the stored `MLInference` row,
-   rebuilt in `feature_names` order; non-event targets and incomplete vectors
-   are skipped **and counted**.
+**The V5 invariant holds.** `registry.activate_model`, behind an approved
+proposal, remains the only write into production detection state. V5's
+deployment, registry-immutability and proposal suites pass unchanged.
 
-**No `feedback_dataset_id` means telemetry alone**, exactly as V5 — asserted by
-test. `cap_policy` defaults to **`baseline_relative`**, the policy V6 §9
-measured stops targeted poisoning; `global` is an explicit opt-out. The default
-derives its per-group baseline from prior feedback datasets, excluding the batch
-being admitted, and **refuses a cold start** rather than degrading silently —
-with no baseline every group falls to the floor, a measured 6 rows of 220, and
-§7.4 measured feedback that sparse is worse than none.
+Three modules reach the production path:
 
-**No new migrations. No schema change. No frontend change.** Head is still
-`0009_v5_proposals`; migrations round-trip base→head→base→head on SQLite.
+| Module | Why it exists |
+| --- | --- |
+| `adaptation/feedback/augmentation.py` | V5's Arm 2 could not run in production and `train_candidate` never used `feedback_dataset_id`. This adds analyst-verified benign events to the telemetry corpus |
+| `adaptation/feedback/caps.py` | A global volume cap cannot bound a **concentration** attack (§8) |
+| `adaptation/feedback/baseline_monitor.py` | The cap bounds a campaign but cannot see one. **Advisory** |
+
+`candidates/gates.py` gained two checks: **per-category recall** (§10) and
+**discrimination / ROC-AUC** (§15) — the second because the first is
+threshold-dependent and could reject a better model for a calibration shift.
+Both are **advisory when unmeasured**, never a silent pass.
+
+`app/telemetry/` has exactly one V6 change: `RawTelemetry.scenario`, provenance
+that never reaches the normalized candidate (asserted by test).
+
+**Defaults:** no `feedback_dataset_id` → telemetry alone, as V5. `cap_policy`
+defaults to `baseline_relative`, `DEFAULT_TOLERANCE` to **1.5**, and a cold start
+is **refused** rather than silently degraded.
 
 ---
 
 ## 7. Verification at checkpoint **[MEASURED]**
 
-Run immediately before writing this, on `055abfd`:
+Run immediately before writing this, on `d8e54b4`:
 
 | Check | Result |
 | --- | --- |
-| `pytest` | **660 passed** (535 at V5) |
+| `pytest` | **733 passed** (535 at V5) |
 | `ruff check .` | clean |
 | `vitest run` | **50 passed**, 8 files |
-| `eslint .` | clean (exit 0) |
 | `tsc -b --noEmit` | clean (exit 0) |
-| `vite build` | PASS (chunk-size warning, pre-existing) |
+| `eslint .` | clean (exit 0) |
+| `vite build` | PASS (chunk warning, pre-existing) |
 | Migrations base→head→base→head | PASS (SQLite), head `0009_v5_proposals` |
 
-45 test modules. New in V6: `test_adaptation_arm2.py`,
-`test_adaptation_augmentation.py`, `test_adaptation_candidate_detectors.py`,
-`test_adaptation_contamination.py`, `test_adaptation_feedback_caps.py`,
-`test_adaptation_feedback_quality.py`, `test_adaptation_production_baseline.py`,
-`test_adaptation_targeted_poisoning.py`.
+50 test modules, **13 added in V6** (`git diff --name-only --diff-filter=A 52eea0d..HEAD -- backend/app/tests/`).
 
 ---
 
-## 8. Reproducing everything
+## 8. Reproducing
 
 ```bash
-cd backend
-export DATABASE_URL="sqlite:///aegisx.db"
+cd backend && export DATABASE_URL="sqlite:///aegisx.db"
 
-python -m app.adaptation.experiments.run_adaptation_eval           --seeds 50 --max-seconds 5400
-python -m app.adaptation.experiments.run_novel_behaviour_eval      --seeds 10 --max-seconds 3600
-python -m app.adaptation.experiments.run_detector_comparison       --seeds 10 --max-seconds 5400
-python -m app.adaptation.experiments.run_contamination_eval        --seeds 10 --max-seconds 3600
-python -m app.adaptation.experiments.run_production_baseline_eval  --seeds 10 --max-seconds 3600
-python -m app.adaptation.experiments.run_arm2_eval                 --seeds 10 --max-seconds 3600
-python -m app.adaptation.experiments.run_feedback_quality_eval     --seeds 10 --max-seconds 5400
-python -m app.adaptation.experiments.run_targeted_poisoning_eval   --seeds 8  --max-seconds 5400 \
-    --targets MALWARE --cap-policy baseline_relative
+python -m app.adaptation.experiments.run_adaptation_eval              --seeds 50
+python -m app.adaptation.experiments.run_novel_behaviour_eval         --seeds 10
+python -m app.adaptation.experiments.run_detector_comparison          --seeds 10
+python -m app.adaptation.experiments.run_contamination_eval           --seeds 10
+python -m app.adaptation.experiments.run_production_baseline_eval     --seeds 10
+python -m app.adaptation.experiments.run_arm2_eval                    --seeds 10
+python -m app.adaptation.experiments.run_feedback_quality_eval        --seeds 10
+python -m app.adaptation.experiments.run_targeted_poisoning_eval      --seeds 8
+python -m app.adaptation.experiments.run_patient_poisoning_eval       --seeds 8
+python -m app.adaptation.experiments.run_matched_operating_point_eval --seeds 20 --substrate telemetry
 ```
 
-Total well under one CPU-hour. **[IMPLEMENTATION]** `app/adaptation/experiments/seeds.py`
-holds one standing seed plan in which a longer plan *extends* a shorter one, so
-`--seeds 3` still reproduces V5 exactly and every V6 run stays comparable with
-the last.
+Pass `--max-seconds 5400`; the 900 s default is too small. Total under one
+CPU-hour.
 
-**Report retention changed in V6.** Timestamped reports are now **committed** as
-immutable evidence; only the mutable `latest-*` pointers are ignored. V4 and V5
-published every number from gitignored local files.
+**Report retention changed in V6.** Timestamped reports are **committed** as
+immutable evidence — 25 of them. Only the mutable `latest-*` pointers are
+ignored. V4 and V5 published every number from gitignored files.
+
+**Seeds** come from one standing plan (`experiments/seeds.py`) in which a longer
+plan *extends* a shorter one, so `--seeds 3` still reproduces V5 exactly.
+
+**Substrates.** `prepare_corpus(substrate=...)` selects `rule-testing` (V4/V5,
+the default, nothing moves) or `telemetry` (§13's rebuild).
 
 ---
 
-## 9. What V6 did NOT do **[LIMITATION]**
+## 9. Two methodological rules V7 should not lose **[INFERENCE]**
 
-Thirteen of the brief's twenty definition-of-done items are done (item 17,
-reproducibility documentation, was paid after this list was first written).
-**These seven are not** — items 5, 6, 7, 8, 9, 10 and 11 of the brief:
+Earned the hard way, and both would have prevented most of this session:
 
-1. **No telemetry-source integration.** Track 4 was never started.
-   `backend/app/telemetry/` now has exactly one V6 change — `RawTelemetry.scenario`,
-   added in §13 so a corpus can be labelled from generator intent. It is
-   provenance and never reaches the normalized candidate, asserted by test.
-2. **No telemetry-source abstraction work.** The `TelemetrySource` ABC from V1
-   is unchanged. **The Phase A audit found `telemetry/normalizer.py` hard-codes
-   vendor schemas (`_normalize_defender` and friends); that leak is documented
-   and unfixed.** Adding a source by appending another branch would deepen it.
-3. **No PostgreSQL validation.** Docker daemon was down for the whole session;
-   no `psql`, no `pg_isready`. Everything is SQLite.
-4. **No live external provider.** No `.env`, no API key. `threatintel/providers/`
-   still has `virustotal.py` + `null.py`; nothing live was called.
-5. **No four-eyes decision.** `self_approved` is still recorded and not
-   prevented, exactly as V5 left it.
+1. **Report a threshold-free measure beside every fixed-threshold one.**
+   ROC-AUC and recall-at-a-matched-alert-budget are portable between models;
+   F1 at a constant is not, and F1 is additionally prevalence-dependent so it is
+   not comparable across corpora either.
+2. **State a corpus's contamination and prevalence before quoting any metric on
+   it.** Both were properties nobody had checked, and both silently set the
+   magnitude of every result.
+
+---
+
+## 10. What V6 did NOT do **[LIMITATION]**
+
+Thirteen of twenty definition-of-done items are done. **These seven are not** —
+items 5, 6, 7, 8, 9, 10 and 11 of the brief:
+
+1. **No telemetry-source integration.** Track 4 never started.
+2. **No telemetry-source abstraction work.** The Phase A audit found
+   `telemetry/normalizer.py` hard-codes vendor schemas (`_normalize_defender`);
+   **that leak is documented and unfixed.** Adding a source by appending another
+   branch would deepen it.
+3. **No PostgreSQL validation.** Docker was unavailable for the whole session.
+   Everything is SQLite on a laptop.
+4. **No live external provider.** No `.env`, no API key; nothing live was called.
+5. **No four-eyes decision.** `self_approved` is still recorded, not prevented.
 6. **No approval-latency measurement or simulation.**
-7. **No dashboard work.** `frontend/` is untouched — 0 files changed. Adaptive
-   SOC observability is exactly as V5 left it, and none of V6's new
-   provenance (`perCategory`, `augmentation`) is visible in the UI.
-8. ~~**Documentation debt.**~~ **Paid.** `MODEL_CARD.md` (Arm 2 corrected, the
-   misconfigured baseline flagged, the novel-behaviour claim struck through with
-   its correction), `ARCHITECTURE.md` (a V6 section and the amended flow),
-   `REPRODUCIBILITY.md` (the nine adaptation runners, the changed report
-   retention, current verification counts) and `ADAPTATION_CARD.md` (the
-   feedback-provenance fields an approver now reads) are current as of the V6
-   checkpoint. **`DETECTION.md`, `EVALUATION.md`, `EVALUATION_METHODOLOGY.md`,
-   `DATASET_CARD.md` and `README.md` were not reviewed** and may still carry
-   V4/V5 framing.
+7. **No dashboard work.** `frontend/` is untouched — 0 files changed. None of
+   V6's provenance (`perCategory`, `augmentation`, `baselineAssessment`) is
+   visible in the UI.
 
-Also unresolved, and load-bearing:
+Also load-bearing:
 
-9. **A patient adversary is contained and now visible, but only to a reader.**
-   `DEFAULT_TOLERANCE` is 1.5 (§11.4) and `feedback/baseline_monitor.py` flags a
-   group whose submissions dwarf its own history (§12), recorded on the
-   candidate as `augmentation.baselineAssessment`. It is **advisory** — nothing
-   acts on a flag. And §12.4.1 is the real caveat: the bands are calibrated
-   against a *greedy* adversary that submits its maximum every cycle. A slower
-   one may not flag at all.
-10. **`event_type` tracks attack category almost perfectly in this corpus**, so
-    §9's result **flatters the defence**. The mechanism is sound; the effect size
-    is unlikely to transfer to real telemetry where an attack spans many event
-    types.
-11. **All feedback is still simulated.** No analyst population exists. This was
-    V5's first recommendation and it remains unaddressed.
-12. Everything inherited from V4 §19 and V3 still applies.
+8. **All feedback is simulated.** No analyst population exists. V5's first
+   recommendation, still unaddressed — and now the *only* outstanding item that
+   would change what is known (§10).
+9. **The cap is conditional.** §19.2 measured it removing 96% of poison where a
+   scenario owns its `event_type` and **40%** where it hides in a high-volume
+   group. §20.3 is worse: a hidden target faces an allowance of ~597 at cycle
+   zero and needs no patience at all.
+10. **Nothing detects a campaign automatically.** `baseline_monitor` is advisory
+    and its bands were calibrated against a *greedy* adversary; a slower one may
+    not flag.
+11. **Seed counts fell** as the session went on — 50 early, 3–4 for §§19–20.
+    Directions there are clear; point estimates are not settled.
+12. **Both corpora are synthetic.** **Nothing in this project is evidence about
+    real attack traffic.** The audit did not change that; it only established
+    that the numbers were also artefacts of measurement choices.
+13. Everything inherited from V4 §19 and V3 still applies.
 
 ---
 
-## 10. Recommended next steps **[INFERENCE]**
+## 11. Recommended next steps **[INFERENCE]**
 
-Argue with the ordering; it is a judgement, not a finding.
-
-1. **Get real analyst feedback.** Every result rests on a simulator, and the
-   audit (§§14–20) has now established that magnitudes here are properties of
-   the corpus and threshold rather than of the system. This was V5's first
-   recommendation and it is now the only one that would change what is known.
-   `evaluation/datasets/telemetry_labelled.py` exists and is tested, but nothing
-   has been re-run on it. Until that happens the published numbers still sit on
-   the old corpus.
-3. **Then the telemetry track (Tracks 4/5)** — but fix the normalizer leak
-   first, or adding a source deepens it.
-4. **Real analyst feedback**, still the highest-value thing available and still
-   not done.
+1. **Get real analyst feedback.** Every result rests on a simulator, and §§14–20
+   established that magnitudes here are properties of the corpus and the
+   threshold rather than of the system. **More experiments against a simulator
+   on a synthetic corpus will keep producing numbers that do not survive the
+   next methodological check.** This is the only outstanding item that would
+   change what is *known*.
+2. **Fix the cap's grouping-key dependence** (§9.9 above). A per-analyst cap
+   would bound a compromised actor regardless of which group they target, and is
+   the obvious complement to the per-group one.
+3. **Fix the normalizer leak, then do the telemetry track.** In that order.
+4. **Surface V6's provenance in the dashboard.** Three new evidence blocks are
+   recorded on candidates and invisible to approvers.
 5. PostgreSQL and one live provider, whenever the environment permits.
 
-**[INFERENCE]** Do *not* treat §3's table as a reason to abandon adaptation. It
-says the baseline was wrong, not that feedback is worthless — the redesigned
-Arm 2 delivers a measured 23% relative FPR reduction against a *correct*
-baseline (§4). What it does mean is that any future claim of the form
-"adaptation improved X by N×" must name the baseline it improved on.
+**[INFERENCE]** Resist starting Track 4 or the agent work first. The project's
+constraint is not features; it is that its measurement substrate only just
+became trustworthy.
 
 ---
 
-## 11. Preserve these decisions
+## 12. Preserve these decisions
 
-All of V3 §16, V4's three and V5's eight (20–27) still hold and were verified by
-the V5 deployment, registry-immutability and proposal suites passing unchanged.
-V6 adds:
+All of V3 §16, V4's three and V5's eight (20–27) still hold. V6 adds:
 
-28. **A result and the artifact behind it are committed together.** V4 and V5
-    published from gitignored files; a result reproducible only from an
-    undocumented local file is not reproducible.
-29. **A longer seed plan extends a shorter one.** Resampling would invalidate
-    every published comparison.
-30. **A correction is recorded beside the original, never in place of it.** Six
-    conclusions were corrected in V6, including two of V6's own.
-31. **Aggregate metrics can hide a targeted attack.** A single-category recall
-    collapse divides by the number of categories and disappears beneath seed
-    noise. Gate per category.
-32. **A volume cap does not bound a concentration attack.** 22 rows inside a 20%
-    cap were enough. Cap per group.
+28. **A result and the artifact behind it are committed together.**
+29. **A longer seed plan extends a shorter one.** Resampling invalidates every
+    published comparison.
+30. **A correction is recorded beside the original, never in place of it.**
+    Fifteen conclusions were corrected in V6, nine of them V6's own.
+31. **Aggregate metrics can hide a targeted attack.** Gate per category.
+32. **A volume cap does not bound a concentration attack.** Cap per group — and
+    know that a per-group cap is only as good as its grouping key.
 33. **Report the defence that failed.** `per_group_absolute` neither stopped the
-    attack nor preserved honest feedback; publishing only `baseline_relative`
+    attack nor preserved honest feedback; publishing only the policy that worked
     would have made the design look inevitable.
-34. **Name the metric that hides the failure mode.** Benign-bias poisoning
-    improves FPR, F1 and ROC-AUC while costing recall. An FPR-reduction feature
-    that reports FPR cannot see its own characteristic failure.
+34. **A fixed threshold is not comparable across models fitted on different
+    data.** Report a threshold-free measure beside it.
+35. **F1 is prevalence-dependent.** It is not comparable across corpora. AUC is.
+36. **Measure the naive version before building the clever one.** The obvious
+    baseline-growth monitor watched admitted volume; measurement showed a working
+    cap erases that signal, which is why the shipped monitor reads submissions.
 
 ---
 
-## 12. First steps for a new session
+## 13. First steps for a new session
 
 1. Verify §2 and §7 yourself. Both were wrong in the V5 handoff.
-2. Read `docs/V6_RESEARCH_REPORT.md` §4 and §5 before any code.
-3. Read `docs/V5_EXPERIMENTAL_DESIGN.md` for how pre-registration was done here,
-   then §5 above for which of its conclusions did not survive.
-4. Inspect `backend/app/adaptation/feedback/{caps,augmentation}.py` and
-   `candidates/gates.py` — the only V6 code on the production path.
-5. Spot-check with
-   `python -m app.adaptation.experiments.run_production_baseline_eval --seeds 3`.
-   It should land near F1 0.65, not 0.04. If it lands near 0.04, something is
-   fitting the labelled corpus again and §3 is repeating itself.
+2. Read `docs/V6_RESEARCH_REPORT.md` **§§4, 5, 14 and 18** before any code.
+   Everything else is downstream of those four.
+3. Read **§5 of this handoff** — fifteen corrected conclusions, with what
+   replaced each.
+4. Inspect `adaptation/feedback/{augmentation,caps,baseline_monitor}.py` and
+   `candidates/gates.py`. The only V6 code on the production path.
+5. Spot-check:
+   `python -m app.adaptation.experiments.run_production_baseline_eval --seeds 3`
+   → F1 ≈ 0.65. If it lands near 0.04, something is fitting the labelled corpus
+   again and §3(a) is repeating itself.
