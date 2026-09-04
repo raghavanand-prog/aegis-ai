@@ -28,6 +28,11 @@ class Permission(str, Enum):
     INCIDENTS_CREATE = "incidents:create"
     INCIDENTS_UPDATE = "incidents:update"
     INCIDENTS_RESPOND = "incidents:respond"
+    # V9: sealing an incident is a separate authority from working one.
+    # `Closed` is terminal - nothing reopens it - so the act of closing is the
+    # last word on what the SOC concluded, and it is the one incident
+    # transition an analyst cannot take alone.
+    INCIDENTS_CLOSE = "incidents:close"
 
     # Threat intelligence / indicators
     IOCS_READ = "iocs:read"
@@ -151,6 +156,9 @@ ADMIN_PERMISSIONS: frozenset[Permission] = ANALYST_PERMISSIONS | frozenset(
         # platform detects, which is the same class of act as activating a model.
         Permission.ADAPTATION_APPROVE,
         Permission.ADAPTATION_DEPLOY,
+        # V9: see the note on the permission. Closing is terminal, so it sits
+        # with the other authorities that end something rather than change it.
+        Permission.INCIDENTS_CLOSE,
     }
 )
 

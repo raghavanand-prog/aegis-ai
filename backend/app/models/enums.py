@@ -27,10 +27,40 @@ class EventStatus(str, Enum):
 
 
 class IncidentStatus(str, Enum):
+    """The incident lifecycle.
+
+        Open -> Triaged -> Investigating -> Containment Pending -> Contained
+                                                                -> Resolved -> Closed
+
+    The four V1 values keep their exact spelling. They are what every stored
+    incident carries and what the frontend renders, and renaming ``Open`` to
+    ``New`` to match a diagram would have made every existing row unreadable by
+    its own status field for no gain - ``Open`` already means "raised, nobody
+    has assessed it yet".
+
+    The edges, the authority each one needs and the reasons it must carry live
+    in :mod:`app.incidents.lifecycle`, not here. This enum says what a state is
+    called; it deliberately says nothing about which ones may follow which.
+    """
+
+    #: Raised. Nobody has assessed it.
     OPEN = "Open"
+    #: Assessed and queued. Severity and scope have been confirmed by a person.
+    TRIAGED = "Triaged"
+    #: Actively worked.
     INVESTIGATING = "Investigating"
+    #: Containment has been decided but is not yet in effect. From V9 this is
+    #: where an incident waits while a response action is approved and executed;
+    #: until that framework exists it is set and cleared by hand.
+    CONTAINMENT_PENDING = "Containment Pending"
+    #: The threat is stopped. Not the same as fixed.
     CONTAINED = "Contained"
+    #: Remediated. The work is done and the record is still open to correction.
     RESOLVED = "Resolved"
+    #: Sealed. Terminal, and the only state with no way out - reopening a closed
+    #: incident would rewrite a decision somebody signed. Raise a new incident
+    #: instead, the same rule V5 applied to a rejected proposal.
+    CLOSED = "Closed"
 
 
 class SourceType(str, Enum):
