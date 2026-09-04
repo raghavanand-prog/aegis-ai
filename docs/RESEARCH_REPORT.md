@@ -192,6 +192,82 @@ The alert-volume column is the analyst-workload half of the trade-off: the
 Isolation Forest's 100% recall costs 987 alerts per 1,000 events, which no SOC
 can staff.
 
+### 2.6 Distribution shift — the temporal split
+
+**[MEASURED, V8]** The same corpus and the same source grouping, cut
+chronologically instead of at random: every duplicate group is placed by its
+earliest observation, so a detector is fitted on the past and evaluated on the
+future. Split fingerprint `c3a3830a9db1bce2`, seed 1337.
+
+This split was run and its artifact committed at V6, but its **detector results
+were never published in any report**. They are published here.
+
+| | Samples | Malicious | Attack density | Window |
+| --- | --- | --- | --- | --- |
+| Train | 88,417 | 1,958 | **2.21%** | 2015-01-22 11:49 → 23:33 |
+| Validation | 32,311 | 4,234 | **13.10%** | 2015-01-22 23:33 → 2015-02-18 03:38 |
+| Test | 79,798 | 16,133 | **20.22%** | 2015-02-18 03:38 → 12:21 |
+
+The prevalence shift is **real and measured, not induced**: it is a property of
+the capture, whose second day is far more hostile than its first. The split
+plan raises it as a warning on itself rather than leaving a reader to notice.
+
+**Leakage: 0.00% of the test split** shares a feature vector with any training
+sample (5.71% on validation). The temporal cut is the strictest of the three
+splits on this axis, and it is clean.
+
+| Detector | Score kind | Thresh. | TP | TN | FP | FN | Precision | Recall | F1 | FPR | MCC | ROC-AUC | PR-AUC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules only | rule hit | — | 0 | 63,665 | 0 | 16,133 | — | 0.0% | — | 0.0% | — | — | — |
+| Isolation Forest (fitted) | anomaly ranking | 0.65 | 1,525 | 46,882 | 16,783 | 14,608 | 8.3% | 9.5% | 8.9% | 26.4% | **−0.1615** | 0.6511 | 0.2429 |
+| Supervised (HGB) | probability | 0.95 | 15,095 | 62,058 | 1,607 | 1,038 | **90.4%** | **93.6%** | **91.9%** | 2.5% | 0.8988 | 0.9902 | 0.9472 |
+| Hybrid (rules OR ML) | rule hit | 0.65 | 1,525 | 46,882 | 16,783 | 14,608 | 8.3% | 9.5% | 8.9% | 26.4% | −0.1615 | — | — |
+| Hybrid (production risk) | risk 0-100 | 5.0 | 1,525 | 46,882 | 16,783 | 14,608 | 8.3% | 9.5% | 8.9% | 26.4% | −0.1615 | 0.4125 | 0.1901 |
+
+PR-AUC baseline (the test positive rate) is **0.2022**.
+
+#### The result worth the run: ranking improved and the decision inverted
+
+The Isolation Forest's **ROC-AUC rises from 0.4198 on the random split to
+0.6511 here** — from below chance to meaningfully above it. Its **MCC at the
+frozen threshold falls from +0.040 to −0.1615**, which is worse than random as
+a *decision*.
+
+Both are true at once, and they are not in tension. A negative MCC beside an
+above-chance AUC is the signature of a **misplaced threshold, not a failed
+ranking**. The threshold was frozen on a validation split whose attack density
+is 13.10%; it was then applied to a test split at 20.22%. The ordering the
+model produces got better; the fixed cut through that ordering got worse.
+
+This is V6 §14's finding arriving on real distribution shift rather than a
+simulator: **a threshold frozen on one prevalence does not transfer to
+another**, and a fixed-threshold comparison between differently-fitted models
+compares their calibrations as much as their quality. It is also the reason the
+proposal evidence panel (§10 of the V7 handoff) leads with ROC-AUC.
+
+The supervised model degrades under shift and stays useful: ROC-AUC 0.9997 →
+**0.9902**, F1 0.970 → **0.919**, MCC 0.966 → **0.899**. That is the honest
+cost of distribution shift on a model that has actually learned the boundary.
+
+The production risk path is the one unambiguous regression: **ROC-AUC 0.4125**,
+below chance, and PR-AUC 0.1901 against a 0.2022 baseline — worse than flagging
+at random. The §2.1 ceiling still holds; nothing here reaches High risk.
+
+Ablation is identical in shape to §2.4: rules contribute exactly zero, "Rules +
+ML" equals "ML only" to the sample, and the risk path at band 50 detects
+nothing.
+
+**Reproduction [MEASURED, V8].** Re-run at the V8 checkpoint on a different day
+and in a different process, the report is **identical to the V6 artifact** in
+every field except its timestamp, command string and measured latencies — same
+dataset fingerprint, same split fingerprint, same split membership, same
+confusion matrices, same MCC to four decimals. Artifacts:
+`v4-experiments-unsw-nb15-temporal-source-20260903T040811Z.json` (V6) and
+`v4-experiments-unsw-nb15-temporal-source-20260904T081318Z.json` (V8).
+Wall clock **1,911 s**; see `docs/REPRODUCIBILITY.md` §4.
+
+---
+
 ---
 
 ## 3. Results — UNSW-NB15 with feature-vector grouping
