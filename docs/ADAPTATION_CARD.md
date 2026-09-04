@@ -25,9 +25,10 @@ of the row, not a separate artifact that can drift from it.
 | **Validation** | `validation` | Gate results, or `not_validated` stated plainly |
 | **Expected impact** | `expected_impact` | Estimate; labelled as such |
 | **Risk assessment** | `risk_assessment` | |
-| **Proposed by** | `proposed_by` | `ai:` prefix where AI-drafted |
-| **Approved by** | `approved_by` | Never an `ai:`/`system:` actor — refused |
-| **Self-approved** | `self_approved` | Recorded, not prevented |
+| **Proposed by** | `proposed_by`, `proposed_by_role` | `ai:` prefix where AI-drafted; the role is the one held at the time |
+| **Approved by** | `approved_by`, `approved_by_role` | Never an `ai:`/`system:` actor — refused. The role must grant `adaptation:approve` |
+| **Rejected by / when** | `rejected_by`, `rejected_by_role`, `rejected_at` | A refusal is a decision and records its time (V7) |
+| **Self-approved** | `self_approved` | **Prevented since V7**, not merely recorded. Always `false` for anything approved from V7 on; rows decided earlier may carry `true` and keep it |
 | **Deployed by / at** | `deployed_by`, `deployed_at` | |
 | **Rollback target** | `rollback_state` | Captured at deployment |
 | **Rolled back by / why** | `rolled_back_by`, `rollback_reason` | |
@@ -50,8 +51,70 @@ inferable from the proposal row alone.
 | `skipped.notBenign` | Refused: the label did not project benign |
 | `skipped.nonEvent` | Incidents and sequences have no single feature vector |
 | `skipped.noInference` / `.incompleteVector` | No stored vector, or one missing a feature — refused, never padded |
-| `skipped.byCap` | Rows the per-group cap declined |
+| `skipped.byCap` | Rows either cap axis declined |
+| `actorCounts` | **V7.** Admitted rows per submitting analyst — the second cap axis |
+| `actorCapPolicy` | **V7.** `null` when the actor axis is off, which is the default |
 | `baselineAssessment` | Advisory campaign check (below) |
+
+### The second cap axis (V7)
+
+V6 §19.2 measured the per-group cap removing 96% of poison where a scenario
+owned its `event_type` and **40%** where it hid in a high-volume group; §20.3
+found a hidden target facing an allowance of ~597 at cycle zero, needing no
+patience at all. The V6 handoff called the cap "conditional on its grouping key".
+
+That is not a tuning problem. *Any* single-axis cap is only as good as its key,
+and `event_type` is partly attacker-influenced, so the evasion is to move.
+
+`caps.apply` now takes an optional independent **actor** axis alongside the
+group axis, and both must admit. The two are evaded by opposite behaviours:
+concentrating to stay under an actor cap means concentrating into a group, and
+spreading to stay under a group cap means spreading from one account. A campaign
+across ten event types divides its per-group footprint by ten and leaves its
+per-actor footprint exactly where it was.
+
+**Off by default**, so every published V5/V6 result reproduces unchanged.
+
+**What it does not claim:** it bounds a *compromised actor*, not a colluding set
+of them. An adversary holding several analyst accounts divides their per-actor
+footprint the same way moving between groups divided the per-group one. That is
+the honest residual; it is a harder attack to mount than the one V6 measured.
+
+---
+
+## Analyst feedback (V7)
+
+Feedback is evidence. A verdict is a conclusion drawn from evidence. Until V7
+there was nothing between them: `datasets.build` selected every current
+training-eligible row, so two analysts who disagreed about one event contributed
+**two members with opposite `binary_label`** and a model was fitted on both
+answers, silently.
+
+`adaptation/feedback/adjudication.py` is that missing step.
+
+| Rule | Why |
+| --- | --- |
+| One analyst, one voice | Their latest active row. Otherwise one person outvotes a colleague by being verbose |
+| Abstentions are counted as abstentions | `suspicious` and `uncertain` carry no position; counting either as a side records hesitation as ground truth |
+| Disagreement fails closed | Any dissent under the default policy is `CONFLICTED`, which is **not** training-eligible. A conflicted target needs a human, not arithmetic |
+| Confidence is reported, never decisive | Self-reported. Letting it settle a disagreement lets one over-confident analyst overrule two careful ones |
+
+Statuses: `unanimous`, `majority` (opt-in policy only), `conflicted`,
+`insufficient`. Only the first two are training-eligible, and only with a
+non-null binary projection.
+
+**There is no flag to turn adjudication off.** A caller who could request the
+unadjudicated selection would be asking to train on a contradiction. What was
+excluded is recorded in the snapshot's `selection.adjudication` block — a
+snapshot that quietly dropped a disputed target would hide the disagreement as
+effectively as one that trained on it.
+
+Feedback rows also now carry `analyst_id` (FK to `users`, `ON DELETE SET NULL`)
+and `analyst_role` — the role held **when the claim was made**, recorded rather
+than joined, because roles change and a join would retroactively restate every
+past claim in terms of today's permissions. Both are nullable, and a null is a
+fact: simulated feedback has no account, and minting one would make a generated
+claim indistinguishable from a human's.
 
 ### Reading `baselineAssessment`
 

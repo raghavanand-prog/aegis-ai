@@ -19,6 +19,7 @@ from collections import Counter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adaptation.feedback import adjudication
 from app.adaptation.feedback.labels import FeedbackLabel
 from app.models.adaptation import AnalystFeedback, FeedbackDataset, FeedbackDatasetMember
 
@@ -77,13 +78,27 @@ def build(
     feature_schema_version: str | None = None,
     analysts: list[str] | None = None,
     notes: str | None = None,
+    adjudication_policy: str = adjudication.POLICY_UNANIMOUS,
 ) -> FeedbackDataset:
-    """Snapshot the current training-eligible feedback.
+    """Snapshot the current *adjudicated* training-eligible feedback.
 
     Rebuilding an identical selection returns the existing snapshot rather than
     creating a duplicate: same data, same fingerprint, same dataset. Rebuilding
     a *different* selection under a name and version already in use is refused,
     because two different datasets cannot both be "v1.0".
+
+    **Adjudication is not optional (V7).** Before V7 this function selected every
+    current training-eligible row and made each one a member, so two analysts
+    who disagreed about one event contributed two members with opposite
+    ``binary_label`` and a model was fitted on both answers. Now the rows are
+    grouped by target and adjudicated first, and a target whose analysts do not
+    agree contributes **nothing**. There is deliberately no flag to turn that
+    off: a caller who could ask for the unadjudicated selection would be asking
+    to train on a contradiction, and the honest answer to that request is no.
+
+    What was excluded, and why, is recorded in ``selection`` - a snapshot that
+    silently dropped a disputed target would hide the disagreement just as
+    effectively as one that trained on it.
     """
     rows = _select_feedback(
         db,
@@ -97,6 +112,37 @@ def build(
             "Labels such as 'suspicious' and 'uncertain' are deliberately not "
             "eligible, and superseded claims are excluded."
         )
+
+    verdicts = adjudication.adjudicate_rows(rows, policy=adjudication_policy)
+    conflicted = sorted(
+        f"{key[0]}:{key[1]}"
+        for key, verdict in verdicts.items()
+        if verdict.status is adjudication.ConsensusStatus.CONFLICTED
+    )
+
+    # A row survives only if its target reached a verdict *and* the row agrees
+    # with it. The second half matters under the majority policy, where the
+    # dissenting minority's rows must not travel into the training set on the
+    # strength of a verdict that went against them.
+    admitted: list[AnalystFeedback] = []
+    for row in rows:
+        verdict = verdicts[(row.target_type, row.target_id)]
+        if not verdict.is_training_eligible:
+            continue
+        if FeedbackLabel(row.label).binary_label is not verdict.binary_label:
+            continue
+        admitted.append(row)
+
+    if not admitted:
+        raise ValueError(
+            "Refusing to build a dataset with no adjudicated feedback: every "
+            f"selected target is unresolved ({len(conflicted)} conflicted of "
+            f"{len(verdicts)}). Analyst disagreement is a signal that those "
+            "targets need a human, not a label to pick between."
+        )
+
+    excluded_rows = len(rows) - len(admitted)
+    rows = admitted
 
     schemas = {row.feature_schema_version for row in rows}
     if len(schemas) > 1:
@@ -138,6 +184,15 @@ def build(
             "analysts": analysts,
             "featureSchemaVersion": feature_schema_version,
             "eligibleLabels": list(TRAINING_ELIGIBLE_LABELS),
+            # V7. Which targets were adjudicated away, and under what rule.
+            # Without this a snapshot records what it contains but not what the
+            # SOC disagreed about, and the disagreement is the interesting part.
+            "adjudication": {
+                "policy": adjudication_policy,
+                "targets": len(verdicts),
+                "conflictedTargets": conflicted,
+                "excludedRows": excluded_rows,
+            },
         },
         created_by=created_by,
         notes=notes,

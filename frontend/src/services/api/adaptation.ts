@@ -128,13 +128,28 @@ export interface Proposal {
   rejectedBy: string | null;
   deployedBy: string | null;
   rolledBackBy: string | null;
-  /** Surfaced, never hidden: the same person proposed and approved. */
+  /**
+   * V7. The role each actor held when they acted — the authority a decision was
+   * made under, not the authority its author holds today. Null on rows written
+   * before V7, which is a fact about them rather than a gap.
+   */
+  proposedByRole: string | null;
+  approvedByRole: string | null;
+  rejectedByRole: string | null;
+  /**
+   * Always false for anything approved from V7 onwards: `proposals.approve`
+   * refuses a self-approval rather than flagging it. Still rendered, because
+   * rows approved before V7 may carry true and an approver reading old history
+   * should see what actually happened.
+   */
   selfApproved: boolean;
   rejectionReason: string | null;
   rollbackReason: string | null;
   rollbackState: Record<string, unknown>;
   createdAt: string;
   approvedAt: string | null;
+  /** V7. Every other terminal decision recorded its time; rejection did not. */
+  rejectedAt: string | null;
   deployedAt: string | null;
   rolledBackAt: string | null;
 }

@@ -127,7 +127,7 @@ class TestApprovalMarksTheModelApproved:
 
         candidate = _candidate(db, tmp_path)
         proposal = _model_proposal(db, candidate)
-        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
         db.refresh(candidate)
 
         assert candidate.status == MLModelStatus.APPROVED.value
@@ -157,7 +157,7 @@ class TestDeployment:
 
         candidate = _candidate(db, tmp_path)
         proposal = _model_proposal(db, candidate)
-        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
         deployment.deploy(db, proposal.id, deployed_by="admin@aegisx.dev")
 
@@ -194,7 +194,7 @@ class TestDeployment:
 
         candidate = _candidate(db, tmp_path)
         proposal = _model_proposal(db, candidate)
-        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
         before = registry.get_active(db, candidate.name)
 
         Path(candidate.artifact_path).write_bytes(b"tampered")
@@ -216,7 +216,7 @@ class TestRollback:
         candidate = _candidate(db, tmp_path)
         previous = registry.get_active(db, candidate.name)
         proposal = _model_proposal(db, candidate)
-        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
         deployment.deploy(db, proposal.id, deployed_by="admin@aegisx.dev")
 
         deployment.rollback(
@@ -237,7 +237,7 @@ class TestRollback:
 
         candidate = _candidate(db, tmp_path)
         proposal = _model_proposal(db, candidate)
-        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev")
+        proposals.approve(db, proposal.id, approved_by="admin@aegisx.dev", approver_role="admin")
 
         with pytest.raises(ValueError, match="deployed"):
             deployment.rollback(
@@ -303,7 +303,11 @@ class TestDeploymentAPI:
         assert response.status_code == 409
 
     def test_deployment_and_rollback_are_audited(self, client, auth_headers) -> None:
-        created = _api_proposal(client, auth_headers)
+        # The analyst raises it and the administrator approves: V7 forbids one
+        # actor doing both, so the realistic split is now the only one that
+        # reaches deployment at all.
+        analyst = _analyst_headers(client, auth_headers)
+        created = _api_proposal(client, analyst)
         client.post(
             f"/api/v1/adaptation/proposals/{created['id']}/approve", headers=auth_headers
         )
