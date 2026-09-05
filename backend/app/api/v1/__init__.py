@@ -18,6 +18,7 @@ from app.api.v1 import (
     iocs,
     ml,
     notifications,
+    providers,
     response_actions,
     sequences,
     telemetry,
@@ -39,6 +40,8 @@ api_router.include_router(decisions.router)
 # V9 Phase E: requesting containment, and a second person deciding on it.
 # Nothing here executes an action.
 api_router.include_router(response_actions.router)
+# V9 Phase F: which evidence sources are answering, and which are degraded.
+api_router.include_router(providers.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)
