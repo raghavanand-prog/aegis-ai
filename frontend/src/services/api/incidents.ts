@@ -117,3 +117,38 @@ export async function recordResponseAction(
   });
   return toUiIncident(data);
 }
+
+/** One state an incident may move to, and what that would take (V9). */
+export interface ApiTransitionOption {
+  target: IncidentStatus;
+  requiresReason: boolean;
+  requiredPermission: string;
+  /** Whether the signed-in role holds that permission. */
+  permitted: boolean;
+  /** Whether taking this edge records an evidence binding. */
+  bindsEvidence: boolean;
+}
+
+export interface ApiIncidentTransitions {
+  incidentId: string;
+  currentStatus: IncidentStatus;
+  isTerminal: boolean;
+  options: ApiTransitionOption[];
+}
+
+/**
+ * What this incident may become.
+ *
+ * Asked of the server rather than restated here. The lifecycle graph, which
+ * edges need a reason and which need which permission all live in
+ * `app/incidents/lifecycle.py`; a second copy in TypeScript would drift, and
+ * the copy that drifts is the one users see.
+ */
+export async function fetchIncidentTransitions(
+  incidentId: string,
+): Promise<ApiIncidentTransitions> {
+  const { data } = await api.get<ApiIncidentTransitions>(
+    `/incidents/${incidentId}/transitions`,
+  );
+  return data;
+}
