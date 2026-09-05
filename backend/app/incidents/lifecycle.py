@@ -40,6 +40,7 @@ in place, it is superseded by a new record.
 
 from __future__ import annotations
 
+from app.core import actors
 from app.core.rbac import Permission, has_permission
 from app.models.enums import IncidentStatus
 
@@ -139,10 +140,9 @@ _CONTAINMENT_TARGETS: frozenset[IncidentStatus] = frozenset(
     {IncidentStatus.CONTAINMENT_PENDING, IncidentStatus.CONTAINED}
 )
 
-#: Actor prefixes that are not people. V7 established this for adaptation
-#: approvals; the same reasoning applies to containment and closure. A machine
-#: may recommend either, and the recommendation is not the act.
-_NON_HUMAN_ACTOR_PREFIXES = ("ai:", "system:", "automation:")
+# The non-human actor rule lives in `app.core.actors`. It was defined here at
+# Phase B and separately in `adaptation/proposals/service.py` at V7, and the two
+# had drifted - see that module. One definition now, three consumers.
 
 
 # --- Queries --------------------------------------------------------------
@@ -210,11 +210,10 @@ def requires_reason(
 def is_human_actor(actor: str) -> bool:
     """Whether the actor string names a person rather than a process.
 
-    Folded for case and surrounding whitespace, for the reason V7 gave: a
-    separation-of-duties check that ``AI:Analyst`` defeats is not a check.
+    Re-exported from :mod:`app.core.actors` so existing callers keep working;
+    the rule itself is defined once, there.
     """
-    normalized = (actor or "").strip().casefold()
-    return not any(normalized.startswith(prefix) for prefix in _NON_HUMAN_ACTOR_PREFIXES)
+    return actors.is_human_actor(actor)
 
 
 # --- The gate -------------------------------------------------------------

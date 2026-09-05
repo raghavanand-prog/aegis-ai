@@ -60,6 +60,12 @@ const VERDICTS: Record<
   },
 };
 
+/** Readable names for the decisions that are not lifecycle transitions. */
+const DECISION_TYPE_LABELS: Record<string, string> = {
+  "response_action.approval": "Containment approved",
+  "response_action.rejection": "Containment refused",
+};
+
 function VerdictBadge({ verdict }: { verdict: DriftVerdict }) {
   const style = VERDICTS[verdict] ?? VERDICTS.tampered;
   const { Icon } = style;
@@ -85,7 +91,21 @@ function DecisionRow({ binding }: { binding: ApiDecisionBinding }) {
           {binding.fromState ? `${binding.fromState} → ` : ""}
           <span className="font-medium">{binding.toState}</span>
         </p>
-        <VerdictBadge verdict={drift.verdict} />
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {/* A response-action approval and a status change are both bindings
+              and read identically without this - "requested → approved" could
+              be either. Only shown when it is not a lifecycle change, so the
+              common case stays uncluttered. */}
+          {binding.decisionType !== "incident.status_change" && (
+            <span
+              title={`Decision type: ${binding.decisionType}`}
+              className="rounded-full border border-slate-600/40 bg-slate-700/30 px-2 py-0.5 text-[10px] text-slate-300"
+            >
+              {DECISION_TYPE_LABELS[binding.decisionType] ?? binding.decisionType}
+            </span>
+          )}
+          <VerdictBadge verdict={drift.verdict} />
+        </div>
       </div>
 
       <p className="text-[11px] text-slate-500">

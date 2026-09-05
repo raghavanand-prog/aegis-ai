@@ -161,6 +161,36 @@ describe("DecisionIntegrity", () => {
     expect(screen.getByText(/1 item added since/)).toBeInTheDocument();
   });
 
+  it("distinguishes a containment approval from a status change", () => {
+    // Both are bindings and both read "requested → approved" or
+    // "Investigating → Contained" without a label; an approver reviewing the
+    // record needs to know which kind of decision they are looking at.
+    renderWithProviders(
+      <DecisionIntegrity
+        decisions={list({
+          items: [
+            binding({
+              decisionType: "response_action.approval",
+              fromState: "requested",
+              toState: "approved",
+            }),
+          ],
+        })}
+        isLoading={false}
+        isError={false}
+      />,
+    );
+    expect(screen.getByText("Containment approved")).toBeInTheDocument();
+  });
+
+  it("does not clutter an ordinary lifecycle decision with a type badge", () => {
+    renderWithProviders(
+      <DecisionIntegrity decisions={list()} isLoading={false} isError={false} />,
+    );
+    expect(screen.queryByText(/Containment approved/)).not.toBeInTheDocument();
+    expect(screen.queryByText("incident.status_change")).not.toBeInTheDocument();
+  });
+
   it("surfaces a decision taken while a provider was unreachable", () => {
     renderWithProviders(
       <DecisionIntegrity

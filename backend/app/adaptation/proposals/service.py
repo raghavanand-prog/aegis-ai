@@ -123,19 +123,17 @@ def _require(db: Session, proposal_id: int) -> AdaptationProposal:
     return proposal
 
 
-#: Actors that may never approve. The AI drafts proposals; letting it also
-#: approve one would make "human approval" a string the machine can write.
-_NON_HUMAN_ACTOR_PREFIXES = ("ai:", "system:", "automation:")
+# Actors that may never approve. The AI drafts proposals; letting it also
+# approve one would make "human approval" a string the machine can write.
+#
+# **V9 fixed a real gap here.** This module compared the raw string against the
+# prefixes while `_same_actor` two lines below folded case, so `AI:analyst`
+# passed the non-human check and `ai:analyst` did not. Both now use the one
+# definition in `app.core.actors`, which folds first.
+from app.core import actors  # noqa: E402 - kept beside the note that explains it
 
-
-def _same_actor(left: str, right: str | None) -> bool:
-    """Whether two actor strings name the same person.
-
-    Case- and whitespace-insensitive, because actors are email addresses and
-    ``Admin@Aegisx.dev`` is the same account as ``admin@aegisx.dev``. A
-    comparison that missed that would let four-eyes be defeated with a shift key.
-    """
-    return left.strip().casefold() == (right or "").strip().casefold()
+is_human_actor = actors.is_human_actor
+_same_actor = actors.same_actor
 
 
 def _require_approver_authority(role: str | None) -> None:
@@ -177,7 +175,7 @@ def approve(
     ``approver_role`` is required and not inferred: an approval whose authority
     cannot be stated is not an approval.
     """
-    if any(approved_by.startswith(prefix) for prefix in _NON_HUMAN_ACTOR_PREFIXES):
+    if not actors.is_human_actor(approved_by):
         raise ValueError(
             f"{approved_by!r} is not a human actor and cannot approve an "
             "adaptation. AI may draft a proposal; only a person may accept one."

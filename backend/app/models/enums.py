@@ -204,6 +204,14 @@ class AuditAction(str, Enum):
     # evidence that moved since the decider reviewed it.
     DECISION_EVIDENCE_BOUND = "decision.evidence_bound"
     DECISION_EVIDENCE_STALE = "decision.evidence_stale"
+    # V9 Phase E: the response-action approval trail. A refusal is audited
+    # as well as an approval - an attempt to sign off containment against
+    # stale evidence, or by the person who asked for it, is exactly the
+    # event a reviewer wants to find later.
+    RESPONSE_ACTION_REQUESTED = "response_action.requested"
+    RESPONSE_ACTION_APPROVED = "response_action.approved"
+    RESPONSE_ACTION_REJECTED = "response_action.rejected"
+    RESPONSE_ACTION_REFUSED = "response_action.refused"
     DETECTION_EVALUATION_RUN = "detection.evaluation_run"
     # --- V3: AI / ML / enrichment -----------------------------------------
     ML_MODEL_TRAINED = "ml.model_trained"
