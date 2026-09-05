@@ -15,8 +15,46 @@ vi.mock("@/services/api/incidents", async () => {
   const actual = await vi.importActual<typeof import("@/services/api/incidents")>(
     "@/services/api/incidents",
   );
-  return { ...actual, fetchIncidents: (...args: unknown[]) => fetchIncidents(...args) };
+  return {
+    ...actual,
+    fetchIncidents: (...args: unknown[]) => fetchIncidents(...args),
+    // V9 Phase I: the workspace asks the server what this incident may become
+    // rather than restating the lifecycle graph in TypeScript.
+    fetchIncidentTransitions: vi.fn().mockResolvedValue({
+      incidentId: "INC-1024",
+      currentStatus: "Open",
+      isTerminal: false,
+      options: [
+        {
+          target: "Investigating",
+          requiresReason: false,
+          requiredPermission: "incidents:update",
+          permitted: true,
+          bindsEvidence: false,
+        },
+        {
+          target: "Resolved",
+          requiresReason: true,
+          requiredPermission: "incidents:update",
+          permitted: true,
+          bindsEvidence: true,
+        },
+      ],
+    }),
+  };
 });
+
+vi.mock("@/services/api/responseActions", () => ({
+  fetchResponseActions: vi.fn().mockResolvedValue({
+    incidentId: "INC-1024",
+    total: 0,
+    pending: 0,
+    items: [],
+  }),
+  requestResponseAction: vi.fn(),
+  approveResponseAction: vi.fn(),
+  rejectResponseAction: vi.fn(),
+}));
 
 // The V3 workspace fetches the incident itself rather than trusting the list
 // row it was opened from, so the detail request is stubbed here.
@@ -249,6 +287,35 @@ describe("Incident rendering", () => {
     expect(within(workspace).getByText(/Behavioural Sequence/)).toBeInTheDocument();
     expect(
       within(workspace).getByText(/Endpoint agent reported mass encryption/),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the lifecycle transitions the server says are legal", async () => {
+    // V9 Phase I wiring. The workspace had no status control at all before
+    // this, which is why the evidence-freshness check behind it had never been
+    // reachable by a click.
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText("Ransomware activity detected"));
+    const workspace = await screen.findByRole("complementary");
+
+    expect(
+      await within(workspace).findByRole("button", { name: "Investigating" }),
+    ).toBeInTheDocument();
+    expect(within(workspace).getByRole("button", { name: "Resolved" })).toBeInTheDocument();
+  });
+
+  it("exposes the response-action panel", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText("Ransomware activity detected"));
+    const workspace = await screen.findByRole("complementary");
+
+    await user.click(within(workspace).getByRole("tab", { name: /Response/ }));
+    expect(
+      await within(workspace).findByText(/Nothing here is executed/i),
     ).toBeInTheDocument();
   });
 
