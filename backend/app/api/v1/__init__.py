@@ -18,6 +18,7 @@ from app.api.v1 import (
     iocs,
     ml,
     notifications,
+    response_actions,
     sequences,
     telemetry,
     threat_intel,
@@ -35,6 +36,9 @@ api_router.include_router(evidence.router)
 # V9: what evidence each consequential decision was taken on, and whether
 # it still holds.
 api_router.include_router(decisions.router)
+# V9 Phase E: requesting containment, and a second person deciding on it.
+# Nothing here executes an action.
+api_router.include_router(response_actions.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)

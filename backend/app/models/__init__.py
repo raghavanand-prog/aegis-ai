@@ -25,6 +25,7 @@ from app.models.incident import Incident
 from app.models.ioc import IOC, event_iocs, incident_iocs
 from app.models.ml import MLInference, MLModel
 from app.models.notification import Notification
+from app.models.response_action import ResponseActionRequest
 from app.models.sequence import SecuritySequence, sequence_events
 from app.models.threat_intel import ThreatIntelResult
 from app.models.user import User
@@ -49,6 +50,7 @@ __all__ = [
     "MLInference",
     "MLModel",
     "Notification",
+    "ResponseActionRequest",
     "SecuritySequence",
     "ThreatIntelResult",
     "TimestampMixin",
