@@ -84,9 +84,15 @@ class EvidenceProvider(ABC):
         return HEALTHY
 
     def describe(self) -> dict[str, Any]:
+        """The static facts about this provider.
+
+        Health is deliberately **not** included. Asking a broken provider how
+        it is can raise, and the registry is the layer that can contain that -
+        see ``registry._health_of``. A ``describe`` that called ``health``
+        would hand every caller an unguarded copy of the same hazard.
+        """
         return {
             "name": self.name,
             "produces": [kind.value for kind in self.produces],
             "isExternal": self.is_external,
-            "health": self.health().to_dict(),
         }
