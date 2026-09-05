@@ -89,3 +89,27 @@ class IncidentRead(CamelModel):
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
+
+
+class TransitionOption(CamelModel):
+    """One state this incident could move to, and what that would take."""
+
+    target: IncidentStatus
+    #: Whether the lifecycle demands a reason for this edge.
+    requires_reason: bool
+    #: The permission the edge needs.
+    required_permission: str
+    #: Whether the *calling* user holds it. False options are still listed, so
+    #: the UI can show what exists and say who may do it rather than silently
+    #: hiding half the lifecycle.
+    permitted: bool
+    #: Whether taking this edge records an evidence binding, so the UI knows to
+    #: state which evidence the decision was taken on.
+    binds_evidence: bool
+
+
+class IncidentTransitions(CamelModel):
+    incident_id: str
+    current_status: IncidentStatus
+    is_terminal: bool
+    options: list[TransitionOption] = Field(default_factory=list)

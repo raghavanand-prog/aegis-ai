@@ -9,12 +9,17 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import client_ip, require
 from app.core.database import get_db
-from app.core.rbac import Permission
+from app.core.rbac import Permission, has_permission
 from app.incidents import lifecycle
 from app.models.enums import AuditAction, IncidentStatus, Severity
 from app.models.user import User
-from app.schemas.common import Page
-from app.schemas.incident import IncidentCreate, IncidentRead, IncidentUpdate
+from app.schemas.common import Message, Page
+from app.schemas.incident import (
+    IncidentCreate,
+    IncidentRead,
+    IncidentTransitions,
+    IncidentUpdate,
+)
 from app.services import (
     audit_service,
     decision_service,
@@ -128,6 +133,51 @@ def update_incident(
         raise HTTPException(status_code=_LIFECYCLE_STATUS[type(exc)], detail=str(exc)) from exc
     db.commit()
     return incident_to_schema(incident)
+
+
+@router.get(
+    "/{incident_id}/transitions",
+    response_model=IncidentTransitions,
+    summary="What this incident may become, and what that would take",
+    description=(
+        "Derived from the lifecycle rules themselves rather than restated, so a client "
+        "cannot drift from what the server will actually allow. Options the caller may "
+        "not take are listed with `permitted: false` rather than omitted - a UI that "
+        "silently hides half the lifecycle teaches its users the wrong model of it."
+    ),
+    responses={404: {"model": Message, "description": "Unknown incident"}},
+)
+def incident_transitions(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require(Permission.INCIDENTS_READ)),
+) -> IncidentTransitions:
+    incident = incident_service.get_incident(db, incident_id)
+    if incident is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found")
+
+    current = lifecycle.parse(incident.status)
+    options = []
+    for target in sorted(lifecycle.allowed_transitions(current), key=lambda s: s.value):
+        permission = lifecycle.required_permission(current, target)
+        options.append(
+            {
+                "target": target,
+                "requiresReason": lifecycle.requires_reason(current, target),
+                "requiredPermission": permission.value,
+                "permitted": has_permission(user.role, permission),
+                "bindsEvidence": decision_service.is_consequential(current.value, target),
+            }
+        )
+
+    return IncidentTransitions.model_validate(
+        {
+            "incidentId": incident.incident_id,
+            "currentStatus": current,
+            "isTerminal": lifecycle.is_terminal(current),
+            "options": options,
+        }
+    )
 
 
 @router.post("/{incident_id}/response", response_model=IncidentRead)
