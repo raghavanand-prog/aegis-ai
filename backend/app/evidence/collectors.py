@@ -47,13 +47,41 @@ from app.evidence.models import (
     Integrity,
     Provenance,
 )
-from app.evidence.provider import EvidenceProvider
+from app.evidence.provider import HEALTHY, EvidenceProvider, ProviderHealth
 from app.evidence.registry import register
 
 #: Bounds, for the same reason ``app.ai.evidence`` has them: an incident with
 #: ten thousand linked events must not produce a response nothing can render.
 MAX_EVENTS = 200
 MAX_ITEMS_PER_PROVIDER = 500
+
+
+def _subsystem_health(probe_name: str) -> ProviderHealth:
+    """Translate a subsystem probe into this provider's health.
+
+    Imported inside the call rather than at module scope: ``health_service``
+    reaches into the ML engine, the AI service and the threat-intelligence
+    client, and a top-level import would drag all three into every module that
+    merely wants to describe an evidence item.
+
+    Looked up by name on the module so that a probe monkeypatched in a test -
+    or, later, swapped for a different implementation - is seen here too. Two
+    opinions about whether the anomaly model is loaded is precisely the
+    divergence this indirection exists to prevent.
+    """
+    from app.services import health_service
+
+    state = getattr(health_service, probe_name)()
+    if state["status"] == health_service.HEALTHY:
+        return HEALTHY
+    return ProviderHealth(
+        status=state["status"],
+        # A probe always explains a non-healthy status, but this provider is
+        # not the place to discover it did not: an unexplained degradation
+        # would raise out of ProviderHealth and take the page with it.
+        reason=state.get("reason")
+        or f"The {probe_name.removesuffix('_health')} subsystem is {state['status']}.",
+    )
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -162,6 +190,17 @@ class MLEvidenceProvider(EvidenceProvider):
     name = "aegisx.ml"
     produces = (EvidenceKind.ML_INFERENCE,)
 
+    def health(self) -> ProviderHealth:
+        """Degraded when no anomaly model is loaded.
+
+        This is the provider that made the case for Phase F. A SOC running on
+        rules alone is a supported mode, so the engine reports *degraded* and
+        this projection returns nothing - and until now it reported nothing
+        while claiming to be healthy, which reads as "the model looked and
+        found no anomalies". Those are opposite conclusions.
+        """
+        return _subsystem_health("ml_health")
+
     def collect(self, db: Any, incident: Any) -> list[EvidenceItem]:
         items = []
         for event in _events(incident):
@@ -258,6 +297,15 @@ class ThreatIntelEvidenceProvider(EvidenceProvider):
 
     name = "aegisx.threatintel"
     produces = (EvidenceKind.THREAT_INTEL,)
+
+    def health(self) -> ProviderHealth:
+        """Degraded when no intelligence provider is configured.
+
+        Cached verdicts from a previously configured provider still project, so
+        this can be degraded and non-empty at once. That combination is the
+        honest one: the rows are real, and nothing new can be looked up.
+        """
+        return _subsystem_health("threat_intel_health")
 
     def collect(self, db: Any, incident: Any) -> list[EvidenceItem]:
         items = []
@@ -375,6 +423,14 @@ class AIAnalysisEvidenceProvider(EvidenceProvider):
 
     name = "aegisx.ai"
     produces = (EvidenceKind.AI_ANALYSIS,)
+
+    def health(self) -> ProviderHealth:
+        """Degraded when no AI provider is available.
+
+        Past analyses remain readable when the provider goes away - they are
+        rows, not calls - so this too can be degraded with evidence present.
+        """
+        return _subsystem_health("ai_health")
 
     def collect(self, db: Any, incident: Any) -> list[EvidenceItem]:
         items = []

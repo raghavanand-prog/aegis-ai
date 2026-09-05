@@ -40,8 +40,35 @@ def get(name: str) -> EvidenceProvider | None:
     return next((provider for provider in providers() if provider.name == name), None)
 
 
+def _health_of(provider: EvidenceProvider) -> ProviderHealth:
+    """A provider's health, or ``unavailable`` if asking raised.
+
+    ``collect()`` was guarded from the start; ``health()`` was not. That left
+    the one method whose entire job is to report brokenness able to break the
+    page instead - and the listing an operator opens *because* something is
+    wrong was the most likely place for it to happen.
+    """
+    try:
+        return provider.health()
+    except Exception as exc:  # noqa: BLE001 - reporting brokenness must not break
+        logger.warning(
+            "evidence provider health check failed",
+            extra={"provider": provider.name, "error": type(exc).__name__},
+        )
+        # Type only, for the same reason collect_all withholds the message:
+        # exception text can carry row content and this renders in a browser.
+        return ProviderHealth(
+            status="unavailable",
+            reason=f"Health check raised {type(exc).__name__}.",
+        )
+
+
 def describe() -> list[dict[str, Any]]:
-    return [provider.describe() for provider in providers()]
+    """Every provider, what it produces, and what state it is in."""
+    return [
+        {**provider.describe(), "health": _health_of(provider).to_dict()}
+        for provider in providers()
+    ]
 
 
 def collect_all(db: Any, incident: Any) -> tuple[list[EvidenceItem], list[dict[str, Any]]]:
@@ -74,7 +101,7 @@ def collect_all(db: Any, incident: Any) -> tuple[list[EvidenceItem], list[dict[s
             )
             continue
 
-        health = provider.health()
+        health = _health_of(provider)
         if health.status != "healthy":
             degraded.append({"provider": provider.name, **health.to_dict()})
         items.extend(collected)
