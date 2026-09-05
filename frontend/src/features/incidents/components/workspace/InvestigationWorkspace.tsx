@@ -9,11 +9,13 @@ import {
   Globe,
   Layers,
   Network,
+  ShieldAlert,
   Sparkles,
   X,
 } from "lucide-react";
 
 import { ErrorState, LoadingState } from "@/components/ui";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { usePermissions } from "@/features/auth/hooks/usePermissions";
 import RiskBreakdown from "@/features/detection/components/RiskBreakdown";
 import { fetchAIAnalyses, fetchAIStatus, requestAIAnalysis } from "@/services/api/ai";
@@ -21,6 +23,13 @@ import type { AIAnalysisKind } from "@/services/api/ai";
 import { api } from "@/services/api/client";
 import { fetchIncidentDecisions } from "@/services/api/decisions";
 import { fetchIncidentEvidence } from "@/services/api/evidence";
+import { fetchIncidentTransitions, updateIncident } from "@/services/api/incidents";
+import {
+  approveResponseAction,
+  fetchResponseActions,
+  rejectResponseAction,
+  requestResponseAction,
+} from "@/services/api/responseActions";
 import { fetchIncidentMLFindings, fetchMLStatus } from "@/services/api/ml";
 import {
   enrichIndicator,
@@ -33,7 +42,9 @@ import type { ApiIncident } from "@/services/api/types";
 import AIAnalystPanel from "../AIAnalystPanel";
 import EvidenceTab from "./EvidenceTab";
 import IntelTab from "./IntelTab";
+import LifecycleControl from "./LifecycleControl";
 import MitreTab from "./MitreTab";
+import ResponseActions from "./ResponseActions";
 import SequenceTab from "./SequenceTab";
 
 /**
@@ -57,6 +68,7 @@ const TABS = [
   { id: "intel", label: "Threat Intel", icon: Globe },
   { id: "correlation", label: "Correlation", icon: Network },
   { id: "mitre", label: "MITRE", icon: Crosshair },
+  { id: "response", label: "Response", icon: ShieldAlert },
   { id: "ai", label: "AI Analyst", icon: Bot },
   { id: "raw", label: "Raw", icon: FileText },
 ] as const;
@@ -78,6 +90,9 @@ export default function InvestigationWorkspace({
   const [enriching, setEnriching] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { can } = usePermissions();
+  // Four-eyes is the backend's rule; the email is only so the UI does not
+  // offer a button that would always be refused.
+  const { user } = useAuth();
 
   const enabled = Boolean(open && incidentId);
 
@@ -108,6 +123,106 @@ export default function InvestigationWorkspace({
     queryKey: ["incident", incidentId, "decisions"],
     queryFn: () => fetchIncidentDecisions(incidentId as string),
     enabled,
+  });
+
+  // V9 Phase I: what this incident may become, asked of the backend rather
+  // than restated here - see LifecycleControl.
+  const transitionsQuery = useQuery({
+    queryKey: ["incident", incidentId, "transitions"],
+    queryFn: () => fetchIncidentTransitions(incidentId as string),
+    enabled,
+  });
+
+  const responseActionsQuery = useQuery({
+    queryKey: ["incident", incidentId, "response-actions"],
+    queryFn: () => fetchResponseActions(incidentId as string),
+    enabled,
+  });
+
+  // One place to surface a server refusal. These messages explain what to do
+  // next - "the evidence has changed since it was last loaded", "you raised
+  // this request" - so they are shown verbatim rather than replaced with a
+  // generic failure.
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  function refuse(error: unknown): void {
+    const detail = (error as { response?: { data?: { detail?: unknown } } })
+      ?.response?.data?.detail;
+    setActionError(
+      typeof detail === "string"
+        ? detail
+        : "The request was refused and no reason was given.",
+    );
+  }
+
+  function refreshIncident(): void {
+    setActionError(null);
+    void queryClient.invalidateQueries({ queryKey: ["incident", incidentId] });
+    void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+  }
+
+  const transitionMutation = useMutation({
+    mutationFn: ({ target, reason }: { target: string; reason: string }) =>
+      updateIncident(incidentId as string, {
+        status: target as never,
+        statusReason: reason.trim() || undefined,
+        // The manifest the workspace actually rendered. A 409 then means
+        // precisely "the evidence moved between you reading it and clicking".
+        expectedEvidenceDigest: evidenceQuery.data?.manifestDigest,
+      }),
+    onSuccess: refreshIncident,
+    onError: refuse,
+  });
+
+  const requestActionMutation = useMutation({
+    mutationFn: (input: Parameters<typeof requestResponseAction>[1]) =>
+      requestResponseAction(incidentId as string, input),
+    onSuccess: refreshIncident,
+    onError: refuse,
+  });
+
+  const approveActionMutation = useMutation({
+    mutationFn: ({
+      ref,
+      reason,
+      digest,
+    }: {
+      ref: string;
+      reason: string;
+      digest: string;
+    }) =>
+      approveResponseAction(incidentId as string, ref, {
+        // Required by the server for an approval, unlike a lifecycle
+        // transition where it is optional.
+        expectedEvidenceDigest: digest,
+        reason: reason.trim() || undefined,
+      }),
+    onSuccess: refreshIncident,
+    onError: refuse,
+  });
+
+  /**
+   * Approving states which evidence the approver was given, so there has to be
+   * some. Sending an empty digest would earn a 422 whose body is a validation
+   * list rather than a sentence, and the analyst would be told nothing useful.
+   */
+  function approve(ref: string, reason: string): void {
+    const digest = evidenceQuery.data?.manifestDigest;
+    if (!digest) {
+      setActionError(
+        "The evidence for this incident has not loaded, so there is nothing " +
+          "for this approval to be recorded against. Reload and try again.",
+      );
+      return;
+    }
+    approveActionMutation.mutate({ ref, reason, digest });
+  }
+
+  const rejectActionMutation = useMutation({
+    mutationFn: ({ ref, reason }: { ref: string; reason: string }) =>
+      rejectResponseAction(incidentId as string, ref, { reason }),
+    onSuccess: refreshIncident,
+    onError: refuse,
   });
 
   const mlStatusQuery = useQuery({
@@ -286,6 +401,23 @@ export default function InvestigationWorkspace({
                     signals={incident.riskSignals ?? []}
                   />
 
+                  {/* V9 Phase I: the first status control this workspace has
+                      had. Until now `useUpdateIncident` was unreachable, and
+                      with it the evidence-freshness check behind it. */}
+                  <section>
+                    <h3 className="mb-2 text-sm font-semibold text-white">Lifecycle</h3>
+                    <LifecycleControl
+                      transitions={transitionsQuery.data}
+                      isLoading={transitionsQuery.isLoading}
+                      isError={transitionsQuery.isError}
+                      isSubmitting={transitionMutation.isPending}
+                      error={actionError}
+                      onTransition={(target, reason) =>
+                        transitionMutation.mutate({ target, reason })
+                      }
+                    />
+                  </section>
+
                   <section>
                     <h3 className="text-sm font-semibold text-white">Description</h3>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-400">
@@ -382,6 +514,28 @@ export default function InvestigationWorkspace({
 
               {tab === "mitre" && (
                 <MitreTab incident={incident} sequences={sequences} />
+              )}
+
+              {tab === "response" && (
+                <ResponseActions
+                  actions={responseActionsQuery.data}
+                  isLoading={responseActionsQuery.isLoading}
+                  isError={responseActionsQuery.isError}
+                  canRequest={can("incidents:respond")}
+                  canDecide={can("incidents:respond_approve")}
+                  currentUserEmail={user?.email}
+                  isSubmitting={
+                    requestActionMutation.isPending ||
+                    approveActionMutation.isPending ||
+                    rejectActionMutation.isPending
+                  }
+                  error={actionError}
+                  onRequest={(input) => requestActionMutation.mutate(input)}
+                  onApprove={approve}
+                  onReject={(ref, reason) =>
+                    rejectActionMutation.mutate({ ref, reason })
+                  }
+                />
               )}
 
               {tab === "ai" && (

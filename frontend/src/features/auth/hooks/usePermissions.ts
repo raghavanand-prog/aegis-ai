@@ -19,6 +19,10 @@ export function usePermissions() {
     canPromoteEvents: can("events:promote"),
     canUpdateIncidents: can("incidents:update"),
     canRespond: can("incidents:respond"),
+    // V9: requesting containment and signing one off are separate authorities,
+    // and closing an incident is separate from working it.
+    canApproveResponse: can("incidents:respond_approve"),
+    canCloseIncidents: can("incidents:close"),
     canRunEvaluation: can("detection:evaluate"),
     canManageUsers: can("users:manage"),
     isReadOnly: permissions.length > 0 && !can("events:promote"),
