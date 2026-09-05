@@ -28,6 +28,10 @@ class Permission(str, Enum):
     INCIDENTS_CREATE = "incidents:create"
     INCIDENTS_UPDATE = "incidents:update"
     INCIDENTS_RESPOND = "incidents:respond"
+    # V9: requesting a containment action and signing one off are separate
+    # authorities, exactly as proposing an adaptation is separate from
+    # approving it. An analyst raises the request; somebody else decides.
+    INCIDENTS_RESPOND_APPROVE = "incidents:respond_approve"
     # V9: sealing an incident is a separate authority from working one.
     # `Closed` is terminal - nothing reopens it - so the act of closing is the
     # last word on what the SOC concluded, and it is the one incident
@@ -159,6 +163,10 @@ ADMIN_PERMISSIONS: frozenset[Permission] = ANALYST_PERMISSIONS | frozenset(
         # V9: see the note on the permission. Closing is terminal, so it sits
         # with the other authorities that end something rather than change it.
         Permission.INCIDENTS_CLOSE,
+        # V9: deciding a response action. Kept off the analyst set on purpose -
+        # an analyst who could both raise and approve would make four-eyes a
+        # formality they satisfy by logging in twice.
+        Permission.INCIDENTS_RESPOND_APPROVE,
     }
 )
 

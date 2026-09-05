@@ -78,6 +78,16 @@ class Incident(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="DecisionEvidenceBinding.decided_at.desc()",
     )
+    # V9 Phase E: containment actions requested against this incident. The
+    # request records what was wanted; approving one records that a second
+    # person agreed and what evidence they agreed on. Nothing executes.
+    response_requests = relationship(
+        "ResponseActionRequest",
+        back_populates="incident",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="ResponseActionRequest.requested_at.desc()",
+    )
     ai_analyses = relationship(
         "AIAnalysis",
         back_populates="incident",
