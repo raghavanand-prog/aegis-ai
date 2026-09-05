@@ -19,8 +19,17 @@ folded into, and inventing one would be worse than admitting the loss.
 from __future__ import annotations
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 from alembic import op
+
+#: The same JSON variant every other migration and the models use: plain JSON on
+#: SQLite, JSONB on PostgreSQL. **The first cut of this migration declared a bare
+#: JSON column**, which is a no-op difference on SQLite and a real one on
+#: PostgreSQL: the column came out `json`, losing GIN indexing and the
+#: containment operators, while the model declared `jsonb`. Only the PostgreSQL
+#: validation could catch it, and it did.
+JSONType = sa.JSON().with_variant(JSONB, "postgresql")
 
 revision = "0013_v9_decision_evidence"
 down_revision = "0012_v9_incident_lifecycle"
@@ -43,7 +52,7 @@ def upgrade() -> None:
         sa.Column("decided_by_role", sa.String(length=32), nullable=True),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("manifest_digest", sa.String(length=64), nullable=False),
-        sa.Column("evidence_snapshot", sa.JSON(), nullable=False),
+        sa.Column("evidence_snapshot", JSONType, nullable=False),
         sa.Column("evidence_count", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["incident_id"], ["incidents.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
