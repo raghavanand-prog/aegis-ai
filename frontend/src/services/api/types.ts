@@ -18,7 +18,25 @@ import type {
 
 export type Severity = "Low" | "Medium" | "High" | "Critical";
 export type EventStatus = "New" | "Investigating" | "Resolved";
-export type IncidentStatus = "Open" | "Investigating" | "Contained" | "Resolved";
+/**
+ * The full incident lifecycle (V9 Phase B).
+ *
+ * This listed only four states until Phase I - the backend had returned seven
+ * since Phase B, so a `Triaged` or `Closed` incident was a value TypeScript
+ * insisted could not exist. Nothing crashed, which is why it survived: the
+ * types were simply wrong about the running system.
+ *
+ * Which state may follow which is the backend's business, not this file's -
+ * see `GET /incidents/{id}/transitions`.
+ */
+export type IncidentStatus =
+  | "Open"
+  | "Triaged"
+  | "Investigating"
+  | "Containment Pending"
+  | "Contained"
+  | "Resolved"
+  | "Closed";
 export type NotificationSeverity = "low" | "medium" | "high" | "critical";
 export type NotificationCategory =
   | "event"

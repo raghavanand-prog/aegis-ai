@@ -1,3 +1,5 @@
+import type { IncidentStatus } from "@/services/api/types";
+
 /**
  * Incident shape used by the Incidents UI.
  *
@@ -17,7 +19,7 @@ export interface Incident {
   title: string;
   severity: "Critical" | "High" | "Medium" | "Low";
   description: string;
-  status: "Open" | "Investigating" | "Contained" | "Resolved";
+  status: IncidentStatus;
   analyst: string;
   source: string;
   created: string;
