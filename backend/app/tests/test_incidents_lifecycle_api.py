@@ -553,3 +553,152 @@ class TestCreation:
             )
             assert response.status_code == 201, f"{status}: {response.text}"
             assert response.json()["status"] == status
+
+
+class TestTransitionsEndpoint:
+    """What the UI asks instead of restating the lifecycle in TypeScript."""
+
+    def test_it_offers_the_legal_next_states(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        incident = _new_incident(client, auth_headers)
+        body = client.get(
+            f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+        ).json()
+
+        assert body["currentStatus"] == "Open"
+        assert body["isTerminal"] is False
+        assert {option["target"] for option in body["options"]} == {
+            "Triaged",
+            "Investigating",
+            "Resolved",
+        }
+
+    def test_it_says_which_edges_need_a_reason(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        incident = _new_incident(client, auth_headers)
+        options = {
+            option["target"]: option
+            for option in client.get(
+                f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+            ).json()["options"]
+        }
+
+        assert options["Resolved"]["requiresReason"] is True
+        assert options["Triaged"]["requiresReason"] is False
+
+    def test_it_says_which_edges_bind_evidence(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        """So the UI knows when to state which evidence was reviewed."""
+        incident = _new_incident(client, auth_headers)
+        _drive_to(client, auth_headers, incident["id"], "Investigating")
+        options = {
+            option["target"]: option
+            for option in client.get(
+                f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+            ).json()["options"]
+        }
+
+        assert options["Contained"]["bindsEvidence"] is True
+        assert options["Containment Pending"]["bindsEvidence"] is True
+
+    def test_an_option_the_caller_cannot_take_is_listed_not_hidden(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """A UI that silently drops half the lifecycle teaches the wrong model
+        of it. The option is shown, marked unavailable, and names the authority
+        it needs."""
+        incident = _new_incident(client, auth_headers)
+        _drive_to(client, auth_headers, incident["id"], "Investigating", "Resolved")
+
+        options = {
+            option["target"]: option
+            for option in client.get(
+                f"/api/v1/incidents/{incident['id']}/transitions", headers=analyst_headers
+            ).json()["options"]
+        }
+
+        assert "Closed" in options
+        assert options["Closed"]["permitted"] is False
+        assert options["Closed"]["requiredPermission"] == "incidents:close"
+
+    def test_an_administrator_may_close(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        incident = _new_incident(client, auth_headers)
+        _drive_to(client, auth_headers, incident["id"], "Investigating", "Resolved")
+        options = {
+            option["target"]: option
+            for option in client.get(
+                f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+            ).json()["options"]
+        }
+        assert options["Closed"]["permitted"] is True
+
+    def test_a_closed_incident_offers_nothing(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        incident = _new_incident(client, auth_headers)
+        _drive_to(
+            client, auth_headers, incident["id"], "Investigating", "Resolved", "Closed"
+        )
+        body = client.get(
+            f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+        ).json()
+
+        assert body["isTerminal"] is True
+        assert body["options"] == []
+
+    def test_the_options_match_what_the_patch_actually_allows(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        """The whole point: what is offered is what the server will accept.
+
+        Every offered target must succeed, and a target that is *not* offered
+        must be refused - otherwise the endpoint is a second, drifting copy of
+        the rules rather than a view of them.
+        """
+        incident = _new_incident(client, auth_headers)
+        _drive_to(client, auth_headers, incident["id"], "Investigating")
+
+        offered = {
+            option["target"]
+            for option in client.get(
+                f"/api/v1/incidents/{incident['id']}/transitions", headers=auth_headers
+            ).json()["options"]
+        }
+        assert offered == {"Containment Pending", "Contained", "Resolved"}
+
+        # Each offered target, taken on its own incident so one attempt does not
+        # move the state out from under the next.
+        for target in sorted(offered):
+            other = _new_incident(client, auth_headers)
+            _drive_to(client, auth_headers, other["id"], "Investigating")
+            accepted = _patch(
+                client, auth_headers, other["id"], status=target, statusReason="offered"
+            )
+            assert accepted.status_code == 200, f"{target}: {accepted.text}"
+            assert accepted.json()["status"] == target
+
+        for target in ("Open", "Triaged", "Closed"):
+            assert target not in offered
+            refused = _patch(
+                client, auth_headers, incident["id"], status=target, statusReason="x"
+            )
+            assert refused.status_code in (403, 409), f"{target}: {refused.status_code}"
+
+    def test_it_requires_a_session(self, client: TestClient, auth_headers: dict) -> None:
+        incident = _new_incident(client, auth_headers)
+        assert (
+            client.get(f"/api/v1/incidents/{incident['id']}/transitions").status_code == 401
+        )
+
+    def test_an_unknown_incident_is_a_404(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        assert (
+            client.get("/api/v1/incidents/INC-NOPE/transitions", headers=auth_headers).status_code
+            == 404
+        )
