@@ -50,7 +50,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from app.ai.sanitize import contains_injection_attempt, scrub_text, scrub_value
+from app.core.sanitize import contains_injection_attempt, scrub_text, scrub_value
 
 
 class EvidenceKind(str, Enum):
@@ -295,7 +295,7 @@ class EvidenceItem:
     def for_model(self) -> dict[str, Any]:
         """The form safe to put in front of a language model.
 
-        Everything goes through ``app.ai.sanitize`` - the existing mechanism,
+        Everything goes through ``app.core.sanitize`` - the existing mechanism,
         not a competing one - and the provenance travels with it, because a
         model that cannot see whether a claim was observed or merely reported
         cannot weigh it.

@@ -1,4 +1,22 @@
-"""Neutralising untrusted event text before it reaches a model.
+"""Neutralising untrusted event text wherever it is rendered or reasoned over.
+
+**This lives in ``app.core`` rather than ``app.ai``, and that placement is the
+point.** It was written for the AI analyst and three of its four callers are
+not AI code: the evidence domain, the cloud findings layer and the adaptation
+proposals all scrub the same attacker-influenceable telemetry for the same
+reason. Scrubbing is a general defensive concern, not an AI feature.
+
+Leaving it under ``app.ai`` also meant every consumer paid for the whole AI
+package's imports, because Python runs a package's ``__init__`` before any of
+its submodules. That is what produced the import cycle V9 §12 recorded: the
+evidence domain reached up into the AI layer for this helper, the AI layer
+pulled in correlation, correlation pulled in the service layer, and the service
+layer came back down to the evidence domain while it was still half-defined.
+Moving one pure module - no dependencies beyond ``re`` and ``unicodedata`` -
+broke it without a deferred import anywhere.
+
+``app.ai`` still re-exports these names, because the AI layer is a legitimate
+caller and its public surface should not change.
 
 Every string in an evidence package originates in telemetry: a command line, a
 hostname, a filename, a DNS query, a threat-intelligence category. All of it is

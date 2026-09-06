@@ -353,6 +353,40 @@ class TestExpectedDigest:
         assert response.status_code == 200, response.text
 
 
+class TestTheStaleDecisionAuditRecordsBothDigests:
+    """The lifecycle path carried the same half-record as the response path.
+
+    Fixed together, because it is one exception and one defect: the error knew
+    both digests and threw the server's away before either caller saw it.
+    """
+
+    def test_a_refused_transition_records_the_reviewed_and_the_current_digest(
+        self, client: TestClient, auth_headers: dict, db
+    ) -> None:
+        from app.services import incident_service
+
+        incident = _incident(client, auth_headers)
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        stored = incident_service.get_incident(db, incident["id"])
+        stored.events[0].hostname = "MOVED-AFTER-REVIEW"
+        db.commit()
+
+        response = _contain(
+            client, auth_headers, incident["id"], expectedEvidenceDigest=reviewed
+        )
+        assert response.status_code == 409, response.text
+
+        audit = client.get(
+            f"/api/v1/audit?action=decision.evidence_stale&targetId={incident['id']}",
+            headers=auth_headers,
+        ).json()
+        details = audit["items"][0]["details"]
+        assert details["reviewedDigest"] == reviewed
+        assert details["currentDigest"], details
+        assert details["currentDigest"] != reviewed
+
+
 # --- Drift after the decision ---------------------------------------------
 
 
