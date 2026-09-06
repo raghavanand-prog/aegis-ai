@@ -489,6 +489,91 @@ def _scale(value: int | None) -> float | None:
     return max(0.0, min(1.0, float(value) / 100.0))
 
 
+class CloudPostureEvidenceProvider(EvidenceProvider):
+    """Cloud misconfigurations affecting the resources this incident touches.
+
+    The first producer for ``CLOUD_FINDING``, which has been a reserved member
+    of the contract since Phase C.
+
+    This is the only provider whose evidence is not about the incident's
+    *events* at all. A posture finding says nothing happened; it says a
+    resource is configured in a way that made what happened possible, or would
+    make it worse. An analyst weighs that differently again from telemetry, a
+    detection or a third-party verdict - which is why it is a distinct kind
+    rather than another shape of ``THREAT_INTEL``.
+
+    ``REPORTED``, not ``OBSERVED``: a scanner asserts this, and the assertion
+    is only as good as the configuration snapshot behind it. ``MUTABLE``,
+    because a rescan rewrites the row in place - the same honest admission the
+    threat-intelligence provider makes, and the reason both show up as
+    ``refreshed`` rather than ``unchanged`` in a drift report.
+
+    Every finding is simulated, and ``is_synthetic`` carries that all the way
+    into provenance rather than stopping at the database.
+    """
+
+    name = "aegisx.cloudposture"
+    produces = (EvidenceKind.CLOUD_FINDING,)
+
+    def health(self) -> ProviderHealth:
+        """Degraded when nothing has been scanned.
+
+        Distinguishing "this account is clean" from "nobody has looked" is the
+        entire reason Phase F built this contract, and posture is where the
+        distinction is most dangerous to get wrong: an empty findings list
+        reads as a clean bill of health.
+        """
+        return _subsystem_health("cloud_posture_health")
+
+    def collect(self, db: Any, incident: Any) -> list[EvidenceItem]:
+        from app.services import cloud_posture_service
+
+        items = []
+        for row in cloud_posture_service.findings_for_incident(db, incident)[
+            :MAX_ITEMS_PER_PROVIDER
+        ]:
+            items.append(
+                EvidenceItem(
+                    kind=EvidenceKind.CLOUD_FINDING,
+                    title=row.title,
+                    content={
+                        "checkId": row.check_id,
+                        "severity": row.severity,
+                        "control": row.control,
+                        "description": row.description,
+                        "provider": row.provider,
+                        "account": row.account,
+                        "region": row.region,
+                        "service": row.service,
+                        "resourceType": row.resource_type,
+                        "resourceId": row.resource_id,
+                        "detail": row.detail,
+                        "firstSeenAt": (
+                            _aware(row.first_seen_at).isoformat()
+                            if row.first_seen_at
+                            else None
+                        ),
+                    },
+                    provenance=Provenance(
+                        provider=self.name,
+                        source_ref=f"cloud_finding:{row.finding_id}",
+                        origin=EvidenceOrigin.REPORTED,
+                        integrity=Integrity.MUTABLE,
+                        # When the configuration was seen this way, not when
+                        # the row was written.
+                        observed_at=_aware(row.last_seen_at),
+                        collected_at=_aware(row.last_seen_at),
+                        # No confidence: a check either matched the
+                        # configuration or it did not. A number here would
+                        # invent a doubt the check does not have.
+                        incident_ref=incident.incident_id,
+                        is_synthetic=bool(row.is_simulated),
+                    ),
+                )
+            )
+        return items
+
+
 for _provider in (
     EventEvidenceProvider(),
     RuleEvidenceProvider(),
@@ -497,5 +582,7 @@ for _provider in (
     ThreatIntelEvidenceProvider(),
     CorrelationEvidenceProvider(),
     AIAnalysisEvidenceProvider(),
+    # V9 Phase G: the first producer for the reserved CLOUD_FINDING kind.
+    CloudPostureEvidenceProvider(),
 ):
     register(_provider)
