@@ -16,6 +16,7 @@ function action(overrides: Partial<ApiResponseAction> = {}): ApiResponseAction {
     parameters: { target: "SYN-WIN-001" },
     parametersDigest: "a".repeat(64),
     justification: "confirmed encoded PowerShell",
+    consequence: "reversible",
     status: "requested",
     requestedBy: "analyst@aegisx.dev",
     requestedByRole: "analyst",
@@ -46,6 +47,7 @@ function render(props: Partial<Parameters<typeof ResponseActions>[0]> = {}) {
   const onRequest = vi.fn();
   const onApprove = vi.fn();
   const onReject = vi.fn();
+  const onWithdraw = vi.fn();
   renderWithProviders(
     <ResponseActions
       actions={list()}
@@ -59,10 +61,11 @@ function render(props: Partial<Parameters<typeof ResponseActions>[0]> = {}) {
       onRequest={onRequest}
       onApprove={onApprove}
       onReject={onReject}
+      onWithdraw={onWithdraw}
       {...props}
     />,
   );
-  return { onRequest, onApprove, onReject };
+  return { onRequest, onApprove, onReject, onWithdraw };
 }
 
 describe("ResponseActions", () => {
@@ -181,5 +184,104 @@ describe("ResponseActions", () => {
     const malformed = { incidentId: "INC-1024" } as unknown as ApiResponseActionList;
     render({ actions: malformed });
     expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
+  });
+
+  // --- Consequence --------------------------------------------------------
+
+  it("shows how hard the action is to undo", () => {
+    render();
+    expect(screen.getByText("reversible")).toBeInTheDocument();
+  });
+
+  it("marks a disruptive action as disruptive", () => {
+    render({
+      actions: list({
+        items: [action({ actionType: "disable_account", consequence: "disruptive" })],
+      }),
+    });
+    expect(screen.getByText("disruptive")).toBeInTheDocument();
+  });
+
+  it("does not present a reversible action as needing less approval", () => {
+    // The whole risk of putting a classification next to a control: somebody
+    // reads "reversible" as "wave it through". Both tiers get the same
+    // controls, and the label's own tooltip says so.
+    render({ canDecide: true, currentUserEmail: "admin@aegisx.dev" });
+
+    expect(screen.getByTitle(/Needs the same approval/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decide" })).toBeInTheDocument();
+  });
+
+  // --- Withdrawal ---------------------------------------------------------
+
+  it("lets the requester withdraw their own pending request", () => {
+    const { onWithdraw } = render({ currentUserEmail: "analyst@aegisx.dev" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Withdraw$/ }));
+    fireEvent.change(screen.getByLabelText(/Reason for withdrawing/i), {
+      target: { value: "contained by hand" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Withdraw request/ }));
+
+    expect(onWithdraw).toHaveBeenCalledWith("RAR-INC-1024-0001", "contained by hand");
+  });
+
+  it("requires a reason to withdraw", () => {
+    render({ currentUserEmail: "analyst@aegisx.dev" });
+    fireEvent.click(screen.getByRole("button", { name: /Withdraw$/ }));
+
+    expect(screen.getByRole("button", { name: /Withdraw request/ })).toBeDisabled();
+  });
+
+  it("does not offer withdrawal of somebody else's request", () => {
+    // The inverse of four-eyes, mirrored from the backend: an administrator who
+    // disagrees rejects it under their own name rather than retracting it under
+    // the requester's.
+    render({ canDecide: true, currentUserEmail: "admin@aegisx.dev" });
+    expect(
+      screen.queryByRole("button", { name: /Withdraw$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not offer withdrawal to a role that could not have raised it", () => {
+    render({ canRequest: false, currentUserEmail: "analyst@aegisx.dev" });
+    expect(
+      screen.queryByRole("button", { name: /Withdraw$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not offer withdrawal once the request is decided", () => {
+    render({
+      currentUserEmail: "analyst@aegisx.dev",
+      actions: list({
+        items: [action({ status: "approved", decidedBy: "admin@aegisx.dev" })],
+      }),
+    });
+    expect(
+      screen.queryByRole("button", { name: /Withdraw$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says a withdrawal was a withdrawal, not a refusal", () => {
+    render({
+      actions: list({
+        items: [
+          action({
+            status: "withdrawn",
+            decidedBy: "analyst@aegisx.dev",
+            decidedByRole: "analyst",
+            decisionReason: "handled offline",
+          }),
+        ],
+      }),
+    });
+    expect(screen.getByText(/Withdrawn by/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Refused by/i)).not.toBeInTheDocument();
+  });
+
+  it("warns that withdrawing is final before it is done", () => {
+    render({ currentUserEmail: "analyst@aegisx.dev" });
+    fireEvent.click(screen.getByRole("button", { name: /Withdraw$/ }));
+    expect(screen.getByText(/Withdrawing is final/i)).toBeInTheDocument();
   });
 });

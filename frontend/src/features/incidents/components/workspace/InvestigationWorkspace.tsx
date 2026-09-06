@@ -29,6 +29,7 @@ import {
   fetchResponseActions,
   rejectResponseAction,
   requestResponseAction,
+  withdrawResponseAction,
 } from "@/services/api/responseActions";
 import { fetchIncidentMLFindings, fetchMLStatus } from "@/services/api/ml";
 import {
@@ -221,6 +222,18 @@ export default function InvestigationWorkspace({
   const rejectActionMutation = useMutation({
     mutationFn: ({ ref, reason }: { ref: string; reason: string }) =>
       rejectResponseAction(incidentId as string, ref, { reason }),
+    onSuccess: refreshIncident,
+    onError: refuse,
+  });
+
+  /**
+   * Retracting your own request. No evidence digest is sent because the server
+   * takes none: a withdrawal cannot be refused for stale evidence, or a request
+   * whose evidence moved would be stuck pending with no way to end it.
+   */
+  const withdrawActionMutation = useMutation({
+    mutationFn: ({ ref, reason }: { ref: string; reason: string }) =>
+      withdrawResponseAction(incidentId as string, ref, { reason }),
     onSuccess: refreshIncident,
     onError: refuse,
   });
@@ -527,13 +540,17 @@ export default function InvestigationWorkspace({
                   isSubmitting={
                     requestActionMutation.isPending ||
                     approveActionMutation.isPending ||
-                    rejectActionMutation.isPending
+                    rejectActionMutation.isPending ||
+                    withdrawActionMutation.isPending
                   }
                   error={actionError}
                   onRequest={(input) => requestActionMutation.mutate(input)}
                   onApprove={approve}
                   onReject={(ref, reason) =>
                     rejectActionMutation.mutate({ ref, reason })
+                  }
+                  onWithdraw={(ref, reason) =>
+                    withdrawActionMutation.mutate({ ref, reason })
                   }
                 />
               )}
