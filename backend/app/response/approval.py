@@ -26,11 +26,30 @@ evidence digest is optional for compatibility with clients that predate it.
 These endpoints are new, so there are no such clients, and an approval that
 does not say which evidence it was given would be unprotected for no reason.
 
-Rejection is deliberately asymmetric: it needs authority and a decidable
-request, and it does **not** need freshness or a second person. Refusing to let
-somebody withdraw or refuse a request because the evidence moved would trap it
-as pending forever, and refusing a containment action is the fail-safe
-direction.
+There are three decisions, and their asymmetries are the design rather than
+oversights:
+
+===========  ==========  ===========  =========  ==================
+Decision     Decidable?  Who          Freshness  Permission
+===========  ==========  ===========  =========  ==================
+approve      yes         *not* the    required   respond_approve
+                         requester,
+                         and human
+reject       yes         anyone with  no         respond_approve
+                         authority
+withdraw     yes         *only* the   n/a        respond
+                         requester
+===========  ==========  ===========  =========  ==================
+
+Both refusing directions skip freshness on purpose. Blocking a rejection or a
+withdrawal because the evidence moved would trap the request pending forever,
+and ending a containment request is the fail-safe direction - the failure mode
+of getting it wrong is that nothing is contained.
+
+Approval and withdrawal look symmetric and are not. Approval *forbids* one
+actor; withdrawal *requires* one. An administrator who disagrees with a pending
+request rejects it under their own name, rather than retracting it under the
+requester's.
 """
 
 from __future__ import annotations
@@ -54,6 +73,10 @@ class SelfApprovalRefused(ApprovalError):
 
 class UnauthorizedApproval(ApprovalError):
     """This actor may not decide a response action."""
+
+
+class NotTheRequester(ApprovalError):
+    """Only the actor who raised a request may retract it."""
 
 
 class ParametersChanged(ApprovalError):
@@ -101,6 +124,44 @@ def check_authority(approver: str | None, approver_role: str | None) -> None:
         )
 
 
+def check_requester(requested_by: str, actor: str | None) -> None:
+    """Four-eyes inverted: only the person who asked may take it back.
+
+    An administrator who disagrees with a pending request has ``reject``,
+    which records a refusal against their own name. Letting them *withdraw* it
+    instead would file a retraction under the requester's, and the record
+    would say somebody changed their mind when they did not.
+    """
+    if not actors.same_actor(actor, requested_by):
+        raise NotTheRequester(
+            f"{actor!r} did not raise this request and cannot withdraw it. "
+            "Only the requester retracts their own request; anyone else with "
+            "the authority to end it rejects it, under their own name."
+        )
+
+
+def check_request_authority(actor_role: str | None) -> None:
+    """The authority that raises a request is the authority that retracts one.
+
+    Re-checked at the decision rather than inferred from the row's existence:
+    a role can be reduced between raising a request and ending it, and the
+    permission a caller holds *now* is the one that governs what they may do
+    now.
+    """
+    if not actor_role:
+        raise UnauthorizedApproval(
+            "A withdrawal must state the role it was made under, for the same "
+            "reason an approval must: a decision whose authority cannot be "
+            "checked is not one the record can stand behind."
+        )
+    if not has_permission(actor_role, Permission.INCIDENTS_RESPOND):
+        raise UnauthorizedApproval(
+            f"Role {actor_role!r} does not hold "
+            f"{Permission.INCIDENTS_RESPOND.value} and cannot withdraw a "
+            "response action."
+        )
+
+
 def check_four_eyes(requested_by: str, approver: str) -> None:
     if actors.same_actor(approver, requested_by):
         raise SelfApprovalRefused(
@@ -144,6 +205,36 @@ def check_approval(
     check_authority(approver, approver_role)
     check_parameters_unchanged(recorded_parameters_digest, current_parameters_digest)
     check_freshness_stated(expected_evidence_digest)
+
+
+def check_withdrawal(
+    *,
+    requested_by: str,
+    actor: str | None,
+    actor_role: str | None,
+    status: ResponseActionStatus | str,
+    reason: str | None,
+) -> None:
+    """Preconditions for retracting a response action.
+
+    **There is deliberately no ``expected_evidence_digest`` parameter.** Not
+    optional - absent. A withdrawal cannot be blocked by evidence moving, so a
+    parameter that existed and was ignored would advertise a check nobody
+    could rely on. Retraction only ever reduces what gets contained, which is
+    the fail-safe direction, exactly as for rejection.
+
+    No four-eyes either, and for the opposite reason to rejection's: this
+    check *requires* one specific actor rather than forbidding one.
+    """
+    check_decidable(status)
+    check_requester(requested_by, actor)
+    check_request_authority(actor_role)
+    if not (reason or "").strip():
+        raise ApprovalError(
+            "A withdrawal needs a reason. The request carried a justification; "
+            "retracting it without one leaves a record the next person cannot "
+            "read."
+        )
 
 
 def check_rejection(

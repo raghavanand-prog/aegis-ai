@@ -1,8 +1,14 @@
 """Requesting a containment action, and deciding on one.
 
-Three operations and no fourth: ``request``, ``approve``, ``reject``. There is
-no ``execute`` and no provider call anywhere in this module - V9 stops at the
-decision, and a test asserts it.
+Four operations and no fifth: ``request``, ``approve``, ``reject`` and
+``withdraw``. There is no ``execute`` and no provider call anywhere in this
+module - the platform stops at the decision, and a test asserts it.
+
+``withdraw`` is V10's, and it exists because ``withdrawn`` was already in the
+status enum and in the table's CHECK constraint with nothing able to produce
+it. A schema-valid state no code path reaches is a claim the system cannot
+support, in the same way an ``executed`` column with no executor behind it
+would be.
 
 Approval reuses Phase D wholesale rather than growing a second
 evidence-integrity mechanism: the same ``snapshot_for``, the same
@@ -42,6 +48,11 @@ logger = logging.getLogger(__name__)
 #: status transition, and so is the rejection - a refusal is a result.
 RESPONSE_ACTION_APPROVAL = "response_action.approval"
 RESPONSE_ACTION_REJECTION = "response_action.rejection"
+#: V10: a retraction by the requester. Recorded under its own type rather than
+#: reusing the rejection's, because "the analyst stood down" and "an
+#: administrator refused" are different conclusions and a reader of
+#: ``GET /incidents/{id}/decisions`` should not have to infer which.
+RESPONSE_ACTION_WITHDRAWAL = "response_action.withdrawal"
 
 
 class ResponseActionError(ValueError):
@@ -236,6 +247,59 @@ def reject_action(
     record.status = ResponseActionStatus.REJECTED.value
     record.decided_by = approver
     record.decided_by_role = approver_role
+    record.decided_at = binding.decided_at
+    record.decision_reason = reason.strip()
+    record.evidence_binding_id = binding.id
+    db.flush()
+    return record
+
+
+def withdraw_action(
+    db: Session,
+    incident: Any,
+    record: ResponseActionRequest,
+    *,
+    actor: str,
+    actor_role: str | None,
+    reason: str,
+) -> ResponseActionRequest:
+    """Retract a pending request, as the person who raised it.
+
+    Deliberately **not** an approval path: this only ever writes ``withdrawn``,
+    so no ordering of calls reaches ``approved`` without a second person. The
+    checks run before any write, as everywhere else here, so a refusal leaves
+    the request pending whether or not the caller rolls back.
+
+    No freshness check and no snapshot comparison - see
+    ``approval.check_withdrawal``. The evidence is still *bound*, because what
+    was known when containment was called off is as worth answering later as
+    what was known when it was refused.
+    """
+    approval.check_withdrawal(
+        requested_by=record.requested_by,
+        actor=actor,
+        actor_role=actor_role,
+        status=record.status,
+        reason=reason,
+    )
+
+    snapshot = decision_service.snapshot_for(db, incident)
+    binding = decision_service.bind(
+        db,
+        incident,
+        snapshot=snapshot,
+        from_state=ResponseActionStatus.REQUESTED.value,
+        to_state=ResponseActionStatus.WITHDRAWN.value,
+        reason=reason.strip(),
+        decided_by=actor,
+        decided_by_role=actor_role,
+        decision_type=RESPONSE_ACTION_WITHDRAWAL,
+    )
+
+    instruments.response_actions.increment(labels={"outcome": "withdrawn"})
+    record.status = ResponseActionStatus.WITHDRAWN.value
+    record.decided_by = actor
+    record.decided_by_role = actor_role
     record.decided_at = binding.decided_at
     record.decision_reason = reason.strip()
     record.evidence_binding_id = binding.id

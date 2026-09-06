@@ -2,8 +2,10 @@
 
     POST /incidents/{id}/response-actions               raise a request
     GET  /incidents/{id}/response-actions               list them
+    GET  /incidents/{id}/response-actions/{ref}         read one
     POST /incidents/{id}/response-actions/{ref}/approve sign one off
     POST /incidents/{id}/response-actions/{ref}/reject  refuse one
+    POST /incidents/{id}/response-actions/{ref}/withdraw retract your own
 
 **There is no execute route, and that is the design.** V9 records that a second
 authorised person agreed to a containment action and what evidence they agreed
@@ -32,6 +34,7 @@ from app.core.database import get_db
 from app.core.rbac import Permission
 from app.models.enums import AuditAction
 from app.models.user import User
+from app.response.actions import consequence_of
 from app.schemas.common import Message
 from app.schemas.response_action import (
     ResponseActionApprove,
@@ -39,6 +42,7 @@ from app.schemas.response_action import (
     ResponseActionList,
     ResponseActionRead,
     ResponseActionReject,
+    ResponseActionWithdraw,
 )
 from app.services import (
     audit_service,
@@ -58,6 +62,7 @@ _APPROVAL_STATUS: dict[type[Exception], int] = {
     response_action_service.approval.UnauthorizedApproval: status.HTTP_403_FORBIDDEN,
     response_action_service.approval.ParametersChanged: status.HTTP_409_CONFLICT,
     response_action_service.approval.FreshnessRequired: status.HTTP_400_BAD_REQUEST,
+    response_action_service.approval.NotTheRequester: status.HTTP_403_FORBIDDEN,
     response_action_service.approval.ApprovalError: status.HTTP_400_BAD_REQUEST,
 }
 
@@ -89,6 +94,7 @@ def _render(db: Session, record) -> dict:
         "parameters": dict(record.parameters or {}),
         "parametersDigest": record.parameters_digest,
         "justification": record.justification,
+        "consequence": consequence_of(record.action_type).value,
         "status": record.status,
         "requestedBy": record.requested_by,
         "requestedByRole": record.requested_by_role,
@@ -176,6 +182,31 @@ def list_response_actions(
     )
 
 
+@router.get(
+    "/{incident_id}/response-actions/{request_ref}",
+    response_model=ResponseActionRead,
+    summary="One response action, by reference",
+    description=(
+        "The reference is scoped to its incident: one belonging to a different "
+        "incident resolves to 404 rather than to somebody else's pending containment "
+        "action. Reading is `incidents:read` - seeing what the SOC is deciding is not "
+        "a privilege, deciding it is."
+    ),
+    responses={404: {"model": Message, "description": "Unknown incident or request"}},
+)
+def read_response_action(
+    incident_id: str,
+    request_ref: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require(Permission.INCIDENTS_READ)),
+) -> ResponseActionRead:
+    incident = _incident_or_404(db, incident_id)
+    record = _request_or_404(db, incident, request_ref)
+    # The same `_render` the list uses. Two renderers onto one row is how the
+    # two surfaces end up disagreeing about a pending containment action.
+    return ResponseActionRead.model_validate(_render(db, record))
+
+
 @router.post(
     "/{incident_id}/response-actions/{request_ref}/approve",
     response_model=ResponseActionRead,
@@ -233,6 +264,11 @@ def approve_response_action(
                 "incidentId": incident_id,
                 "refusal": type(exc).__name__,
                 "reviewedDigest": (payload.expected_evidence_digest or "")[:64],
+                # What the server actually held. Null for a refusal the
+                # evidence had no part in - a self-approval is turned away
+                # before the evidence is weighed, and recording a digest there
+                # would imply it was one of the reasons.
+                "currentDigest": getattr(exc, "current_digest", None),
             },
         )
         db.commit()
@@ -254,6 +290,19 @@ def approve_response_action(
             "incidentId": incident.incident_id,
             "actionType": record.action_type,
             "requestedBy": record.requested_by,
+            # What class of thing was signed off, so an audit reader does not
+            # have to know the action taxonomy to see that an account was
+            # disabled rather than an indicator blocked.
+            "consequence": consequence_of(record.action_type).value,
+            # The evidence this was signed off against, in the audit itself.
+            # It is reachable through the binding row, but a reader should not
+            # have to know to make that join to answer "what did they approve
+            # this on".
+            "evidenceDigest": (
+                record.evidence_binding.manifest_digest
+                if record.evidence_binding
+                else None
+            ),
             "decisionRef": (
                 record.evidence_binding.decision_ref if record.evidence_binding else None
             ),
@@ -309,6 +358,67 @@ def reject_response_action(
     audit_service.record(
         db,
         action=AuditAction.RESPONSE_ACTION_REJECTED,
+        user=user,
+        target_type="response_action",
+        target_id=record.request_ref,
+        ip_address=client_ip(request),
+        details={
+            "incidentId": incident.incident_id,
+            "actionType": record.action_type,
+            "reason": record.decision_reason,
+        },
+    )
+    db.commit()
+    return ResponseActionRead.model_validate(_render(db, record))
+
+
+@router.post(
+    "/{incident_id}/response-actions/{request_ref}/withdraw",
+    response_model=ResponseActionRead,
+    summary="Withdraw your own containment request",
+    description=(
+        "Retracts a request you raised. Only the requester may withdraw; anyone else "
+        "with the authority to end it uses `reject`, which records the refusal under "
+        "their own name. Needs a reason and **no** evidence digest - a withdrawal "
+        "cannot be blocked by evidence moving, or a request whose evidence changed "
+        "would be trapped pending forever. Withdrawing is terminal and never reaches "
+        "`approved`."
+    ),
+    responses={
+        403: {"model": Message, "description": "Not the requester, or lacking authority"},
+        404: {"model": Message, "description": "Unknown incident or request"},
+        409: {"model": Message, "description": "Already decided"},
+    },
+)
+def withdraw_response_action(
+    incident_id: str,
+    request_ref: str,
+    payload: ResponseActionWithdraw,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require(Permission.INCIDENTS_RESPOND)),
+) -> ResponseActionRead:
+    incident = _incident_or_404(db, incident_id)
+    record = _request_or_404(db, incident, request_ref)
+
+    try:
+        response_action_service.withdraw_action(
+            db,
+            incident,
+            record,
+            actor=user.email,
+            actor_role=user.role,
+            reason=payload.reason,
+        )
+    except response_action_service.approval.ApprovalError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=_APPROVAL_STATUS[type(exc)], detail=str(exc)
+        ) from exc
+
+    audit_service.record(
+        db,
+        action=AuditAction.RESPONSE_ACTION_WITHDRAWN,
         user=user,
         target_type="response_action",
         target_id=record.request_ref,

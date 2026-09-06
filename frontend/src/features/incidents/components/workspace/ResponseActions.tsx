@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Check, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Check, ShieldAlert, Undo2, X } from "lucide-react";
 
 import { Button } from "@/components/ui";
 import type {
@@ -35,6 +35,24 @@ const ACTION_TYPES: { value: ResponseActionType; label: string }[] = [
   { value: "quarantine_file", label: "Quarantine file" },
 ];
 
+/**
+ * How hard the action is to undo. Amber for the disruptive ones because they
+ * are the ones worth pausing over - and deliberately *not* green for the
+ * others, which would read as "this one is fine to wave through". Both need
+ * the same second person, the same authority and the same evidence digest.
+ */
+const CONSEQUENCE_STYLES: Record<string, string> = {
+  reversible: "border-slate-600/40 bg-slate-800/40 text-slate-300",
+  disruptive: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+};
+
+const CONSEQUENCE_TITLES: Record<string, string> = {
+  reversible:
+    "Undone by the operator who applied it, on the same system. Needs the same approval as any other containment action.",
+  disruptive:
+    "Undoing this means going elsewhere - a helpdesk ticket, a restore. Needs the same approval as any other containment action.",
+};
+
 const STATUS_STYLES: Record<string, string> = {
   requested: "border-amber-500/30 bg-amber-500/10 text-amber-300",
   approved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
@@ -45,22 +63,28 @@ const STATUS_STYLES: Record<string, string> = {
 function ActionRow({
   action,
   canDecide,
+  canWithdraw,
   currentUserEmail,
   onApprove,
   onReject,
+  onWithdraw,
   isSubmitting,
   error,
 }: {
   action: ApiResponseAction;
   canDecide: boolean;
+  canWithdraw: boolean;
   currentUserEmail: string | undefined;
   onApprove: (ref: string, reason: string) => void;
   onReject: (ref: string, reason: string) => void;
+  onWithdraw: (ref: string, reason: string) => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
   const [reason, setReason] = useState("");
   const [open, setOpen] = useState(false);
+  const [retracting, setRetracting] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
 
   // Four-eyes, mirrored from the backend rule so the UI does not offer a button
   // that will always be refused. Folded for case, as the server folds it.
@@ -69,6 +93,11 @@ function ActionRow({
     currentUserEmail.trim().toLowerCase() ===
       action.requestedBy.trim().toLowerCase();
   const decidable = action.status === "requested" && canDecide && !isOwnRequest;
+  // The inverse rule: only the requester retracts their own request, and they
+  // need the authority that raised it. Mirrored from the backend so the UI does
+  // not offer a button that would always be refused.
+  const withdrawable =
+    action.status === "requested" && canWithdraw && isOwnRequest;
 
   return (
     <li className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
@@ -77,13 +106,24 @@ function ActionRow({
           {ACTION_TYPES.find((item) => item.value === action.actionType)?.label ??
             action.actionType}
         </p>
-        <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-            STATUS_STYLES[action.status] ?? STATUS_STYLES.withdrawn
-          }`}
-        >
-          {action.status}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span
+            title={CONSEQUENCE_TITLES[action.consequence]}
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+              CONSEQUENCE_STYLES[action.consequence] ??
+              CONSEQUENCE_STYLES.disruptive
+            }`}
+          >
+            {action.consequence}
+          </span>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
+              STATUS_STYLES[action.status] ?? STATUS_STYLES.withdrawn
+            }`}
+          >
+            {action.status}
+          </span>
+        </div>
       </div>
 
       <p className="text-[11px] italic text-slate-400">
@@ -103,7 +143,12 @@ function ActionRow({
 
       {action.decidedBy && (
         <p className="mt-1.5 text-[11px] text-slate-400">
-          {action.status === "approved" ? "Approved" : "Refused"} by{" "}
+          {action.status === "approved"
+            ? "Approved"
+            : action.status === "withdrawn"
+              ? "Withdrawn"
+              : "Refused"}{" "}
+          by{" "}
           {action.decidedBy}
           {action.decidedByRole ? ` (${action.decidedByRole})` : ""}
           {action.decisionReason ? ` — ${action.decisionReason}` : ""}
@@ -134,6 +179,61 @@ function ActionRow({
           You raised this request, so you cannot also decide it. A containment
           action needs a second person.
         </p>
+      )}
+
+      {withdrawable && !retracting && (
+        <div className="mt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setRetracting(true)}
+          >
+            <span className="inline-flex items-center gap-1">
+              <Undo2 size={13} /> Withdraw
+            </span>
+          </Button>
+        </div>
+      )}
+
+      {withdrawable && retracting && (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={withdrawReason}
+            onChange={(event) => setWithdrawReason(event.target.value)}
+            rows={2}
+            placeholder="Why are you retracting this? — required"
+            aria-label="Reason for withdrawing"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-cyan-600 focus:outline-none"
+          />
+          {error && (
+            <p className="flex items-start gap-1.5 rounded border border-red-500/30 bg-red-500/5 px-2 py-1.5 text-[11px] text-red-300">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              {error}
+            </p>
+          )}
+          <p className="text-[11px] text-slate-500">
+            Withdrawing is final. It does not delete the request — it records
+            that you stood it down, and a new request must be raised to ask
+            again.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isSubmitting || withdrawReason.trim().length === 0}
+              onClick={() => onWithdraw(action.requestRef, withdrawReason)}
+            >
+              Withdraw request
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRetracting(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
       )}
 
       {decidable && !open && (
@@ -202,6 +302,7 @@ interface Props {
   }) => void;
   onApprove: (ref: string, reason: string) => void;
   onReject: (ref: string, reason: string) => void;
+  onWithdraw: (ref: string, reason: string) => void;
 }
 
 export default function ResponseActions({
@@ -216,6 +317,7 @@ export default function ResponseActions({
   onRequest,
   onApprove,
   onReject,
+  onWithdraw,
 }: Props) {
   const [actionType, setActionType] = useState<ResponseActionType>(
     "isolate_endpoint",
@@ -350,9 +452,11 @@ export default function ResponseActions({
               key={action.requestRef}
               action={action}
               canDecide={canDecide}
+              canWithdraw={canRequest}
               currentUserEmail={currentUserEmail}
               onApprove={onApprove}
               onReject={onReject}
+              onWithdraw={onWithdraw}
               isSubmitting={isSubmitting}
               error={error}
             />

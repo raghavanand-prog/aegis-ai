@@ -17,8 +17,10 @@ from app.core import actors
 from app.models.enums import UserRole
 from app.response import approval
 from app.response.actions import (
+    ResponseActionConsequence,
     ResponseActionStatus,
     ResponseActionType,
+    consequence_of,
     parameters_digest,
 )
 
@@ -56,6 +58,18 @@ def reject(**overrides) -> None:
     }
     kwargs.update(overrides)
     return approval.check_rejection(**kwargs)
+
+
+def withdraw(**overrides) -> None:
+    kwargs = {
+        "requested_by": REQUESTER,
+        "actor": REQUESTER,
+        "actor_role": ANALYST,
+        "status": ResponseActionStatus.REQUESTED,
+        "reason": "contained by hand before this was decided",
+    }
+    kwargs.update(overrides)
+    return approval.check_withdrawal(**kwargs)
 
 
 # --- Four eyes ------------------------------------------------------------
@@ -231,6 +245,121 @@ class TestRefusalOrder:
             approve(approver=REQUESTER, expected_evidence_digest=None)
 
 
+# --- Withdrawal -----------------------------------------------------------
+
+
+class TestWithdrawal:
+    """Retracting a request, which is four-eyes read backwards.
+
+    Approval asks *may somebody else sign this off*. Withdrawal asks the
+    opposite: may the person who raised it take it back. So the identity check
+    is inverted - only the requester may withdraw - and an administrator who
+    disagrees has ``reject`` instead, which records a decision against their
+    own name rather than retracting one under somebody else's.
+
+    Like rejection it needs no freshness and no second person, for the same
+    fail-safe reason: withdrawal only ever *reduces* what gets contained, and
+    blocking it because the evidence moved would trap the request pending
+    forever.
+    """
+
+    def test_the_requester_may_withdraw_their_own_pending_request(self) -> None:
+        withdraw()
+
+    def test_somebody_else_may_not_withdraw_it(self) -> None:
+        """Not even an administrator, who holds every other authority here.
+
+        Withdrawal is retraction, and retracting somebody else's request under
+        their name puts words in their mouth. An administrator rejects it.
+        """
+        with pytest.raises(approval.NotTheRequester):
+            withdraw(actor=APPROVER, actor_role=ADMIN)
+
+    def test_withdrawal_is_not_defeated_by_case_or_whitespace(self) -> None:
+        """The same shared rule four-eyes uses, applied in the other
+        direction - so a requester cannot be locked out of retracting their
+        own request by a stray capital."""
+        withdraw(actor="  Analyst@AegisX.dev  ")
+
+    def test_an_absent_actor_cannot_withdraw(self) -> None:
+        with pytest.raises(approval.NotTheRequester):
+            withdraw(actor=None)
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            ResponseActionStatus.APPROVED,
+            ResponseActionStatus.REJECTED,
+            ResponseActionStatus.WITHDRAWN,
+        ],
+    )
+    def test_a_decided_request_cannot_be_withdrawn(self, status) -> None:
+        """Terminal stays terminal, including withdrawal itself. Retracting an
+        approved containment action would be an undo the platform does not
+        have."""
+        with pytest.raises(approval.NotDecidable):
+            withdraw(status=status)
+
+    def test_withdrawal_needs_the_authority_that_raised_it(self) -> None:
+        """A viewer could never have raised this request, so a viewer cannot
+        end one either - authority is re-checked at the decision rather than
+        assumed from the fact that a row exists."""
+        with pytest.raises(approval.UnauthorizedApproval):
+            withdraw(actor_role=VIEWER)
+
+    def test_an_unstated_role_is_refused(self) -> None:
+        with pytest.raises(approval.UnauthorizedApproval):
+            withdraw(actor_role=None)
+
+    @pytest.mark.parametrize("blank", [None, "", "   ", "\t\n"])
+    def test_withdrawal_needs_a_reason(self, blank) -> None:
+        """The request carried a justification; retracting it without one
+        leaves a record the next person cannot read."""
+        with pytest.raises(approval.ApprovalError):
+            withdraw(reason=blank)
+
+    def test_a_machine_cannot_withdraw_its_own_request(self) -> None:
+        """A stated limit rather than a hidden one.
+
+        A machine may *request* containment (see ``TestNonHumanActors``) but
+        holds no role, and withdrawal checks authority like every other
+        decision. This does not trap the request: an administrator can still
+        reject it, which is the path that ends it.
+        """
+        with pytest.raises(approval.UnauthorizedApproval):
+            withdraw(requested_by="ai:analyst", actor="ai:analyst", actor_role=None)
+
+    def test_withdrawal_cannot_state_an_evidence_digest_at_all(self) -> None:
+        """Not merely optional - absent. A parameter that existed and was
+        ignored would read as a check somebody could rely on."""
+        with pytest.raises(TypeError):
+            withdraw(expected_evidence_digest=DIGEST)
+
+
+class TestWithdrawalRefusalOrder:
+    """Same principle as ``TestRefusalOrder``: the first message is the one
+    the operator acts on."""
+
+    def test_a_decided_request_reports_that_before_anything_else(self) -> None:
+        with pytest.raises(approval.NotDecidable):
+            withdraw(
+                status=ResponseActionStatus.WITHDRAWN,
+                actor=APPROVER,
+                actor_role=VIEWER,
+                reason="",
+            )
+
+    def test_the_wrong_actor_is_reported_before_their_authority(self) -> None:
+        """Telling an administrator they lack a permission would send them to
+        ask for one that still would not let them withdraw it."""
+        with pytest.raises(approval.NotTheRequester):
+            withdraw(actor=APPROVER, actor_role=VIEWER, reason="")
+
+    def test_authority_is_reported_before_the_missing_reason(self) -> None:
+        with pytest.raises(approval.UnauthorizedApproval):
+            withdraw(actor_role=VIEWER, reason="")
+
+
 # --- The action vocabulary ------------------------------------------------
 
 
@@ -258,6 +387,116 @@ class TestActionTypesAreNamesOnly:
                 assert not any(
                     forbidden in name.lower() for name in names
                 ), f"{module.__name__} exposes {forbidden!r}"
+
+
+# --- Consequence ----------------------------------------------------------
+
+
+class TestConsequenceClassification:
+    """What an approver is signing, said out loud.
+
+    Every declared action is consequential - none of them is a read-only
+    recommendation - so the useful distinction is not *whether* it matters but
+    **how hard it is to undo**. An approver who isolates a host can un-isolate
+    it; one who quarantines a file may be facing a restore from backup.
+
+    This is description, not policy. See ``TestConsequenceIsNotAGate``.
+    """
+
+    def test_every_action_type_is_classified(self) -> None:
+        """Exhaustive on purpose. A sixth action added without a consequence
+        should fail here rather than quietly default to the milder tier."""
+        for action in ResponseActionType:
+            assert isinstance(consequence_of(action), ResponseActionConsequence)
+
+    def test_the_reversible_ones(self) -> None:
+        assert consequence_of(ResponseActionType.BLOCK_INDICATOR) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+        assert consequence_of(ResponseActionType.REVOKE_SESSION) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+        assert consequence_of(ResponseActionType.ISOLATE_ENDPOINT) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+
+    def test_the_disruptive_ones(self) -> None:
+        """Disabling an account locks a person out of their work; quarantining
+        a file may mean a restore. Both are undoable in principle and neither
+        is undoable by reversing the request."""
+        assert consequence_of(ResponseActionType.DISABLE_ACCOUNT) is (
+            ResponseActionConsequence.DISRUPTIVE
+        )
+        assert consequence_of(ResponseActionType.QUARANTINE_FILE) is (
+            ResponseActionConsequence.DISRUPTIVE
+        )
+
+    def test_it_accepts_the_stored_string_form(self) -> None:
+        """The column holds a string, so the function must take one."""
+        assert consequence_of("isolate_endpoint") is consequence_of(
+            ResponseActionType.ISOLATE_ENDPOINT
+        )
+
+    def test_an_unknown_action_has_no_consequence_rather_than_a_mild_one(self) -> None:
+        """Fails closed. Guessing REVERSIBLE for something the taxonomy has
+        never seen would understate exactly the case worth overstating."""
+        with pytest.raises(ValueError):
+            consequence_of("delete_everything")
+
+    def test_there_is_no_harmless_tier(self) -> None:
+        """No action occupies a 'read-only recommendation' tier, so there is
+        not one. An empty tier is decoration, and a tier that exists invites a
+        later action to be filed under it to avoid the approval."""
+        assert set(ResponseActionConsequence) == {
+            ResponseActionConsequence.REVERSIBLE,
+            ResponseActionConsequence.DISRUPTIVE,
+        }
+
+
+class TestConsequenceIsNotAGate:
+    """The load-bearing tests of this phase.
+
+    A classification beside a control is a standing invitation to make the
+    control conditional on it. It is not: every tier requires four eyes, an
+    authority and a stated evidence digest, identically. The classification
+    tells an approver what they are signing; it decides nothing.
+    """
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_four_eyes_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.SelfApprovalRefused):
+            approve(approver=REQUESTER)
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_authority_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.UnauthorizedApproval):
+            approve(approver_role=ANALYST)
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_freshness_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.FreshnessRequired):
+            approve(expected_evidence_digest=None)
+
+    def test_the_approval_rules_never_see_a_consequence(self) -> None:
+        """Structural, in the spirit of `test_nothing_dispatches_on_an_action
+        _type`: the approval module takes no consequence argument and does not
+        reference the taxonomy, so no future edit can make a check conditional
+        on it without this failing first.
+        """
+        import inspect
+
+        import app.response.approval as approval_module
+
+        source = inspect.getsource(approval_module)
+        assert "consequence" not in source.lower(), (
+            "app.response.approval referenced a consequence. The classification "
+            "describes what an approver is signing; it must not decide whether "
+            "a check runs."
+        )
+        for name in ("check_approval", "check_rejection", "check_withdrawal"):
+            parameters = inspect.signature(getattr(approval_module, name)).parameters
+            assert "consequence" not in parameters
+            assert "action_type" not in parameters
 
 
 # --- The consolidation ----------------------------------------------------

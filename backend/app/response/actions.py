@@ -36,6 +36,34 @@ class ResponseActionType(str, Enum):
     QUARANTINE_FILE = "quarantine_file"
 
 
+class ResponseActionConsequence(str, Enum):
+    """How hard an action is to undo, said out loud for the approver.
+
+    Every declared action is consequential - none of them is a read-only
+    recommendation - so "is this consequential?" is not the useful question and
+    there is deliberately **no harmless tier**. An empty tier would be
+    decoration, and worse: a tier that exists invites a later action to be
+    filed under it to avoid the approval.
+
+    The useful question is how hard the thing is to reverse. An approver who
+    isolates a host can un-isolate it in a minute; one who quarantines a file
+    may be facing a restore. Both need the same approval, and the approver
+    deserves to know which one they are signing.
+
+    **This is description, not policy.** Nothing in ``app.response.approval``
+    reads it, and a test asserts that module never even mentions the word, so
+    no later edit can make a check conditional on the tier without failing
+    first. If a policy layer ever wants to key on this, it can - but it will be
+    a new thing that has to argue for itself, not a quiet weakening of the
+    checks that exist.
+    """
+
+    #: Undone by the operator who applied it, on the same system, in minutes.
+    REVERSIBLE = "reversible"
+    #: Undone only by going somewhere else - a helpdesk ticket, a restore.
+    DISRUPTIVE = "disruptive"
+
+
 class ResponseActionStatus(str, Enum):
     """Where a request has got to.
 
@@ -75,3 +103,40 @@ def parameters_digest(parameters: Mapping[str, Any] | None) -> str:
         dict(parameters or {}), sort_keys=True, separators=(",", ":"), default=str
     )
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+#: Every action, classified. Exhaustive by construction - see below.
+_CONSEQUENCE: dict[ResponseActionType, ResponseActionConsequence] = {
+    # Reversible: the operator who applied it takes it back, on the same
+    # system, without involving anybody else.
+    ResponseActionType.ISOLATE_ENDPOINT: ResponseActionConsequence.REVERSIBLE,
+    ResponseActionType.REVOKE_SESSION: ResponseActionConsequence.REVERSIBLE,
+    ResponseActionType.BLOCK_INDICATOR: ResponseActionConsequence.REVERSIBLE,
+    # Disruptive: undoing it means going somewhere else. Disabling an account
+    # locks a person out of their work until somebody re-enables it;
+    # quarantining a file can mean a restore.
+    ResponseActionType.DISABLE_ACCOUNT: ResponseActionConsequence.DISRUPTIVE,
+    ResponseActionType.QUARANTINE_FILE: ResponseActionConsequence.DISRUPTIVE,
+}
+
+_unclassified = set(ResponseActionType) - set(_CONSEQUENCE)
+if _unclassified:  # pragma: no cover - a wiring error, caught at import
+    raise RuntimeError(
+        "Every response action must be classified: "
+        f"{sorted(item.value for item in _unclassified)} are not. Failing at "
+        "import rather than at the moment somebody approves one, and rather "
+        "than defaulting to the milder tier - which would understate exactly "
+        "the case worth overstating."
+    )
+
+
+def consequence_of(
+    action_type: ResponseActionType | str,
+) -> ResponseActionConsequence:
+    """How hard this action is to undo.
+
+    Takes the stored string form as well as the enum, because the column holds
+    a string. An action the taxonomy has never seen raises rather than
+    resolving to the milder tier.
+    """
+    return _CONSEQUENCE[ResponseActionType(action_type)]

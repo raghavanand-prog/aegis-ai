@@ -29,8 +29,8 @@ from sqlalchemy.orm import Session
 
 from app.adaptation.drift.monitor import latest_by_feature
 from app.adaptation.proposals import service as proposals
-from app.ai import sanitize
 from app.ai.grounding import TECHNIQUE_PATTERN
+from app.core import sanitize
 from app.ml.registry import registry
 from app.ml.schemas import FEATURE_SCHEMA_VERSION
 from app.models.adaptation import AdaptationProposal, AnalystFeedback

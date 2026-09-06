@@ -234,9 +234,19 @@ hand-crafted request must be refused identically.
 | A consequential decision records the evidence it rested on | `decision_service.bind` |
 | A decision on stale evidence is refused (409) | `decision_service.check_expected_digest` |
 | An approver is never the requester | `response/approval.py` |
+| Only the requester may withdraw a request (V10) | `approval.check_requester` — four-eyes inverted: approval forbids one actor, withdrawal requires that same one, so no ordering of calls reaches `approved` without a second person |
+| Withdrawal re-checks authority at the decision (V10) | `approval.check_request_authority` — a role can be reduced between raising a request and ending it |
 | A non-human actor cannot approve | `core/actors.py` — one shared rule |
 | Request parameters cannot change between request and approval | `parameters_digest` |
 | One account's cloud posture never appears on another's incident | `cloud_posture_service._belongs_to` |
+
+The `consequence` an action carries (`reversible` or `disruptive`, V10) is
+**description, not policy**. It is derived server-side, never stored, never
+accepted on input, and no check reads it — a structural test asserts that
+`app/response/approval.py` does not so much as mention the word, so no later
+edit can quietly make a control conditional on the tier. There is deliberately
+no harmless tier: an empty one would invite a future action to be filed under it
+to avoid the approval.
 
 ### Four-eyes is real, not advisory
 

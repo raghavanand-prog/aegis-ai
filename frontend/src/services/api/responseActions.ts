@@ -21,6 +21,9 @@ export type ResponseActionType =
   | "revoke_session"
   | "quarantine_file";
 
+/** How hard an action is to undo. Descriptive; it gates nothing. */
+export type ResponseActionConsequence = "reversible" | "disruptive";
+
 export interface ApiResponseAction {
   requestRef: string;
   incidentRef: string;
@@ -28,6 +31,15 @@ export interface ApiResponseAction {
   parameters: Record<string, unknown>;
   parametersDigest: string;
   justification: string;
+  /**
+   * How hard the action is to undo, derived server-side from `actionType`.
+   *
+   * It changes no rule. Every consequence needs the same second person, the
+   * same authority and the same stated evidence digest - this tells the
+   * approver what they are signing, and the UI must not present it as if it
+   * relaxed anything.
+   */
+  consequence: ResponseActionConsequence;
   status: ResponseActionStatus;
   requestedBy: string;
   requestedByRole: string | null;
@@ -99,6 +111,26 @@ export async function rejectResponseAction(
 ): Promise<ApiResponseAction> {
   const { data } = await api.post<ApiResponseAction>(
     `/incidents/${incidentId}/response-actions/${requestRef}/reject`,
+    input,
+  );
+  return data;
+}
+
+/**
+ * Withdraw a request you raised.
+ *
+ * Only the requester may withdraw - four-eyes read backwards. An administrator
+ * who disagrees uses `reject`, which records the refusal under their own name.
+ * No evidence digest: a withdrawal cannot be refused because the evidence
+ * moved, or a request whose evidence changed would be trapped pending forever.
+ */
+export async function withdrawResponseAction(
+  incidentId: string,
+  requestRef: string,
+  input: { reason: string },
+): Promise<ApiResponseAction> {
+  const { data } = await api.post<ApiResponseAction>(
+    `/incidents/${incidentId}/response-actions/${requestRef}/withdraw`,
     input,
   );
   return data;

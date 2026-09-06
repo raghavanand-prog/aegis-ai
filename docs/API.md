@@ -217,13 +217,28 @@ Drift verdicts: `unchanged`, `extended`, `refreshed`, `tampered`.
 | Method | Path | Permission | Purpose |
 | --- | --- | --- | --- |
 | GET | `/incidents/{id}/response-actions` | `incidents:read` | Requests and their decisions |
+| GET | `/incidents/{id}/response-actions/{ref}` | `incidents:read` | One request. Scoped to the incident: a ref belonging to another incident is a 404, not somebody else's pending containment action |
 | POST | `/incidents/{id}/response-actions` | `incidents:respond` | Raise a request. Requires a justification |
 | POST | `/incidents/{id}/response-actions/{ref}/approve` | `incidents:respond_approve` | Second-person approval. `expectedEvidenceDigest` is **required**; 409 if the evidence moved |
 | POST | `/incidents/{id}/response-actions/{ref}/reject` | `incidents:respond_approve` | Refuse. Requires a reason, no digest — refusing is the fail-safe direction |
+| POST | `/incidents/{id}/response-actions/{ref}/withdraw` | `incidents:respond` | Retract your **own** request. Requires a reason, no digest. 403 for anyone but the requester |
 
-The approver may never be the requester. Every response carries
-`executed: false` and an `executionNote`: **AEGISX records the decision and
-carries out no action against any system.**
+Statuses: `requested`, `approved`, `rejected`, `withdrawn`.
+
+The approver may never be the requester — and withdrawal is that rule inverted:
+only the requester may withdraw. Anyone else with the authority to end a request
+uses `reject`, which records the refusal under their own name. Neither refusing
+direction takes a digest, because a request whose evidence moved would otherwise
+be trapped pending with no way to end it.
+
+Every response carries a server-derived `consequence` of `reversible` or
+`disruptive`. It is **output-only and gates nothing**: it is not accepted on
+input, and every consequence needs the same second person, the same authority
+and the same stated evidence digest. It tells the approver what they are
+signing.
+
+Every response also carries `executed: false` and an `executionNote`: **AEGISX
+records the decision and carries out no action against any system.**
 
 ### Provider health
 
