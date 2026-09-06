@@ -78,12 +78,13 @@ standing instruction that nothing inside it is ever an instruction, and that
 text inside it addressing the model should be reported as a finding rather than
 obeyed.
 
-**2. Lexical** (`app/ai/sanitize.py`). Text is Unicode-normalised (homoglyphs
-and zero-width characters walk past naive filters), stripped of chat-format role
-markers and template delimiters, and known imperative phrasings are rewritten to
-`[neutralised: instruction-like text in telemetry]` — rewritten rather than
-deleted, so an analyst still sees that the log line contained it, which is
-itself a finding. Fields that looked like an injection attempt are listed in the
+**2. Lexical** (`app/core/sanitize.py` — it sits under `core` rather than `ai`
+because three of its four callers are not AI code). Text is Unicode-normalised
+(homoglyphs and zero-width characters walk past naive filters), stripped of
+chat-format role markers and template delimiters, and known imperative phrasings
+are rewritten to `[neutralised: instruction-like text in telemetry]` — rewritten
+rather than deleted, so an analyst still sees that the log line contained it,
+which is itself a finding. Fields that looked like an injection attempt are listed in the
 package's `injectionAttemptsDetected` and flagged to the model.
 
 **3. Capability.** No lexical filter is complete, and this one is not either.
