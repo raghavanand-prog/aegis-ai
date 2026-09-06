@@ -26,6 +26,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.response_action import ResponseActionRequest
+from app.observability import instruments
 from app.response import approval
 from app.response.actions import (
     ResponseActionStatus,
@@ -183,6 +184,7 @@ def approve_action(
         decision_type=RESPONSE_ACTION_APPROVAL,
     )
 
+    instruments.response_actions.increment(labels={"outcome": "approved"})
     record.status = ResponseActionStatus.APPROVED.value
     record.decided_by = approver
     record.decided_by_role = approver_role
@@ -230,6 +232,7 @@ def reject_action(
         decision_type=RESPONSE_ACTION_REJECTION,
     )
 
+    instruments.response_actions.increment(labels={"outcome": "rejected"})
     record.status = ResponseActionStatus.REJECTED.value
     record.decided_by = approver
     record.decided_by_role = approver_role

@@ -33,6 +33,7 @@ from app.evidence.binding import DriftReport, EvidenceSnapshot, classify_drift
 from app.incidents import lifecycle
 from app.models.decision import DecisionEvidenceBinding
 from app.models.enums import IncidentStatus
+from app.observability import instruments
 
 logger = logging.getLogger(__name__)
 
@@ -189,4 +190,8 @@ def verify(
 ) -> DriftReport:
     """Has the evidence behind this decision moved since it was taken?"""
     recorded = EvidenceSnapshot.from_dict(binding.evidence_snapshot or {})
-    return classify_drift(recorded, snapshot_for(db, incident))
+    report = classify_drift(recorded, snapshot_for(db, incident))
+    # `tampered` is the one worth an alert: evidence a decision rested on has
+    # been altered rather than merely added to or refreshed.
+    instruments.evidence_drift.increment(labels={"verdict": report.verdict.value})
+    return report

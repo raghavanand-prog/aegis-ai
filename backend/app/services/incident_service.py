@@ -12,6 +12,7 @@ from app.models.enums import AuditAction, IncidentStatus, UserRole
 from app.models.event import Event
 from app.models.incident import Incident
 from app.models.user import User
+from app.observability import instruments
 from app.repositories.event_repository import event_repository
 from app.repositories.incident_repository import incident_repository
 from app.schemas.event import EventPromoteRequest
@@ -342,6 +343,7 @@ def update_incident(
 
         incident.status = target.value
         incident.resolved_at = _resolved_at_for(incident, target)
+        instruments.incident_transitions.increment(labels={"target": target.value})
 
         binding = None
         if evidence_snapshot is not None:
