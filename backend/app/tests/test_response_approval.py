@@ -17,8 +17,10 @@ from app.core import actors
 from app.models.enums import UserRole
 from app.response import approval
 from app.response.actions import (
+    ResponseActionConsequence,
     ResponseActionStatus,
     ResponseActionType,
+    consequence_of,
     parameters_digest,
 )
 
@@ -385,6 +387,116 @@ class TestActionTypesAreNamesOnly:
                 assert not any(
                     forbidden in name.lower() for name in names
                 ), f"{module.__name__} exposes {forbidden!r}"
+
+
+# --- Consequence ----------------------------------------------------------
+
+
+class TestConsequenceClassification:
+    """What an approver is signing, said out loud.
+
+    Every declared action is consequential - none of them is a read-only
+    recommendation - so the useful distinction is not *whether* it matters but
+    **how hard it is to undo**. An approver who isolates a host can un-isolate
+    it; one who quarantines a file may be facing a restore from backup.
+
+    This is description, not policy. See ``TestConsequenceIsNotAGate``.
+    """
+
+    def test_every_action_type_is_classified(self) -> None:
+        """Exhaustive on purpose. A sixth action added without a consequence
+        should fail here rather than quietly default to the milder tier."""
+        for action in ResponseActionType:
+            assert isinstance(consequence_of(action), ResponseActionConsequence)
+
+    def test_the_reversible_ones(self) -> None:
+        assert consequence_of(ResponseActionType.BLOCK_INDICATOR) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+        assert consequence_of(ResponseActionType.REVOKE_SESSION) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+        assert consequence_of(ResponseActionType.ISOLATE_ENDPOINT) is (
+            ResponseActionConsequence.REVERSIBLE
+        )
+
+    def test_the_disruptive_ones(self) -> None:
+        """Disabling an account locks a person out of their work; quarantining
+        a file may mean a restore. Both are undoable in principle and neither
+        is undoable by reversing the request."""
+        assert consequence_of(ResponseActionType.DISABLE_ACCOUNT) is (
+            ResponseActionConsequence.DISRUPTIVE
+        )
+        assert consequence_of(ResponseActionType.QUARANTINE_FILE) is (
+            ResponseActionConsequence.DISRUPTIVE
+        )
+
+    def test_it_accepts_the_stored_string_form(self) -> None:
+        """The column holds a string, so the function must take one."""
+        assert consequence_of("isolate_endpoint") is consequence_of(
+            ResponseActionType.ISOLATE_ENDPOINT
+        )
+
+    def test_an_unknown_action_has_no_consequence_rather_than_a_mild_one(self) -> None:
+        """Fails closed. Guessing REVERSIBLE for something the taxonomy has
+        never seen would understate exactly the case worth overstating."""
+        with pytest.raises(ValueError):
+            consequence_of("delete_everything")
+
+    def test_there_is_no_harmless_tier(self) -> None:
+        """No action occupies a 'read-only recommendation' tier, so there is
+        not one. An empty tier is decoration, and a tier that exists invites a
+        later action to be filed under it to avoid the approval."""
+        assert set(ResponseActionConsequence) == {
+            ResponseActionConsequence.REVERSIBLE,
+            ResponseActionConsequence.DISRUPTIVE,
+        }
+
+
+class TestConsequenceIsNotAGate:
+    """The load-bearing tests of this phase.
+
+    A classification beside a control is a standing invitation to make the
+    control conditional on it. It is not: every tier requires four eyes, an
+    authority and a stated evidence digest, identically. The classification
+    tells an approver what they are signing; it decides nothing.
+    """
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_four_eyes_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.SelfApprovalRefused):
+            approve(approver=REQUESTER)
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_authority_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.UnauthorizedApproval):
+            approve(approver_role=ANALYST)
+
+    @pytest.mark.parametrize("action", list(ResponseActionType))
+    def test_freshness_holds_for_every_consequence(self, action) -> None:
+        with pytest.raises(approval.FreshnessRequired):
+            approve(expected_evidence_digest=None)
+
+    def test_the_approval_rules_never_see_a_consequence(self) -> None:
+        """Structural, in the spirit of `test_nothing_dispatches_on_an_action
+        _type`: the approval module takes no consequence argument and does not
+        reference the taxonomy, so no future edit can make a check conditional
+        on it without this failing first.
+        """
+        import inspect
+
+        import app.response.approval as approval_module
+
+        source = inspect.getsource(approval_module)
+        assert "consequence" not in source.lower(), (
+            "app.response.approval referenced a consequence. The classification "
+            "describes what an approver is signing; it must not decide whether "
+            "a check runs."
+        )
+        for name in ("check_approval", "check_rejection", "check_withdrawal"):
+            parameters = inspect.signature(getattr(approval_module, name)).parameters
+            assert "consequence" not in parameters
+            assert "action_type" not in parameters
 
 
 # --- The consolidation ----------------------------------------------------

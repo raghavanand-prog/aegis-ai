@@ -78,6 +78,13 @@ class ResponseActionRead(CamelModel):
     #: against this, so editing the row between request and approval is refused.
     parameters_digest: str
     justification: str
+    #: How hard this action is to undo, derived server-side from `actionType`.
+    #: Read-only and not accepted on input: a client that could declare its own
+    #: account deletion "reversible" would be classifying its own blast radius.
+    #: It changes no check - every consequence needs the same four eyes, the
+    #: same authority and the same stated evidence digest - it tells the
+    #: approver what they are signing.
+    consequence: str
     status: str
     requested_by: str
     requested_by_role: str | None = None
