@@ -54,7 +54,8 @@ fired, severity, risk contribution and MITRE techniques.
 | GET | `/incidents/{id}` | `incidents:read` | One incident with events, IOCs and timeline |
 | POST | `/incidents` | `incidents:create` | Create from one or more events |
 | PATCH | `/incidents/{id}` | `incidents:update` | Status, severity, assignment |
-| POST | `/incidents/{id}/response` | `incidents:respond` | Record a response action (recorded, never executed) |
+| POST | `/incidents/{id}/response` | `incidents:respond` | V7 placeholder: a single-party free-text note (recorded, never executed). V9 left it unchanged — see the V9 section below |
+| GET | `/incidents/{id}/transitions` | `incidents:read` | Which states this incident may move to, and what each would take |
 
 ### detection
 
@@ -184,3 +185,71 @@ Six new permissions, on the existing three roles — no new role was introduced:
 | `feedback:read`, `drift:read`, `adaptation:read` | ✅ | ✅ | ✅ |
 | `feedback:submit`, `adaptation:propose` | | ✅ | ✅ |
 | `adaptation:approve`, `adaptation:deploy` | | | ✅ |
+
+---
+
+## V9: evidence, decisions, approval, providers, cloud, metrics
+
+Thirteen paths. `PATCH /incidents/{id}` also gained an optional
+`expectedEvidenceDigest`, and `GET /incidents/{id}/transitions` is listed above.
+
+### Investigation evidence
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/incidents/{id}/evidence` | `incidents:read` | The evidence set, with provenance, a manifest digest and any degraded providers |
+| GET | `/incidents/{id}/evidence/{evidence_id}` | `incidents:read` | One item. Scoped to the incident: an id learned elsewhere resolves to nothing |
+
+Evidence is a **read-only projection**. There is no create, update or delete
+route, by design.
+
+### Decisions and evidence integrity
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/incidents/{id}/decisions` | `incidents:read` | Consequential decisions and the evidence each rested on |
+| GET | `/incidents/{id}/decisions/{decision_ref}` | `incidents:read` | One decision with its drift verdict |
+
+Drift verdicts: `unchanged`, `extended`, `refreshed`, `tampered`.
+
+### Response actions — approved, never executed
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/incidents/{id}/response-actions` | `incidents:read` | Requests and their decisions |
+| POST | `/incidents/{id}/response-actions` | `incidents:respond` | Raise a request. Requires a justification |
+| POST | `/incidents/{id}/response-actions/{ref}/approve` | `incidents:respond_approve` | Second-person approval. `expectedEvidenceDigest` is **required**; 409 if the evidence moved |
+| POST | `/incidents/{id}/response-actions/{ref}/reject` | `incidents:respond_approve` | Refuse. Requires a reason, no digest — refusing is the fail-safe direction |
+
+The approver may never be the requester. Every response carries
+`executed: false` and an `executionNote`: **AEGISX records the decision and
+carries out no action against any system.**
+
+### Provider health
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/providers` | `telemetry:read` | Every evidence provider, what it produces, and its health |
+
+Read-only. There is no enable, disable, reconfigure or retry.
+
+### Cloud posture — **simulated**
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/cloud/findings` | `cloud:read` | Misconfigurations, worst severity first |
+| POST | `/cloud/scan` | `cloud:scan` | Re-run the local checks over the committed snapshots. Audited |
+
+Every response carries a `note` stating that no cloud account was contacted.
+The scan takes no path, URL or credential from the caller. See
+`docs/CLAUDE_HANDOFF_V9.md` §9.
+
+### Metrics
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| GET | `/metrics` | `telemetry:read` | Prometheus text exposition |
+
+**Requires a session**, unlike the usual open `/metrics`: request rates and
+incident volumes describe how much security activity an organisation handles.
+No metric is labelled by user, incident, account or indicator.

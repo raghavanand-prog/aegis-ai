@@ -232,6 +232,7 @@ false-positive-rate ceiling on the detection evaluation.
 | [docs/V5_EXPERIMENTAL_DESIGN.md](docs/V5_EXPERIMENTAL_DESIGN.md) | Pre-registered V5 design and predictions |
 | [docs/V5_RESEARCH_REPORT.md](docs/V5_RESEARCH_REPORT.md) | Measured static-vs-adaptive results |
 | [docs/ADAPTATION_CARD.md](docs/ADAPTATION_CARD.md) | The standard record for a production-affecting change |
+| [docs/CLAUDE_HANDOFF_V9.md](docs/CLAUDE_HANDOFF_V9.md) | V9 security-operations layer: lifecycle, evidence, approval, cloud posture, metrics — and what it deliberately does not do |
 
 ## Adaptive SOC (V5)
 
