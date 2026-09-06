@@ -28,6 +28,15 @@ class Permission(str, Enum):
     INCIDENTS_CREATE = "incidents:create"
     INCIDENTS_UPDATE = "incidents:update"
     INCIDENTS_RESPOND = "incidents:respond"
+    # V9: requesting a containment action and signing one off are separate
+    # authorities, exactly as proposing an adaptation is separate from
+    # approving it. An analyst raises the request; somebody else decides.
+    INCIDENTS_RESPOND_APPROVE = "incidents:respond_approve"
+    # V9: sealing an incident is a separate authority from working one.
+    # `Closed` is terminal - nothing reopens it - so the act of closing is the
+    # last word on what the SOC concluded, and it is the one incident
+    # transition an analyst cannot take alone.
+    INCIDENTS_CLOSE = "incidents:close"
 
     # Threat intelligence / indicators
     IOCS_READ = "iocs:read"
@@ -42,6 +51,13 @@ class Permission(str, Enum):
     # operation on purpose - it is minutes of CPU over a whole corpus, which is
     # not something an HTTP request should be able to trigger.
     EVALUATION_READ = "evaluation:read"
+
+    # V9 Phase G: cloud security posture.
+    #: Reading findings is part of the SOC picture, like detection results.
+    CLOUD_READ = "cloud:read"
+    #: Running a scan is not. It writes rows every analyst then reads, and
+    #: a posture scan is the kind of act that should have a name against it.
+    CLOUD_SCAN = "cloud:scan"
 
     # Analyst feedback and controlled adaptation (V5). Reading what the SOC
     # concluded about its own detections is transparency, in the same spirit as
@@ -107,6 +123,9 @@ VIEWER_PERMISSIONS: frozenset[Permission] = frozenset(
         # Anyone who can see what the platform concluded may see how well it
         # actually performs.
         Permission.EVALUATION_READ,
+        # V9: a misconfiguration behind an incident is part of understanding
+        # it, so reading findings is not a privilege.
+        Permission.CLOUD_READ,
         # V5: feedback is part of the SOC picture - a viewer may see what
         # analysts concluded, and may not add to it.
         Permission.FEEDBACK_READ,
@@ -151,6 +170,16 @@ ADMIN_PERMISSIONS: frozenset[Permission] = ANALYST_PERMISSIONS | frozenset(
         # platform detects, which is the same class of act as activating a model.
         Permission.ADAPTATION_APPROVE,
         Permission.ADAPTATION_DEPLOY,
+        # V9 Phase G: running a posture scan writes findings the whole SOC
+        # reads, so it sits with the other acts that change shared state.
+        Permission.CLOUD_SCAN,
+        # V9: see the note on the permission. Closing is terminal, so it sits
+        # with the other authorities that end something rather than change it.
+        Permission.INCIDENTS_CLOSE,
+        # V9: deciding a response action. Kept off the analyst set on purpose -
+        # an analyst who could both raise and approve would make four-eyes a
+        # formality they satisfy by logging in twice.
+        Permission.INCIDENTS_RESPOND_APPROVE,
     }
 )
 

@@ -24,8 +24,13 @@ class Incident(Base, TimestampMixin):
         CheckConstraint(
             "severity IN ('Low', 'Medium', 'High', 'Critical')", name="ck_incidents_severity"
         ),
+        # V9 widened this to the full lifecycle. The constraint guards the
+        # spelling only - which state may follow which is enforced in
+        # `app.incidents.lifecycle`, because a CHECK constraint can see the row
+        # it is writing and not the one it replaces.
         CheckConstraint(
-            "status IN ('Open', 'Investigating', 'Contained', 'Resolved')",
+            "status IN ('Open', 'Triaged', 'Investigating', 'Containment Pending', "
+            "'Contained', 'Resolved', 'Closed')",
             name="ck_incidents_status",
         ),
         CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="ck_incidents_risk_score"),
@@ -64,6 +69,25 @@ class Incident(Base, TimestampMixin):
     events = relationship("Event", back_populates="incident", lazy="selectin")
     iocs = relationship("IOC", secondary=incident_iocs, back_populates="incidents", lazy="selectin")
     sequences = relationship("SecuritySequence", back_populates="incident", lazy="selectin")
+    # V9: what evidence each consequential decision on this incident was
+    # taken on. Append-only; ordered newest first for the workspace panel.
+    decision_bindings = relationship(
+        "DecisionEvidenceBinding",
+        back_populates="incident",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="DecisionEvidenceBinding.decided_at.desc()",
+    )
+    # V9 Phase E: containment actions requested against this incident. The
+    # request records what was wanted; approving one records that a second
+    # person agreed and what evidence they agreed on. Nothing executes.
+    response_requests = relationship(
+        "ResponseActionRequest",
+        back_populates="incident",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="ResponseActionRequest.requested_at.desc()",
+    )
     ai_analyses = relationship(
         "AIAnalysis",
         back_populates="incident",
