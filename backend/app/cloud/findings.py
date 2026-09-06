@@ -19,8 +19,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from app.ai.sanitize import contains_injection_attempt, scrub_text, scrub_value
 from app.cloud.resources import ResourceRef
+from app.core.sanitize import contains_injection_attempt, scrub_text, scrub_value
 
 
 class FindingSeverity(str, Enum):
