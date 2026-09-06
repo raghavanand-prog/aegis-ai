@@ -1,0 +1,95 @@
+{
+  "$comment": [
+    "A SIMULATED AWS configuration snapshot. This file is hand-written to the",
+    "shape a posture scanner would read back from the AWS APIs. No AWS account",
+    "was contacted to produce it, no credentials exist in this project, and",
+    "nothing here describes real infrastructure. The account id below is one of",
+    "the reserved-looking all-ones values used throughout this repository's",
+    "fixtures precisely so it cannot be mistaken for a real account.",
+    "The resources are chosen to exercise every check, including the clean",
+    "ones - a fixture where everything is broken would never prove that a",
+    "check can decline to fire."
+  ],
+  "provider": "aws",
+  "account": "111111111111",
+  "generatedAt": "2026-01-05T09:00:00+00:00",
+  "isSimulated": true,
+  "resources": [
+    {
+      "arn": "arn:aws:s3:::aegisx-payroll-exports",
+      "kind": "s3_bucket",
+      "config": {
+        "publicAccessBlock": false,
+        "defaultEncryption": null,
+        "accessLogging": false
+      }
+    },
+    {
+      "arn": "arn:aws:s3:::aegisx-terraform-state",
+      "kind": "s3_bucket",
+      "config": {
+        "publicAccessBlock": true,
+        "defaultEncryption": "aws:kms",
+        "accessLogging": true
+      }
+    },
+    {
+      "arn": "arn:aws:iam::111111111111:role/aegisx-deploy",
+      "kind": "iam_role",
+      "config": {
+        "trustPolicyPrincipals": ["*"],
+        "attachedPolicies": ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      }
+    },
+    {
+      "arn": "arn:aws:iam::111111111111:role/aegisx-readonly",
+      "kind": "iam_role",
+      "config": {
+        "trustPolicyPrincipals": ["arn:aws:iam::111111111111:root"],
+        "attachedPolicies": ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+      }
+    },
+    {
+      "arn": "arn:aws:iam::111111111111:user/contractor.jsmith",
+      "kind": "iam_user",
+      "config": {
+        "mfaEnabled": false,
+        "consoleAccess": true,
+        "oldestAccessKeyAgeDays": 812,
+        "attachedPolicies": []
+      }
+    },
+    {
+      "arn": "arn:aws:iam::111111111111:user/ci-runner",
+      "kind": "iam_user",
+      "config": {
+        "mfaEnabled": false,
+        "consoleAccess": false,
+        "oldestAccessKeyAgeDays": 41,
+        "attachedPolicies": []
+      }
+    },
+    {
+      "arn": "arn:aws:ec2:eu-west-1:111111111111:security-group/sg-0bastion",
+      "kind": "security_group",
+      "config": {
+        "ingress": [
+          { "port": 22, "cidr": "0.0.0.0/0", "protocol": "tcp" },
+          { "port": 443, "cidr": "0.0.0.0/0", "protocol": "tcp" }
+        ]
+      }
+    },
+    {
+      "arn": "arn:aws:ec2:eu-west-1:111111111111:security-group/sg-0internal",
+      "kind": "security_group",
+      "config": {
+        "ingress": [{ "port": 22, "cidr": "10.0.0.0/8", "protocol": "tcp" }]
+      }
+    },
+    {
+      "arn": "arn:aws:cloudtrail:eu-west-1:111111111111:trail/aegisx-audit",
+      "kind": "cloudtrail_trail",
+      "config": { "isLogging": false, "isMultiRegion": true }
+    }
+  ]
+}
