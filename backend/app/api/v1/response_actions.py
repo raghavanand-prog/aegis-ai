@@ -2,6 +2,7 @@
 
     POST /incidents/{id}/response-actions               raise a request
     GET  /incidents/{id}/response-actions               list them
+    GET  /incidents/{id}/response-actions/{ref}         read one
     POST /incidents/{id}/response-actions/{ref}/approve sign one off
     POST /incidents/{id}/response-actions/{ref}/reject  refuse one
     POST /incidents/{id}/response-actions/{ref}/withdraw retract your own
@@ -177,6 +178,31 @@ def list_response_actions(
             "items": items,
         }
     )
+
+
+@router.get(
+    "/{incident_id}/response-actions/{request_ref}",
+    response_model=ResponseActionRead,
+    summary="One response action, by reference",
+    description=(
+        "The reference is scoped to its incident: one belonging to a different "
+        "incident resolves to 404 rather than to somebody else's pending containment "
+        "action. Reading is `incidents:read` - seeing what the SOC is deciding is not "
+        "a privilege, deciding it is."
+    ),
+    responses={404: {"model": Message, "description": "Unknown incident or request"}},
+)
+def read_response_action(
+    incident_id: str,
+    request_ref: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require(Permission.INCIDENTS_READ)),
+) -> ResponseActionRead:
+    incident = _incident_or_404(db, incident_id)
+    record = _request_or_404(db, incident, request_ref)
+    # The same `_render` the list uses. Two renderers onto one row is how the
+    # two surfaces end up disagreeing about a pending containment action.
+    return ResponseActionRead.model_validate(_render(db, record))
 
 
 @router.post(

@@ -96,6 +96,12 @@ def _reject(client: TestClient, headers: dict, incident_id: str, ref: str, **bod
     )
 
 
+def _get_one(client: TestClient, headers: dict, incident_id: str, ref: str):
+    return client.get(
+        f"/api/v1/incidents/{incident_id}/response-actions/{ref}", headers=headers
+    )
+
+
 def _withdraw(client: TestClient, headers: dict, incident_id: str, ref: str, **body):
     return client.post(
         f"/api/v1/incidents/{incident_id}/response-actions/{ref}/withdraw",
@@ -779,6 +785,81 @@ class TestWithdrawing:
         assert record.status == "requested"
         assert record.decided_by is None
         assert record.evidence_binding_id is None
+
+
+class TestReadingOne:
+    """One request by reference.
+
+    The list endpoint could already answer this by being filtered client-side,
+    which is exactly the arrangement that puts an authorization decision in the
+    browser. A caller that wants one request asks for one.
+    """
+
+    def test_a_request_can_be_read_by_reference(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        created = _request(client, analyst_headers, incident["id"]).json()
+
+        response = _get_one(client, auth_headers, incident["id"], created["requestRef"])
+        assert response.status_code == 200, response.text
+        assert response.json() == created
+
+    def test_it_renders_exactly_what_the_list_renders(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """Two surfaces onto one row must not be able to disagree - a field
+        that appears in one and not the other is how a reviewer ends up
+        believing the wrong thing about a pending containment action."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        digest = _manifest(client, auth_headers, incident["id"])
+        _approve(client, auth_headers, incident["id"], ref, expectedEvidenceDigest=digest)
+
+        listed = client.get(
+            f"/api/v1/incidents/{incident['id']}/response-actions", headers=auth_headers
+        ).json()["items"][0]
+        assert _get_one(client, auth_headers, incident["id"], ref).json() == listed
+
+    def test_a_viewer_may_read_one(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, viewer_headers: dict
+    ) -> None:
+        """Reading what the SOC is deciding is not a privilege; deciding it
+        is. Same split the list endpoint already makes."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        assert _get_one(client, viewer_headers, incident["id"], ref).status_code == 200
+
+    def test_it_requires_a_session(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        assert _get_one(client, {}, incident["id"], ref).status_code == 401
+
+    def test_an_unknown_reference_is_a_404(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        assert _get_one(client, auth_headers, incident["id"], "RAR-NOPE-0001").status_code == 404
+
+    def test_an_unknown_incident_is_a_404(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        assert _get_one(client, auth_headers, "INC-999999", "RAR-NOPE-0001").status_code == 404
+
+    def test_a_request_from_another_incident_is_not_reachable(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """The security-relevant one. A reference is scoped to its incident,
+        so guessing a neighbouring reference resolves to nothing rather than
+        to somebody else's pending containment action."""
+        first = _incident(client, auth_headers)
+        second = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, first["id"]).json()["requestRef"]
+
+        assert _get_one(client, auth_headers, second["id"], ref).status_code == 404
+        assert _get_one(client, auth_headers, first["id"], ref).status_code == 200
 
 
 class TestCrossIncidentAccess:
