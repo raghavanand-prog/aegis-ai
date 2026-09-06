@@ -34,6 +34,7 @@ from app.core.database import get_db
 from app.core.rbac import Permission
 from app.models.enums import AuditAction
 from app.models.user import User
+from app.response.actions import consequence_of
 from app.schemas.common import Message
 from app.schemas.response_action import (
     ResponseActionApprove,
@@ -93,6 +94,7 @@ def _render(db: Session, record) -> dict:
         "parameters": dict(record.parameters or {}),
         "parametersDigest": record.parameters_digest,
         "justification": record.justification,
+        "consequence": consequence_of(record.action_type).value,
         "status": record.status,
         "requestedBy": record.requested_by,
         "requestedByRole": record.requested_by_role,
@@ -288,6 +290,10 @@ def approve_response_action(
             "incidentId": incident.incident_id,
             "actionType": record.action_type,
             "requestedBy": record.requested_by,
+            # What class of thing was signed off, so an audit reader does not
+            # have to know the action taxonomy to see that an account was
+            # disabled rather than an indicator blocked.
+            "consequence": consequence_of(record.action_type).value,
             # The evidence this was signed off against, in the audit itself.
             # It is reachable through the binding row, but a reader should not
             # have to know to make that join to answer "what did they approve

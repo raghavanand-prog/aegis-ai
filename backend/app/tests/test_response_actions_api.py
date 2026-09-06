@@ -862,6 +862,103 @@ class TestReadingOne:
         assert _get_one(client, auth_headers, first["id"], ref).status_code == 200
 
 
+class TestConsequenceIsPublished:
+    """The approver has to be able to see what they are signing.
+
+    A classification the server keeps to itself informs nobody. It appears on
+    every surface that shows a request, and it is derived from the action type
+    rather than stored, so it cannot drift away from the taxonomy.
+    """
+
+    def test_a_request_reports_its_consequence(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        body = _request(client, analyst_headers, incident["id"]).json()
+        assert body["consequence"] == "reversible"
+
+    def test_a_disruptive_action_says_so(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        body = _request(
+            client,
+            analyst_headers,
+            incident["id"],
+            actionType="disable_account",
+            parameters={"account": "jdoe@aegisx.dev"},
+        ).json()
+        assert body["consequence"] == "disruptive"
+
+    def test_every_surface_agrees(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        created = _request(
+            client,
+            analyst_headers,
+            incident["id"],
+            actionType="quarantine_file",
+            parameters={"path": "C:/temp/x.exe"},
+        ).json()
+        ref = created["requestRef"]
+
+        one = _get_one(client, auth_headers, incident["id"], ref).json()
+        listed = client.get(
+            f"/api/v1/incidents/{incident['id']}/response-actions", headers=auth_headers
+        ).json()["items"][0]
+        assert created["consequence"] == one["consequence"] == listed["consequence"]
+        assert created["consequence"] == "disruptive"
+
+    def test_it_is_derived_and_not_stored(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """No column holds it, so the taxonomy is the single source. A stored
+        copy would be a second place for the answer to live and a second place
+        for it to be wrong."""
+        from app.models.response_action import ResponseActionRequest
+
+        incident = _incident(client, auth_headers)
+        _request(client, analyst_headers, incident["id"])
+        assert not hasattr(ResponseActionRequest, "consequence")
+
+    def test_a_client_cannot_state_its_own_consequence(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """The obvious attack on a classification: declare your account
+        deletion 'reversible'. The server derives it and ignores the claim."""
+        incident = _incident(client, auth_headers)
+        body = _request(
+            client,
+            analyst_headers,
+            incident["id"],
+            actionType="disable_account",
+            parameters={"account": "jdoe@aegisx.dev"},
+            consequence="reversible",
+        ).json()
+        assert body["consequence"] == "disruptive"
+
+    def test_the_approval_audit_records_what_was_signed_off(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(
+            client,
+            analyst_headers,
+            incident["id"],
+            actionType="disable_account",
+            parameters={"account": "jdoe@aegisx.dev"},
+        ).json()["requestRef"]
+        digest = _manifest(client, auth_headers, incident["id"])
+        _approve(client, auth_headers, incident["id"], ref, expectedEvidenceDigest=digest)
+
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.approved&targetId={ref}",
+            headers=auth_headers,
+        ).json()
+        assert audit["items"][0]["details"]["consequence"] == "disruptive"
+
+
 class TestCrossIncidentAccess:
     def test_a_request_from_another_incident_is_not_reachable(
         self, client: TestClient, auth_headers: dict, analyst_headers: dict
