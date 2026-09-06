@@ -265,8 +265,11 @@ class TestFutureKindsAreReservedNotFaked:
     """V9 declares the kinds later phases will produce so the contract is
     stable. It must not pretend anything produces them yet."""
 
+    # CLOUD_FINDING left this set in Phase G, when `aegisx.cloudposture`
+    # began producing it. That is the outcome this guard is written to force:
+    # a reserved kind either gains a real producer and stops being reserved,
+    # or it stays empty.
     RESERVED = {
-        EvidenceKind.CLOUD_FINDING,
         EvidenceKind.ENDPOINT_FINDING,
         EvidenceKind.IDENTITY_FINDING,
         EvidenceKind.NETWORK_FINDING,

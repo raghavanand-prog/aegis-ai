@@ -215,10 +215,12 @@ class TestFiltering:
     def test_a_reserved_kind_returns_empty_not_an_error(
         self, client: TestClient, auth_headers: dict
     ) -> None:
-        """``cloud_finding`` is a real member of the contract with no producer
-        yet. Asking for it is legitimate and the honest answer is 'none'."""
+        """``endpoint_finding`` is a real member of the contract with no
+        producer yet. Asking for it is legitimate and the honest answer is
+        'none'. This used to name ``cloud_finding``, which stopped being a
+        reserved kind in Phase G."""
         incident = _incident(client, auth_headers)
-        response = _evidence(client, auth_headers, incident["id"], kind="cloud_finding")
+        response = _evidence(client, auth_headers, incident["id"], kind="endpoint_finding")
         assert response.status_code == 200, response.text
         assert response.json()["items"] == []
 

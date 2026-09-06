@@ -61,9 +61,9 @@ def list_evidence(
     kind: EvidenceKind | None = Query(
         default=None,
         description=(
-            "Restrict to one kind. The reserved kinds (cloud_finding, endpoint_finding, "
-            "identity_finding, network_finding) are valid and currently return nothing - "
-            "no provider produces them yet."
+            "Restrict to one kind. The reserved kinds (endpoint_finding, identity_finding, "
+            "network_finding) are valid and currently return nothing - no provider "
+            "produces them yet. `cloud_finding` gained one in Phase G."
         ),
     ),
     provider: str | None = Query(default=None, max_length=64),
