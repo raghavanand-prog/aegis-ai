@@ -96,6 +96,14 @@ def _reject(client: TestClient, headers: dict, incident_id: str, ref: str, **bod
     )
 
 
+def _withdraw(client: TestClient, headers: dict, incident_id: str, ref: str, **body):
+    return client.post(
+        f"/api/v1/incidents/{incident_id}/response-actions/{ref}/withdraw",
+        json=body,
+        headers=headers,
+    )
+
+
 def _decisions(client: TestClient, headers: dict, incident_id: str):
     return client.get(f"/api/v1/incidents/{incident_id}/decisions", headers=headers).json()
 
@@ -459,6 +467,210 @@ class TestNothingExecutes:
 
         for request in (client.patch, client.put, client.delete):
             assert request(base, headers=auth_headers).status_code in (404, 405)
+
+
+class TestWithdrawing:
+    """Retraction by the requester.
+
+    The status existed in the enum and the CHECK constraint from V9 and
+    nothing could produce it - a schema-valid state no code path reached.
+    """
+
+    def test_the_requester_may_withdraw_their_own_request(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+
+        response = _withdraw(
+            client, analyst_headers, incident["id"], ref, reason="contained by hand"
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["status"] == "withdrawn"
+        assert body["decidedBy"] == ANALYST["email"]
+        assert body["decisionReason"] == "contained by hand"
+
+    def test_an_administrator_may_not_withdraw_somebody_elses_request(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """They reject it instead, under their own name. Checked here as well
+        as in the pure tests because this is the one authority an
+        administrator does *not* hold on this object."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+
+        response = _withdraw(
+            client, auth_headers, incident["id"], ref, reason="I disagree"
+        )
+        assert response.status_code == 403, response.text
+
+        listed = client.get(
+            f"/api/v1/incidents/{incident['id']}/response-actions", headers=auth_headers
+        ).json()
+        assert listed["items"][0]["status"] == "requested"
+
+    def test_a_viewer_may_not_withdraw(
+        self, client: TestClient, auth_headers: dict, viewer_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, auth_headers, incident["id"]).json()["requestRef"]
+        assert (
+            _withdraw(
+                client, viewer_headers, incident["id"], ref, reason="no"
+            ).status_code
+            == 403
+        )
+
+    def test_withdrawal_needs_a_reason(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        assert _withdraw(client, analyst_headers, incident["id"], ref).status_code == 422
+
+    def test_withdrawal_is_bound_to_the_evidence_of_the_moment(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """What was known when containment was called off is worth answering
+        later, exactly as for a rejection."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+
+        body = _withdraw(
+            client, analyst_headers, incident["id"], ref, reason="handled offline"
+        ).json()
+        assert body["decisionRef"] is not None
+
+        decisions = _decisions(client, auth_headers, incident["id"])["items"]
+        withdrawal = [
+            item
+            for item in decisions
+            if item["decisionType"] == "response_action.withdrawal"
+        ]
+        assert len(withdrawal) == 1, decisions
+        assert withdrawal[0]["decisionRef"] == body["decisionRef"]
+
+    def test_withdrawal_is_not_blocked_by_evidence_that_moved(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """The fail-safe direction. If drift could block a withdrawal, a
+        request whose evidence changed would be trapped pending forever."""
+        from app.services import incident_service
+
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+
+        stored = incident_service.get_incident(db, incident["id"])
+        stored.events[0].hostname = "MOVED-AFTER-REQUEST"
+        db.commit()
+
+        response = _withdraw(
+            client, analyst_headers, incident["id"], ref, reason="no longer needed"
+        )
+        assert response.status_code == 200, response.text
+
+    def test_a_withdrawn_request_cannot_then_be_approved(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """The adversarial one. Withdrawal must not become a way to move a
+        request into a state a second person never signed off."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        assert (
+            _withdraw(
+                client, analyst_headers, incident["id"], ref, reason="stand down"
+            ).status_code
+            == 200
+        )
+
+        response = _approve(
+            client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+        )
+        assert response.status_code == 409, response.text
+
+        listed = client.get(
+            f"/api/v1/incidents/{incident['id']}/response-actions", headers=auth_headers
+        ).json()
+        assert listed["items"][0]["status"] == "withdrawn"
+
+    def test_a_withdrawn_request_cannot_be_withdrawn_again(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        _withdraw(client, analyst_headers, incident["id"], ref, reason="stand down")
+
+        assert (
+            _withdraw(
+                client, analyst_headers, incident["id"], ref, reason="again"
+            ).status_code
+            == 409
+        )
+
+    def test_an_approved_request_cannot_be_withdrawn(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """No undo. An approved containment action is a decision a second
+        person took; the requester cannot unmake it."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        reviewed = _manifest(client, auth_headers, incident["id"])
+        assert (
+            _approve(
+                client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+            ).status_code
+            == 200
+        )
+
+        assert (
+            _withdraw(
+                client, analyst_headers, incident["id"], ref, reason="changed my mind"
+            ).status_code
+            == 409
+        )
+
+    def test_withdrawing_is_audited(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        _withdraw(client, analyst_headers, incident["id"], ref, reason="handled offline")
+
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.withdrawn&targetId={ref}",
+            headers=auth_headers,
+        ).json()
+        assert audit["total"] >= 1, audit
+
+    def test_the_service_refuses_without_the_router(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """The API is one caller. A wrong actor reaching the service directly
+        gets the same refusal and mutates nothing, without a rollback."""
+        from app.response import approval
+        from app.services import incident_service, response_action_service
+
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+
+        stored = incident_service.get_incident(db, incident["id"])
+        record = response_action_service.get_for_incident(db, stored, ref)
+
+        with pytest.raises(approval.NotTheRequester):
+            response_action_service.withdraw_action(
+                db,
+                stored,
+                record,
+                actor="somebody.else@aegisx.dev",
+                actor_role="admin",
+                reason="not mine to retract",
+            )
+        assert record.status == "requested"
+        assert record.decided_by is None
+        assert record.evidence_binding_id is None
 
 
 class TestCrossIncidentAccess:

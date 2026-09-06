@@ -91,9 +91,14 @@ class ResponseActionRequest(Base):
     )
     decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    #: The evidence binding recorded when this was approved. NULL for a request
-    #: that is still pending, was rejected, or was withdrawn - none of which
-    #: rest on evidence the way an approval does.
+    #: The evidence binding recorded when this request was decided - approved,
+    #: rejected or withdrawn alike. NULL only while it is still pending.
+    #:
+    #: **This comment used to say the opposite**, claiming a binding was written
+    #: for approvals only, while ``reject_action`` had bound evidence since the
+    #: day it was written. What a security-critical record rests on is exactly
+    #: the thing a stale comment must not be wrong about, so it is corrected
+    #: here rather than left as the reading a hurried reviewer would take.
     evidence_binding_id: Mapped[int | None] = mapped_column(
         ForeignKey("decision_evidence_bindings.id", ondelete="SET NULL"), nullable=True
     )
