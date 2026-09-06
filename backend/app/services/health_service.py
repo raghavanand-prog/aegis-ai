@@ -193,3 +193,27 @@ def enrichment_health() -> dict[str, Any]:
         ),
         **state,
     }
+
+
+def cloud_posture_health() -> dict[str, Any]:
+    """Always degraded, and the reason is the point.
+
+    Every posture scan AEGISX can run is simulated: findings come from
+    configuration snapshots on disk, there is no cloud SDK in this project, no
+    credentials and no network call on this path. A *healthy* cloud posture
+    provider would be claiming a capability the platform does not have, so this
+    probe never returns one.
+
+    Deliberately does not touch the database. Phase F calls ``health()`` on
+    every provider on every evidence collection, and a probe that opened a
+    session each time would put a query on the hot path to report something
+    that is constant.
+    """
+    return {
+        "status": DEGRADED,
+        "reason": (
+            "Cloud posture is simulated. Findings come from configuration "
+            "snapshots on disk; no cloud provider has been contacted."
+        ),
+        "isSimulated": True,
+    }
