@@ -1,3 +1,4 @@
+import CloudPosturePanel from "@/features/cloud/components/CloudPosturePanel";
 import ProviderHealthPanel from "@/features/providers/components/ProviderHealthPanel";
 
 /**
@@ -19,6 +20,7 @@ export default function SettingsPage() {
       </div>
 
       <ProviderHealthPanel />
+      <CloudPosturePanel />
     </div>
   );
 }
