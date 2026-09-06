@@ -94,7 +94,7 @@ the same invocation. Counts are from the run's own output:
 | I | 1153 | 1153 passed, 0 skipped, exit 0 |
 | F | 1171 | 1171 passed, 0 skipped, exit 0 |
 | G | 1226 | 1226 passed, 0 skipped, exit 0 |
-| H | see §11 | run in progress when this section was written |
+| H | 1261 | 1261 passed, 0 skipped, exit 0 |
 
 Frontend at Phase G: **124 tests / 15 files**, `npm run verify` exit 0
 (vitest + `tsc -b` + `vite build`). It was 83 tests / 11 files at the start of
@@ -396,10 +396,15 @@ Without softening:
 
 ---
 
-## 11. Verification of Phase H **[LIMITATION]**
+## 11. Verification of Phase H **[MEASURED]**
 
-At the time this section was written the Phase H full-suite run had not
-finished. What *was* verified:
+Closed. The full backend run finished at **1261 passed, 0 skipped, 0 failed,
+exit 0** — Phase G's 1226 plus Phase H's 35. Zero skips is the part that
+matters: it confirms `test_database_postgres.py` actually ran rather than
+skipping its module against a dead server (§12).
+
+Phase H touches the request middleware on *every* request, so this run is what
+makes it verified rather than merely tested in isolation. Also checked:
 
 - All 35 Phase H tests pass (`test_observability_metrics.py`,
   `test_observability_api.py`).
@@ -408,8 +413,10 @@ finished. What *was* verified:
   reaches a series.
 - `ruff check .` clean.
 
-**A new session must re-run the full backend suite before treating Phase H as
-verified.** See §12 for how.
+**This section was written before the run finished and said so.** It is
+recorded here rather than silently rewritten, because the earlier state — a
+phase committed and pushed while its full-suite verification was still in
+flight — is a real thing a reader of the git history will encounter.
 
 ---
 
@@ -492,19 +499,18 @@ Things a later session should not undo without understanding why they are here:
 
 This is a suggestion, not a finding.
 
-1. **Run the Phase H suite and close §11.** First thing.
-2. **Fix the circular import** in §12 — small, and it makes the package
+1. **Fix the circular import** in §12 — small, and it makes the package
    importable in isolation for pure-domain tests.
-3. **Execution, if and only if it is governed.** The approval object exists and
+2. **Execution, if and only if it is governed.** The approval object exists and
    records who approved what on which evidence. An executor would need: an
    action provider contract, a dry-run mode, a kill switch, an execution audit
    distinct from the approval audit, and a rollback story. Anything less should
    stay unbuilt.
-4. **A real cloud posture source.** Replace `scanner.py` only; the checks and
+3. **A real cloud posture source.** Replace `scanner.py` only; the checks and
    the correlation stay. This is the phase that makes §9 shrink.
-5. **The remaining reserved kinds** — endpoint, identity, network findings —
+4. **The remaining reserved kinds** — endpoint, identity, network findings —
    now have a proven pattern to follow.
-6. **Scrape the metrics.** They are not observed by anything today.
+5. **Scrape the metrics.** They are not observed by anything today.
 
 ---
 
