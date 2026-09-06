@@ -37,6 +37,7 @@ from app.ml.schemas import InferenceResult
 from app.models.enums import EventStatus, Severity
 from app.models.event import Event
 from app.models.ml import MLInference
+from app.observability import instruments
 from app.repositories.event_repository import event_repository
 from app.repositories.ioc_repository import ioc_repository
 from app.schemas.event import EventIngest
@@ -119,6 +120,10 @@ def ingest_candidate(
         inference=inference,
         context=_risk_context(candidate),
         base_severity=result.severity,
+    )
+
+    instruments.events_ingested.increment(
+        labels={"source_type": str(candidate["source_type"])}
     )
 
     event = Event(
