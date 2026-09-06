@@ -54,6 +54,21 @@ class ResponseActionReject(CamelModel):
         return _require_text(value, "reason")
 
 
+class ResponseActionWithdraw(CamelModel):
+    """Retracting a request. **No evidence digest field, deliberately.**
+
+    A withdrawal cannot be refused because the evidence moved, so a field that
+    was accepted and ignored would advertise a protection that is not there.
+    """
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _require_text(value, "reason")
+
+
 class ResponseActionRead(CamelModel):
     request_ref: str
     incident_ref: str
