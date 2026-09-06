@@ -27,8 +27,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from app.ai.sanitize import contains_injection_attempt, scrub_text, scrub_value
 from app.core.config import settings
+from app.core.sanitize import contains_injection_attempt, scrub_text, scrub_value
 from app.correlation import mitre
 from app.models.incident import Incident
 from app.threatintel import service as threat_intel_service
