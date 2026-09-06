@@ -120,6 +120,10 @@ def update_incident(
             details={
                 "attemptedStatus": payload.status.value if payload.status else None,
                 "reviewedDigest": (payload.expected_evidence_digest or "")[:64],
+                # Both halves, for the reason given on EvidenceDriftError: what
+                # the caller claimed is not checkable without what the server
+                # held, and only one of the two survives in the record.
+                "currentDigest": exc.current_digest,
             },
         )
         db.commit()

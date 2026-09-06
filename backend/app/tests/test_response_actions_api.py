@@ -353,6 +353,114 @@ class TestFreshnessIsMandatory:
         assert audit["total"] >= 1, audit
 
 
+class TestTheAuditRecordsBothSidesOfTheComparison:
+    """An audit that records only what the approver *claimed* is half a record.
+
+    "The approver said they had reviewed digest X" is not checkable on its own.
+    "The approver said X, the server held Y" is, and Y is the half a reviewer
+    cannot reconstruct later - the evidence has moved on by the time anybody
+    reads the audit.
+    """
+
+    def test_a_stale_approval_records_the_reviewed_and_the_current_digest(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        from app.services import incident_service
+
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        stored = incident_service.get_incident(db, incident["id"])
+        stored.events[0].hostname = "MOVED-AFTER-REVIEW"
+        db.commit()
+
+        assert (
+            _approve(
+                client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+            ).status_code
+            == 409
+        )
+
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.refused&targetId={ref}",
+            headers=auth_headers,
+        ).json()
+        details = audit["items"][0]["details"]
+        assert details["reviewedDigest"] == reviewed
+        assert details["currentDigest"], details
+        assert details["currentDigest"] != reviewed
+        assert details["currentDigest"] == _manifest(client, auth_headers, incident["id"])
+
+    def test_a_refusal_that_was_not_about_evidence_records_no_current_digest(
+        self, client: TestClient, auth_headers: dict
+    ) -> None:
+        """A stated limit, not an omission.
+
+        The requester approving their own request is refused before the
+        evidence is ever weighed. Recording a current digest there would imply
+        the evidence was part of the reason, and it was not.
+        """
+        incident = _incident(client, auth_headers)
+        ref = _request(client, auth_headers, incident["id"]).json()["requestRef"]
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        assert (
+            _approve(
+                client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+            ).status_code
+            == 403
+        )
+
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.refused&targetId={ref}",
+            headers=auth_headers,
+        ).json()
+        details = audit["items"][0]["details"]
+        assert details["refusal"] == "SelfApprovalRefused"
+        assert details["currentDigest"] is None
+
+    def test_an_approval_records_the_digest_it_was_bound_to(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """The success case needs it too. Reaching the digest through the
+        binding row is a join a reader should not have to know to make."""
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        digest = _manifest(client, auth_headers, incident["id"])
+        assert (
+            _approve(
+                client, auth_headers, incident["id"], ref, expectedEvidenceDigest=digest
+            ).status_code
+            == 200
+        )
+
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.approved&targetId={ref}",
+            headers=auth_headers,
+        ).json()
+        assert audit["items"][0]["details"]["evidenceDigest"] == digest
+
+    def test_no_audit_detail_carries_anything_but_digests_and_references(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """Audit records must not become a second copy of the evidence.
+
+        A digest is a reference; the content behind it is not repeated here,
+        so an audit reader cannot be shown something the evidence endpoint
+        would have refused them.
+        """
+        incident = _incident(client, auth_headers)
+        ref = _request(client, analyst_headers, incident["id"]).json()["requestRef"]
+        digest = _manifest(client, auth_headers, incident["id"])
+        _approve(client, auth_headers, incident["id"], ref, expectedEvidenceDigest=digest)
+
+        audit = client.get(f"/api/v1/audit?targetId={ref}", headers=auth_headers).json()
+        for entry in audit["items"]:
+            for key, value in entry["details"].items():
+                assert not isinstance(value, (dict, list)), (key, value)
+
+
 class TestParameterTampering:
     def test_parameters_edited_after_the_request_refuse_the_approval(
         self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
