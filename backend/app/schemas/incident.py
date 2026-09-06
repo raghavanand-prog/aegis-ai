@@ -45,6 +45,19 @@ class IncidentUpdate(CamelModel):
     description: str | None = None
     severity: Severity | None = None
     status: IncidentStatus | None = None
+    #: Why the status is changing. Required by the lifecycle for any transition
+    #: that ends recorded work (`-> Resolved`, `-> Closed`) or undoes it (a
+    #: reopen), and ignored when the request does not change the status. The
+    #: requirement is enforced in the domain layer rather than by making this
+    #: field mandatory here, because whether a reason is needed depends on
+    #: which two states are involved and this schema cannot see the current one.
+    status_reason: str | None = Field(default=None, max_length=500)
+    #: The evidence manifest the caller reviewed before deciding. Optional,
+    #: and when supplied a consequential transition is refused if the evidence
+    #: has moved since - which is the window between rendering a page and
+    #: clicking on it. Omitting it keeps the pre-V9 behaviour and gets no
+    #: protection; that is a deliberate compatibility choice, not an oversight.
+    expected_evidence_digest: str | None = Field(default=None, max_length=64)
     analyst: str | None = Field(default=None, max_length=120)
     assignee_id: int | None = None
 
@@ -76,3 +89,27 @@ class IncidentRead(CamelModel):
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
+
+
+class TransitionOption(CamelModel):
+    """One state this incident could move to, and what that would take."""
+
+    target: IncidentStatus
+    #: Whether the lifecycle demands a reason for this edge.
+    requires_reason: bool
+    #: The permission the edge needs.
+    required_permission: str
+    #: Whether the *calling* user holds it. False options are still listed, so
+    #: the UI can show what exists and say who may do it rather than silently
+    #: hiding half the lifecycle.
+    permitted: bool
+    #: Whether taking this edge records an evidence binding, so the UI knows to
+    #: state which evidence the decision was taken on.
+    binds_evidence: bool
+
+
+class IncidentTransitions(CamelModel):
+    incident_id: str
+    current_status: IncidentStatus
+    is_terminal: bool
+    options: list[TransitionOption] = Field(default_factory=list)
