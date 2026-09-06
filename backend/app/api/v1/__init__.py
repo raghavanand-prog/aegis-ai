@@ -17,6 +17,7 @@ from app.api.v1 import (
     health,
     incidents,
     iocs,
+    metrics,
     ml,
     notifications,
     providers,
@@ -45,6 +46,8 @@ api_router.include_router(response_actions.router)
 api_router.include_router(providers.router)
 # V9 Phase G: cloud security posture. Simulated - see app/cloud/__init__.py.
 api_router.include_router(cloud.router)
+# V9 Phase H: the metrics scrape. Session-gated - see the module docstring.
+api_router.include_router(metrics.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)
