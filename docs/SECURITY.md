@@ -50,6 +50,8 @@ Three roles and one explicit permission matrix
 | Ingest events, update event status, promote to incident | | ✓ | ✓ |
 | Create / update incidents, record response actions, mark notifications read | | ✓ | ✓ |
 | Run detection evaluation, trigger telemetry, read audit, manage users, change system config | | | ✓ |
+| V9: read cloud posture findings (`cloud:read`) | ✓ | ✓ | ✓ |
+| V9: close an incident (`incidents:close`), approve a containment action (`incidents:respond_approve`), run a posture scan (`cloud:scan`) | | | ✓ |
 
 Enforcement is server-side on every route via a permission dependency. The
 console hides controls a role cannot use, but that is usability: a hidden button
@@ -137,6 +139,11 @@ Stated plainly, because a security document that only lists wins is marketing:
   encryption.
 * No dependency or container scanning in CI yet.
 * No penetration testing. Nothing here has been tested by anyone but its author.
+* **No response action is executed.** V9 added an approval object; there is no
+  executor behind it and no system is ever touched. See the V9 section below.
+* **No cloud provider integration.** Cloud posture findings are computed from
+  configuration snapshots committed to this repository. There is no cloud SDK
+  in this project.
 
 See [THREAT_MODEL.md](THREAT_MODEL.md) for the attacks these controls are and
 are not designed to stop.
@@ -203,3 +210,70 @@ only. With a rebuilt database — an empty `ml_models` table and a `v1.0` artifa
 still on disk — `next_version` returned `1.0` and training overwrote the
 digest-verified deployed model. Observed directly: `053d1ff3…` → `016c6dbf…`.
 Fixed, with the original scenario reproduced as a regression test.
+
+---
+
+## V9: decisions, approval and the boundary at ACT
+
+V9's theme is **OBSERVE → INVESTIGATE → DECIDE → APPROVE → ACT**, and the
+security-relevant fact is where it stops: **at APPROVE**. Nothing is executed.
+
+### Where invariants are enforced
+
+Every one of these lives in the **service or domain layer**, never only in a
+route dependency or the console, because the API is one caller and a
+hand-crafted request must be refused identically.
+
+| Invariant | Enforced by |
+| --- | --- |
+| Only legal lifecycle transitions | `app/incidents/lifecycle.py`, called from `incident_service` |
+| Terminal states cannot be reopened | `lifecycle.is_terminal` |
+| Ending or undoing work requires a reason | `lifecycle.requires_reason` |
+| Evidence cannot be created, edited or deleted | No such function exists anywhere |
+| An evidence id from another incident resolves to nothing | `evidence.service.get_item` scopes to the incident |
+| A consequential decision records the evidence it rested on | `decision_service.bind` |
+| A decision on stale evidence is refused (409) | `decision_service.check_expected_digest` |
+| An approver is never the requester | `response/approval.py` |
+| A non-human actor cannot approve | `core/actors.py` — one shared rule |
+| Request parameters cannot change between request and approval | `parameters_digest` |
+| One account's cloud posture never appears on another's incident | `cloud_posture_service._belongs_to` |
+
+### Four-eyes is real, not advisory
+
+`incidents:respond_approve` is an **admin** permission. Analysts hold
+`incidents:respond` and can raise a containment request; they cannot decide one.
+An analyst who could do both would satisfy four-eyes by logging in twice.
+
+A V7 defect was found and closed here: the check for non-human actors
+(`ai:`, `system:`, `automation:` prefixes) was case-defeatable. There is now one
+shared implementation with all three consumers proven to agree.
+
+### Evidence integrity is stated, not assumed
+
+Evidence does not claim uniform immutability, because it would be false:
+`ThreatIntelResult` rows are overwritten on re-lookup and `IOC.sighting_count`
+is incremented in place. Each item declares `write_once`, `append_only` or
+`mutable`, and a decision's evidence is classified
+`unchanged < extended < refreshed < tampered` when verified later.
+
+`refreshed` is deliberately distinct from `tampered`: mechanically routine,
+materially it can mean the verdict a decision rested on has changed.
+
+### Cloud posture is simulated
+
+There is no cloud SDK, no credential handling and no network call on the posture
+path — a test asserts `boto3`, `botocore`, `azure` and `google` are not
+importable. `is_simulated` is NOT NULL with no server default, so the schema
+refuses a row that does not state what it is, and every API response repeats it.
+
+The checks carry **no CIS, NIST or ISO identifiers**. Nothing here has been
+assessed against a framework, and a benchmark number beside a finding would read
+as a mapping somebody validated.
+
+### The metrics endpoint requires a session
+
+`/api/v1/metrics` is gated on `telemetry:read`, departing from the usual open
+`/metrics`. Request rates and incident volumes describe how much security
+activity an organisation handles and when it stops. No metric is labelled by
+user, incident, account or indicator, and label cardinality is bounded by
+construction — the HTTP metrics use route templates, never request paths.
