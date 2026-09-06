@@ -8,6 +8,7 @@ from app.api.v1 import (
     analytics,
     audit,
     auth,
+    cloud,
     decisions,
     detection,
     evaluation,
@@ -42,6 +43,8 @@ api_router.include_router(decisions.router)
 api_router.include_router(response_actions.router)
 # V9 Phase F: which evidence sources are answering, and which are degraded.
 api_router.include_router(providers.router)
+# V9 Phase G: cloud security posture. Simulated - see app/cloud/__init__.py.
+api_router.include_router(cloud.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)
