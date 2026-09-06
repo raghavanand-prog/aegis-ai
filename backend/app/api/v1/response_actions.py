@@ -236,6 +236,11 @@ def approve_response_action(
                 "incidentId": incident_id,
                 "refusal": type(exc).__name__,
                 "reviewedDigest": (payload.expected_evidence_digest or "")[:64],
+                # What the server actually held. Null for a refusal the
+                # evidence had no part in - a self-approval is turned away
+                # before the evidence is weighed, and recording a digest there
+                # would imply it was one of the reasons.
+                "currentDigest": getattr(exc, "current_digest", None),
             },
         )
         db.commit()
@@ -257,6 +262,15 @@ def approve_response_action(
             "incidentId": incident.incident_id,
             "actionType": record.action_type,
             "requestedBy": record.requested_by,
+            # The evidence this was signed off against, in the audit itself.
+            # It is reachable through the binding row, but a reader should not
+            # have to know to make that join to answer "what did they approve
+            # this on".
+            "evidenceDigest": (
+                record.evidence_binding.manifest_digest
+                if record.evidence_binding
+                else None
+            ),
             "decisionRef": (
                 record.evidence_binding.decision_ref if record.evidence_binding else None
             ),
