@@ -400,46 +400,50 @@ app/tests/test_evidence_domain.py          +2
 frontend .../ResponseActions.test.tsx      +10
 ```
 
-### 12.1 Verification status **[MEASURED where stated]**
+### 12.1 Verification **[MEASURED]**
 
-**The full serial backend run had not finished when this section was first
-committed, and this says so rather than being quietly rewritten later.** V9's
-§11 did the same thing for the same reason: a phase committed while its
-verification is still in flight is a real state a reader of the git history
-will encounter, and papering over it teaches the next session that these
-numbers are decorative.
-
-Verified at the time of writing:
+**The full serial backend run finished after §12 was first committed.** That
+commit (`e43cbb5`) said so at the time rather than being left to look complete,
+which is V9 §11's precedent; this section replaces the pending note with the
+result. Nothing below is recalled.
 
 ```
+backend, one serial run, -q -rs
+
+    collected   1344      (72 test files)
+    passed      1344
+    skipped        0
+    failed         0
+    errors         0
+    exit code      0
+
 ruff check .                                   clean
 alembic base -> head -> base -> head           clean, PostgreSQL and SQLite
-PostgreSQL constraints / FKs / jsonb           inspected live, §13 and §14
-openapi paths                                  98
-frontend: eslint, tsc -b --noEmit              clean
-frontend: vitest                               134 passed, 15 files
-frontend: production build                     succeeded
+migration head                                 0015_v9_cloud_posture (unchanged)
+openapi paths                                  98   (was 96)
+
+frontend, npm run verify
+    eslint                                     clean
+    tsc -b --noEmit                            clean
+    vitest                                     134 passed, 15 files
+    production build                           succeeded
 ```
 
-Targeted backend suites, run repeatedly through the session and green at every
-phase boundary — `test_response_approval`, `test_response_actions_api`,
-`test_decision_binding`, `test_decision_binding_api`, `test_evidence_domain`,
-`test_evidence_api`, `test_ai_analyst`, `test_cloud_domain`,
-`test_cloud_posture_api`, `test_adaptation_ai`, `test_adaptation_proposals`,
-`test_incidents`, `test_incident_lifecycle`, `test_incidents_lifecycle_api`,
-`test_evaluation_subsystems`, `test_security`, `test_auth`,
-`test_observability_api`, `test_v3_api`.
+**Zero skips is the part that matters.** `test_database_postgres.py` collects
+25 tests, and V9 §12 warns that it silently skips its whole module against a
+dead server while the run still exits 0. A `-rs` run prints a short-test-summary
+section for skips; this run printed none, so those 25 ran.
 
-**NOT yet verified when this was committed:** the single full serial run over
-the whole suite, which is the only thing that can catch a regression this
-session's changes caused in a module none of the above touches. The moved
-`sanitize` module (§9) makes that run more load-bearing than usual, because it
-changed an import every layer of the application reaches.
+The count was cross-checked two ways because the run's own summary line did not
+survive the output capture: counting progress characters (1344) and summing
+`--collect-only -q` per-file counts (1344). They agree. A first count said 1346
+and was wrong — the regex was also matching the `../.venv/...` path in the
+warnings block. The wrong number is recorded here because "cross-checked and
+they agreed" is only worth writing down if the cross-check could have
+disagreed, and this one did.
 
-The exact collected / passed / skipped / failed counts belong here, along with
-a check that the **skip count is 0** — a green exit code is not evidence that
-`test_database_postgres.py` ran rather than skipping against a dead server.
-If that run reports failures, they belong in this document as failures.
+V9's last full run was **1261 passed, 0 skipped**. V10 adds 83 collected cases
+from 59 new test functions; the difference is parametrisation.
 
 Three guards were checked for teeth by breaking them deliberately and
 restoring them — the diffs are clean, and each experiment is named in the
