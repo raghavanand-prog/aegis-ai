@@ -45,10 +45,24 @@ def _route_template(request: Request) -> str:
     application. A request that matched nothing has no template - and every
     such request shares one label value, so a flood of random 404 paths costs
     a single series rather than one apiece.
+
+    The version prefix has to be added back. This FastAPI version keeps an
+    included router nested rather than copying its routes onto the app, so the
+    matched route reports its path *within* that router - ``/incidents``, not
+    ``/api/v1/incidents`` - and no scope key carries the mount point
+    (``root_path`` is empty). Left alone the label would not match the endpoint
+    anyone actually calls, which is the sort of small wrongness that wastes an
+    afternoon when a dashboard is being built.
     """
     route = request.scope.get("route")
-    path = getattr(route, "path", None)
-    return path if isinstance(path, str) else "unmatched"
+    template = getattr(route, "path", None)
+    if not isinstance(template, str):
+        return "unmatched"
+
+    prefix = settings.api_v1_prefix
+    if prefix and request.url.path.startswith(prefix) and not template.startswith(prefix):
+        return f"{prefix}{template}"
+    return template
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
