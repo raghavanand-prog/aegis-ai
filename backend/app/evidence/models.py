@@ -70,8 +70,11 @@ class EvidenceKind(str, Enum):
     CORRELATION = "correlation"
     AI_ANALYSIS = "ai_analysis"
 
-    # --- Reserved for later phases; no producer exists ---------------------
+    #: V9 Phase G: cloud posture misconfigurations. Produced by
+    #: ``aegisx.cloudposture``; reserved until that provider existed.
     CLOUD_FINDING = "cloud_finding"
+
+    # --- Reserved for later phases; no producer exists ---------------------
     ENDPOINT_FINDING = "endpoint_finding"
     IDENTITY_FINDING = "identity_finding"
     NETWORK_FINDING = "network_finding"
