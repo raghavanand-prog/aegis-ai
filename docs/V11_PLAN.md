@@ -1,4 +1,4 @@
-# AEGISX V10 — PLAN
+# AEGISX V11 — PLAN
 
 > **This is a plan, not a record.** Nothing in it is implemented. Every claim
 > about AWS behaviour marked **[VERIFY]** must be checked against AWS's own
@@ -6,8 +6,11 @@
 > AWS account attached, and a plan that guesses at IAM semantics is worse than
 > no plan.
 >
-> Written at the end of the V9 session. Supersedes
-> `CLAUDE_HANDOFF_V9.md` §14, which sketched this in five lines.
+> Written at the end of the V9 session as `V10_PLAN.md`, and renamed when
+> V10 shipped something else: the approval-boundary work merged in #2. The
+> scope described here was never V10's, so the file is named for the version
+> that will actually do it. Supersedes `CLAUDE_HANDOFF_V9.md` §14, which
+> sketched this in five lines.
 
 Tags as in V4–V9: **[MEASURED]**, **[IMPLEMENTATION]**, **[SIMULATED]**,
 **[LIMITATION]**, **[INFERENCE]**, **[NOT IMPLEMENTED]**, plus **[VERIFY]** for
@@ -15,7 +18,7 @@ a claim this document is not entitled to make yet.
 
 ---
 
-## 1. The problem V10 exists to solve
+## 1. The problem V11 exists to solve
 
 V9 built a security operations platform whose cloud security capability is
 **entirely simulated** — honestly labelled, carefully bounded, and still
@@ -26,7 +29,7 @@ socket opened on that path.
 Everything else in AEGISX is real. This one area is not, and it is the area the
 project most wants to claim.
 
-**V10's goal: make it real, without loosening a single thing V9 got right.**
+**V11's goal: make it real, without loosening a single thing V9 got right.**
 
 The seam already exists. `app/cloud/scanner.py` is the only provider-specific
 file in the cloud package:
@@ -35,7 +38,7 @@ file in the cloud package:
   scanner.py  ──▶  ResourceSnapshot  ──▶  checks.py  ──▶  CloudFinding
   ^^^^^^^^^^                              (9 checks)      │
   the ONLY file                                           ▼
-  V10 replaces                              resources.py (ARN identity)
+  V11 replaces                              resources.py (ARN identity)
                                                           │
                                                           ▼
                                         cloud_posture_service (correlation)
@@ -45,14 +48,14 @@ file in the cloud package:
 ```
 
 That split was a deliberate V9 decision, made so that a live source changes one
-class and nothing else. V10 is where it either pays off or turns out to have
+class and nothing else. V11 is where it either pays off or turns out to have
 been wishful — and finding out which is itself worth the phase.
 
 ---
 
 ## 2. Prerequisites
 
-1. **V9 is merged.** V10 branches from the resulting `main`. Never stack on
+1. **V10 is merged.** V11 branches from the resulting `main`. Never stack on
    merged history.
 2. **An AWS account you control**, with a **budget alarm set before anything
    else is created**. A student account without a budget alarm is a bill
@@ -71,9 +74,9 @@ That is the guard doing its job, exactly as the Phase C reserved-kinds guard did
 when `cloud_finding` gained a producer. Its message should be read the same way:
 *either the claim is still true, or the claim changes deliberately.*
 
-**First task of V10 is retiring that assertion honestly** — narrowing it to the
+**First task of V11 is retiring that assertion honestly** — narrowing it to the
 SDKs still absent (`azure`, `google`) and replacing the `boto3` case with the
-tighter guarantee V10 actually offers: see §5.3.
+tighter guarantee V11 actually offers: see §5.3.
 
 Do **not** delete the test.
 
@@ -221,7 +224,7 @@ what the column is for.
 ## 8. Phase E — the rest of DevSecOps **[IMPLEMENTATION]**
 
 `SECURITY.md` already admits: *"No dependency or container scanning in CI yet."*
-V10 closes it.
+V11 closes it.
 
 | Gate | Covers |
 | --- | --- |
@@ -238,16 +241,16 @@ a default to copy.
 
 ---
 
-## 9. Phase F — documentation and the V10 handoff
+## 9. Phase F — documentation and the V11 handoff
 
-`docs/CLAUDE_HANDOFF_V10.md`, in the established form. The V9 documents that
+`docs/CLAUDE_HANDOFF_V11.md`, in the established form. The V9 documents that
 describe cloud posture as simulated must be corrected in the same phase that
 makes them untrue — that is the V9 Phase K lesson: documents do not go wrong,
 they go stale, and staleness is invisible.
 
 ---
 
-## 10. What V10 will NOT do **[NOT IMPLEMENTED]**
+## 10. What V11 will NOT do **[NOT IMPLEMENTED]**
 
 Stated now so it cannot drift later:
 
@@ -261,7 +264,7 @@ Stated now so it cannot drift later:
   the enum members; `resources.py` deliberately parses AWS ARNs only and returns
   `None` — matching nothing — for anything it cannot identify.
 - **No agents, no autonomous remediation, no autonomous retraining.**
-- **No new research claim.** V10 is engineering. Any detection-quality claim
+- **No new research claim.** V11 is engineering. Any detection-quality claim
   needs the V4–V8 evaluation machinery and its own pre-registered design.
 - **No secrets in the repository.** Not encrypted, not in an `.env.example` that
   looks real, not in a fixture.
@@ -270,7 +273,7 @@ Stated now so it cannot drift later:
 
 ## 11. Success criteria **[MEASURED, when it happens]**
 
-V10 is done when all of these hold:
+V11 is done when all of these hold:
 
 1. A live posture scan against a real AWS account produces findings with
    `is_simulated=False`, and they correlate to incidents through the **unchanged**

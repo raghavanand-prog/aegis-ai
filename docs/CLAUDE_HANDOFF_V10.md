@@ -542,10 +542,13 @@ This is a suggestion, not a finding.
    repository: cloud security is entirely simulated, and it is the capability
    the project most wants to claim. `app/cloud/scanner.py` is the only
    provider-specific file; the checks, resource identity and correlation are
-   designed to stay unchanged. There is a written plan for this in the
-   uploaded `V10_PLAN.md`, which was *not* the scope this session ran — it
-   covers the AWS account, a read-only OIDC role in Terraform, `Stubber`-based
-   offline tests, and DevSecOps CI gates.
+   designed to stay unchanged. There is a written plan for this in
+   `docs/V11_PLAN.md`, which was *not* the scope this session ran — it covers
+   the AWS account, a read-only OIDC role in Terraform, `Stubber`-based
+   offline tests, and DevSecOps CI gates. It was written as `V10_PLAN.md` and
+   renamed once V10 turned out to be this session's work instead; the sentence
+   is corrected here rather than left pointing at a filename that no longer
+   exists.
 2. **Execution, if and only if it is governed.** The approval boundary is now
    as trustworthy as it is going to get without an executor behind it. One
    would need: an action provider contract, a dry-run mode, a kill switch, an
