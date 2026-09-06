@@ -467,6 +467,187 @@ class TestTheAuditRecordsBothSidesOfTheComparison:
                 assert not isinstance(value, (dict, list)), (key, value)
 
 
+class TestEveryRungOfTheDriftLadderRefusesAnApproval:
+    """The freshness check against the whole V9 ladder.
+
+    `test_decision_binding.py` proves the ladder classifies
+    `unchanged < extended < refreshed < tampered` correctly, and
+    `test_decision_binding_api.py` proves each rung is reachable. Neither
+    proves what an *approval* does when the evidence has moved by each of
+    them, and only the tampered rung was covered here.
+
+    The answer is the same at every rung, because the approval compares
+    digests for exact equality rather than consulting the verdict: any
+    movement refuses. That includes `extended`, which the ladder calls benign
+    - evidence that arrived after the analyst read the page is evidence the
+    approver has not seen, and signing off containment without it is the thing
+    the check exists to prevent. Reload and decide again.
+
+    These tests were expected to pass on first run, and did. They are recorded
+    because "it already worked" and "nothing checks it" look identical from
+    outside, and the second one stops being true only when somebody writes the
+    test.
+    """
+
+    def _pending(self, client: TestClient, admin: dict, analyst: dict):
+        incident = _incident(client, admin)
+        ref = _request(client, analyst, incident["id"]).json()["requestRef"]
+        return incident, ref
+
+    def _assert_refused_and_untouched(
+        self, client: TestClient, admin: dict, incident_id: str, ref: str, reviewed: str
+    ) -> None:
+        response = _approve(
+            client, admin, incident_id, ref, expectedEvidenceDigest=reviewed
+        )
+        assert response.status_code == 409, response.text
+
+        one = _get_one(client, admin, incident_id, ref).json()
+        assert one["status"] == "requested"
+        assert one["decidedBy"] is None
+        assert one["decisionRef"] is None
+        assert not [
+            item
+            for item in _decisions(client, admin, incident_id)["items"]
+            if item["decisionType"].startswith("response_action")
+        ]
+        audit = client.get(
+            f"/api/v1/audit?action=response_action.refused&targetId={ref}",
+            headers=admin,
+        ).json()
+        assert audit["total"] >= 1, audit
+
+    def test_unchanged_evidence_approves(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict
+    ) -> None:
+        """The bottom rung, as the control. Without it the others prove only
+        that approval is hard, not that freshness is what refuses them."""
+        incident, ref = self._pending(client, auth_headers, analyst_headers)
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        response = _approve(
+            client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "approved"
+
+    def test_removed_evidence_refuses_the_approval(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """Removal is not a refresh. The V9 rule is explicit that evidence
+        going missing is the serious end of the ladder, and an approval must
+        not be signable against a set something was taken out of."""
+        from app.services import incident_service
+
+        incident, ref = self._pending(client, auth_headers, analyst_headers)
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        stored = incident_service.get_incident(db, incident["id"])
+        stored.events[0].incident_id = None
+        db.commit()
+
+        self._assert_refused_and_untouched(
+            client, auth_headers, incident["id"], ref, reviewed
+        )
+
+    def test_refreshed_evidence_refuses_the_approval(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """The rung the taxonomy exists for. A threat-intelligence row is
+        rewritten in place on re-lookup - mechanically routine, materially the
+        verdict the analyst read may have inverted. An approval must not carry
+        over it."""
+        from app.models.ioc import IOC
+        from app.models.threat_intel import ThreatIntelResult
+        from app.services import incident_service
+
+        incident, ref = self._pending(client, auth_headers, analyst_headers)
+        stored = incident_service.get_incident(db, incident["id"])
+
+        indicator = IOC(type="ip", value="203.0.113.99", severity="High", confidence=80)
+        db.add(indicator)
+        db.flush()
+        verdict = ThreatIntelResult(
+            ioc_id=indicator.id,
+            ioc_type="ip",
+            ioc_value="203.0.113.99",
+            provider="virustotal",
+            status="ok",
+            reputation="malicious",
+            confidence=90,
+            malicious_count=9,
+        )
+        db.add(verdict)
+        stored.iocs.append(indicator)
+        db.commit()
+
+        # What the analyst was shown: the vendor calling this malicious.
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        # The cache refreshes and the vendor now says the opposite.
+        verdict.reputation = "harmless"
+        verdict.malicious_count = 0
+        verdict.harmless_count = 9
+        db.commit()
+
+        self._assert_refused_and_untouched(
+            client, auth_headers, incident["id"], ref, reviewed
+        )
+
+    def test_added_evidence_also_refuses_the_approval(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """`extended` is benign *after* a decision and is not benign before
+        one. Evidence that arrived since the page was read is evidence the
+        approver has not seen; the fail-safe answer is reload and decide
+        again, not sign off around it."""
+        from app.services import incident_service
+
+        incident, ref = self._pending(client, auth_headers, analyst_headers)
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        extra = ingest(client, auth_headers)
+        stored = incident_service.get_incident(db, incident["id"])
+        stored_event = incident_service.event_repository.get_by_event_id(db, extra["id"])
+        stored_event.incident_id = stored.id
+        db.commit()
+
+        self._assert_refused_and_untouched(
+            client, auth_headers, incident["id"], ref, reviewed
+        )
+
+    def test_the_reload_then_succeeds(
+        self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
+    ) -> None:
+        """The refusal must be recoverable, or operators route around it.
+
+        After reloading the evidence the same approver signs the same request
+        successfully - the check refuses a stale view, not the decision.
+        """
+        from app.services import incident_service
+
+        incident, ref = self._pending(client, auth_headers, analyst_headers)
+        reviewed = _manifest(client, auth_headers, incident["id"])
+
+        stored = incident_service.get_incident(db, incident["id"])
+        stored.events[0].hostname = "MOVED-AFTER-REVIEW"
+        db.commit()
+
+        assert (
+            _approve(
+                client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reviewed
+            ).status_code
+            == 409
+        )
+
+        reloaded = _manifest(client, auth_headers, incident["id"])
+        assert reloaded != reviewed
+        response = _approve(
+            client, auth_headers, incident["id"], ref, expectedEvidenceDigest=reloaded
+        )
+        assert response.status_code == 200, response.text
+
+
 class TestParameterTampering:
     def test_parameters_edited_after_the_request_refuse_the_approval(
         self, client: TestClient, auth_headers: dict, analyst_headers: dict, db
