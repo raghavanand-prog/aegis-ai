@@ -54,6 +54,21 @@ class ResponseActionReject(CamelModel):
         return _require_text(value, "reason")
 
 
+class ResponseActionWithdraw(CamelModel):
+    """Retracting a request. **No evidence digest field, deliberately.**
+
+    A withdrawal cannot be refused because the evidence moved, so a field that
+    was accepted and ignored would advertise a protection that is not there.
+    """
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        return _require_text(value, "reason")
+
+
 class ResponseActionRead(CamelModel):
     request_ref: str
     incident_ref: str
@@ -63,6 +78,13 @@ class ResponseActionRead(CamelModel):
     #: against this, so editing the row between request and approval is refused.
     parameters_digest: str
     justification: str
+    #: How hard this action is to undo, derived server-side from `actionType`.
+    #: Read-only and not accepted on input: a client that could declare its own
+    #: account deletion "reversible" would be classifying its own blast radius.
+    #: It changes no check - every consequence needs the same four eyes, the
+    #: same authority and the same stated evidence digest - it tells the
+    #: approver what they are signing.
+    consequence: str
     status: str
     requested_by: str
     requested_by_role: str | None = None

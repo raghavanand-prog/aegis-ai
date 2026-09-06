@@ -289,3 +289,96 @@ class TestFutureKindsAreReservedNotFaked:
             "A reserved evidence kind has a producer. Either it is real, in "
             "which case it is no longer reserved, or it is fabricated."
         )
+
+
+# --- Layering -------------------------------------------------------------
+
+
+class TestTheDomainImportsWithoutTheApplication:
+    """A low-level package must not need the whole application to load.
+
+    ``app.evidence`` could not be imported on its own. Importing it raised
+    ImportError through a five-hop cycle::
+
+        app.evidence.models  --(line 53)-->  app.ai
+          --> app.correlation --> app.services --> decision_service
+            --> app.evidence.service --> app.evidence.binding
+              --> app.evidence.models   (partially initialised)
+
+    V9 §12 recorded this as pre-existing and harmless "because the app and the
+    tests import through ``app.main``". Both halves of that are true and it is
+    still worth fixing: a pure-domain test that has to boot the application
+    first is not a pure-domain test, and the reason the cycle exists is a
+    layering inversion rather than an accident of ordering - the evidence
+    domain reached up into the AI package for a text-scrubbing helper.
+
+    These run in a subprocess because import cycles are invisible once
+    ``sys.modules`` is warm: by the time pytest has collected anything,
+    ``app.main`` has been imported and every one of these would pass whether
+    the cycle existed or not.
+    """
+
+    #: Packages that must load without dragging in the application. Each is a
+    #: layer that has no business needing the AI stack, the service layer or a
+    #: database session to define its own types.
+    STANDALONE = (
+        "app.core.sanitize",
+        "app.evidence",
+        "app.evidence.models",
+        "app.evidence.binding",
+        "app.response.actions",
+        "app.response.approval",
+        "app.incidents.lifecycle",
+        "app.cloud.findings",
+    )
+
+    @pytest.mark.parametrize("module", STANDALONE)
+    def test_it_imports_in_a_cold_interpreter(self, module: str) -> None:
+        import subprocess
+        import sys
+
+        # noqa justification: a fixed argument list, no shell, and the only
+        # interpolated value is a module name from STANDALONE above - a
+        # literal tuple in this file, not anything a caller supplies.
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", f"import {module}"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, (
+            f"{module} cannot be imported on its own:\n{result.stderr}"
+        )
+
+    def test_the_evidence_domain_does_not_reach_into_the_ai_package(self) -> None:
+        """The layering rule behind the fix, stated so it cannot regress.
+
+        Scrubbing untrusted text is a general defensive concern, not an AI one
+        - three of its four callers are outside ``app.ai``. Leaving it there
+        made every consumer pay for the AI package's imports.
+        """
+        import ast
+        import inspect
+
+        import app.evidence.binding as binding_module
+        import app.evidence.models as models_module
+
+        # Parsed rather than grepped. `models.py` legitimately *mentions*
+        # `app.ai.evidence` in prose, explaining that evidence is rendered for
+        # a person and packaged for a prompt by two different layers. The rule
+        # is about what it imports, and a test that cannot tell a dependency
+        # from a sentence would be failed by documenting the design.
+        for module in (models_module, binding_module):
+            tree = ast.parse(inspect.getsource(module))
+            imported: list[str] = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    imported.append(node.module)
+                elif isinstance(node, ast.Import):
+                    imported.extend(alias.name for alias in node.names)
+            offending = [name for name in imported if name.split(".")[:2] == ["app", "ai"]]
+            assert not offending, (
+                f"{module.__name__} imports {offending} from app.ai. The evidence "
+                "domain sits below the AI layer; reaching up into it is what "
+                "created the import cycle."
+            )

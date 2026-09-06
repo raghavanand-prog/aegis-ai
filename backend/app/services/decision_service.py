@@ -50,7 +50,21 @@ class EvidenceDriftError(Exception):
     view of the evidence that was rendered minutes ago and has since changed,
     which is precisely the window in which an approver reads a page, thinks,
     and clicks.
+
+    Both digests are carried as attributes, not only interpolated into the
+    message. The routers audit a refused decision, and an audit that records
+    only what the caller *claimed* is half a record: "they said they had
+    reviewed X" cannot be checked, while "they said X, the server held Y" can.
+    Y is the half nobody can reconstruct afterwards, because by the time the
+    audit is read the evidence has moved on again.
     """
+
+    def __init__(
+        self, message: str, *, expected_digest: str | None, current_digest: str | None
+    ) -> None:
+        super().__init__(message)
+        self.expected_digest = expected_digest
+        self.current_digest = current_digest
 
 
 def is_consequential(current: str, target: IncidentStatus) -> bool:
@@ -105,7 +119,9 @@ def check_expected_digest(snapshot: EvidenceSnapshot, expected: str | None) -> N
             "The evidence for this incident has changed since it was last "
             "loaded, so this decision would be taken against something other "
             "than what was reviewed. Reload the evidence and decide again. "
-            f"(reviewed {stated[:16]}…, current {snapshot.manifest_digest[:16]}…)"
+            f"(reviewed {stated[:16]}…, current {snapshot.manifest_digest[:16]}…)",
+            expected_digest=stated,
+            current_digest=snapshot.manifest_digest,
         )
 
 

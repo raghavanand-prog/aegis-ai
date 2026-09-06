@@ -25,8 +25,8 @@ from app.ai.base import AIAnalystProvider, ProviderResponse, parse_json_response
 from app.ai.evidence import build as build_evidence
 from app.ai.grounding import verify
 from app.ai.providers.mock import MockAnalystProvider
-from app.ai.sanitize import contains_injection_attempt, scrub_text, scrub_value
 from app.ai.service import AIUnavailable, analyze_incident, reset_provider, set_provider
+from app.core.sanitize import contains_injection_attempt, scrub_text, scrub_value
 from app.models.enums import AIAnalysisKind, AuditAction
 from app.models.event import Event
 from app.models.incident import Incident

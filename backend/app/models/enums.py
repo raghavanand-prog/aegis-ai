@@ -212,6 +212,11 @@ class AuditAction(str, Enum):
     RESPONSE_ACTION_APPROVED = "response_action.approved"
     RESPONSE_ACTION_REJECTED = "response_action.rejected"
     RESPONSE_ACTION_REFUSED = "response_action.refused"
+    #: V10: the requester retracted their own pending request. A separate
+    #: action from `rejected` on purpose - "the analyst stood down" and "an
+    #: administrator refused" are different events, and folding them together
+    #: would lose which of the two happened.
+    RESPONSE_ACTION_WITHDRAWN = "response_action.withdrawn"
     # V9 Phase G: a simulated cloud posture scan was run. Audited because
     # it writes findings the whole SOC then reads.
     CLOUD_POSTURE_SCANNED = "cloud.posture_scanned"
