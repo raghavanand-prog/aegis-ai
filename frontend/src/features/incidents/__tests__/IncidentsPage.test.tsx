@@ -15,8 +15,46 @@ vi.mock("@/services/api/incidents", async () => {
   const actual = await vi.importActual<typeof import("@/services/api/incidents")>(
     "@/services/api/incidents",
   );
-  return { ...actual, fetchIncidents: (...args: unknown[]) => fetchIncidents(...args) };
+  return {
+    ...actual,
+    fetchIncidents: (...args: unknown[]) => fetchIncidents(...args),
+    // V9 Phase I: the workspace asks the server what this incident may become
+    // rather than restating the lifecycle graph in TypeScript.
+    fetchIncidentTransitions: vi.fn().mockResolvedValue({
+      incidentId: "INC-1024",
+      currentStatus: "Open",
+      isTerminal: false,
+      options: [
+        {
+          target: "Investigating",
+          requiresReason: false,
+          requiredPermission: "incidents:update",
+          permitted: true,
+          bindsEvidence: false,
+        },
+        {
+          target: "Resolved",
+          requiresReason: true,
+          requiredPermission: "incidents:update",
+          permitted: true,
+          bindsEvidence: true,
+        },
+      ],
+    }),
+  };
 });
+
+vi.mock("@/services/api/responseActions", () => ({
+  fetchResponseActions: vi.fn().mockResolvedValue({
+    incidentId: "INC-1024",
+    total: 0,
+    pending: 0,
+    items: [],
+  }),
+  requestResponseAction: vi.fn(),
+  approveResponseAction: vi.fn(),
+  rejectResponseAction: vi.fn(),
+}));
 
 // The V3 workspace fetches the incident itself rather than trusting the list
 // row it was opened from, so the detail request is stubbed here.
@@ -70,6 +108,70 @@ vi.mock("@/services/api/ai", () => ({
     .fn()
     .mockResolvedValue({ incidentId: "INC-1024", total: 0, analyses: [] }),
   requestAIAnalysis: vi.fn(),
+}));
+
+// V9: evidence provenance. Mocked with a realistic set so the provenance
+// panel renders its real code path rather than the unavailable state.
+vi.mock("@/services/api/evidence", () => ({
+  fetchIncidentEvidence: vi.fn().mockResolvedValue({
+    incidentId: "INC-1024",
+    manifestDigest: "a".repeat(64),
+    total: 2,
+    countsByKind: { event: 1, threat_intel: 1 },
+    countsByOrigin: { observed: 1, reported: 1 },
+    injectionFlagged: [],
+    degradedProviders: [],
+    filters: { kind: null, provider: null },
+    items: [
+      {
+        evidenceId: "EV-0123456789abcdef",
+        kind: "event",
+        title: "Process created: powershell.exe",
+        content: { eventId: "EVT-000042" },
+        contentDigest: "b".repeat(64),
+        containsInjectionAttempt: false,
+        provenance: {
+          provider: "aegisx.telemetry",
+          sourceRef: "event:EVT-000042",
+          origin: "observed",
+          integrity: "write_once",
+          tamperEvidentAtRest: true,
+          observedAt: "2026-01-01T12:00:00+00:00",
+          collectedAt: "2026-01-01T12:00:05+00:00",
+          confidence: null,
+          confidenceBasis: null,
+          incidentRef: "INC-1024",
+          eventRef: "EVT-000042",
+          isSynthetic: true,
+          extra: {},
+        },
+      },
+      {
+        evidenceId: "EV-fedcba9876543210",
+        kind: "threat_intel",
+        title: "virustotal on 203.0.113.5: malicious",
+        content: { reputation: "malicious" },
+        contentDigest: "c".repeat(64),
+        containsInjectionAttempt: false,
+        provenance: {
+          provider: "aegisx.threatintel",
+          sourceRef: "threat_intel_result:9",
+          origin: "reported",
+          integrity: "mutable",
+          tamperEvidentAtRest: false,
+          observedAt: null,
+          collectedAt: "2026-01-01T12:30:00+00:00",
+          confidence: 0.9,
+          confidenceBasis: "virustotal vendor confidence, 0-100",
+          incidentRef: "INC-1024",
+          eventRef: null,
+          isSynthetic: false,
+          extra: { assertedBy: "virustotal" },
+        },
+      },
+    ],
+  }),
+  fetchEvidenceItem: vi.fn(),
 }));
 
 vi.mock("@/services/api/threatIntel", () => ({
@@ -185,6 +287,35 @@ describe("Incident rendering", () => {
     expect(within(workspace).getByText(/Behavioural Sequence/)).toBeInTheDocument();
     expect(
       within(workspace).getByText(/Endpoint agent reported mass encryption/),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the lifecycle transitions the server says are legal", async () => {
+    // V9 Phase I wiring. The workspace had no status control at all before
+    // this, which is why the evidence-freshness check behind it had never been
+    // reachable by a click.
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText("Ransomware activity detected"));
+    const workspace = await screen.findByRole("complementary");
+
+    expect(
+      await within(workspace).findByRole("button", { name: "Investigating" }),
+    ).toBeInTheDocument();
+    expect(within(workspace).getByRole("button", { name: "Resolved" })).toBeInTheDocument();
+  });
+
+  it("exposes the response-action panel", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByText("Ransomware activity detected"));
+    const workspace = await screen.findByRole("complementary");
+
+    await user.click(within(workspace).getByRole("tab", { name: /Response/ }));
+    expect(
+      await within(workspace).findByText(/Nothing here is executed/i),
     ).toBeInTheDocument();
   });
 

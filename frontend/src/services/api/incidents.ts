@@ -86,6 +86,17 @@ export interface UpdateIncidentInput {
   severity?: Severity;
   status?: IncidentStatus;
   analyst?: string;
+  /** Why the status is changing. Required by the backend lifecycle for any
+   *  transition that ends recorded work or undoes it. */
+  statusReason?: string;
+  /**
+   * The evidence manifest the analyst actually reviewed.
+   *
+   * Sent on consequential transitions so the backend can refuse the decision
+   * with 409 if the evidence moved between the page rendering and the click.
+   * Omitting it is accepted and gets no protection.
+   */
+  expectedEvidenceDigest?: string;
 }
 
 export async function updateIncident(
@@ -105,4 +116,39 @@ export async function recordResponseAction(
     action,
   });
   return toUiIncident(data);
+}
+
+/** One state an incident may move to, and what that would take (V9). */
+export interface ApiTransitionOption {
+  target: IncidentStatus;
+  requiresReason: boolean;
+  requiredPermission: string;
+  /** Whether the signed-in role holds that permission. */
+  permitted: boolean;
+  /** Whether taking this edge records an evidence binding. */
+  bindsEvidence: boolean;
+}
+
+export interface ApiIncidentTransitions {
+  incidentId: string;
+  currentStatus: IncidentStatus;
+  isTerminal: boolean;
+  options: ApiTransitionOption[];
+}
+
+/**
+ * What this incident may become.
+ *
+ * Asked of the server rather than restated here. The lifecycle graph, which
+ * edges need a reason and which need which permission all live in
+ * `app/incidents/lifecycle.py`; a second copy in TypeScript would drift, and
+ * the copy that drifts is the one users see.
+ */
+export async function fetchIncidentTransitions(
+  incidentId: string,
+): Promise<ApiIncidentTransitions> {
+  const { data } = await api.get<ApiIncidentTransitions>(
+    `/incidents/${incidentId}/transitions`,
+  );
+  return data;
 }

@@ -232,6 +232,10 @@ user, operation, duration and result. Context is held in `contextvars` and bound
 by the middleware, so a log line written deep in a service still names the
 request and the analyst.
 
+**V9 added metrics** (`app/observability/`) — see the V9 section below. They are
+exposed at `/api/v1/metrics` in the Prometheus text format and, unlike the usual
+practice, require a session.
+
 Health is reported per component as `healthy` / `degraded` / `unavailable`.
 Degraded is a real state and is used: a telemetry collector that is running but
 has not produced a tick within three intervals is degraded, not healthy - an
@@ -430,3 +434,95 @@ baseline from prior datasets and **refuses a cold start** rather than degrading
 silently.
 
 Full reasoning and measurements: `docs/V6_RESEARCH_REPORT.md`.
+
+---
+
+## V9: from evaluation platform to security operations
+
+V9 changed what the platform is *for*. V4–V8 built a research and evaluation
+system: run experiments, measure detectors, publish results. V9 built the thing
+an analyst works in, on one theme:
+
+```
+OBSERVE  →  INVESTIGATE  →  DECIDE  →  APPROVE  →  ACT
+                                                    │
+                                          V9 stops here, deliberately
+```
+
+**No V4–V8 measured result changed.** V9 ran no experiment and touched no model.
+
+Four migrations: `0012`–`0015`. Head is `0015_v9_cloud_posture`.
+
+### New packages
+
+```
+app/incidents/lifecycle.py    7 states, 14 edges, pure. No ORM, no HTTP.
+app/evidence/                 evidence as a read-only projection with provenance
+app/response/                 four-eyes approval rules, pure
+app/cloud/                    posture checks + a fixture-backed scanner [SIMULATED]
+app/observability/            a bounded metrics registry, no dependency
+app/core/actors.py            the single shared human/non-human actor rule
+```
+
+### The lifecycle is a rule, not a suggestion
+
+```
+Open ──▶ Triaged ──▶ Investigating ──▶ Containment Pending ──▶ Contained
+  │          │              │                                     │
+  └──────────┴──────────────┴────────────▶ Resolved ──▶ Closed (terminal)
+```
+
+Which edges exist, which need a reason, and which permission each requires live
+in one pure module. **Enforcement is in the service layer, not the router**,
+because the API is one caller — a hand-crafted request is refused identically.
+The frontend does not restate the graph; it asks
+`GET /incidents/{id}/transitions`.
+
+### Evidence is a projection
+
+```
+Event ─┐
+MLInference ─┐
+AIAnalysis ─┐ │
+SecuritySequence ─┤ ├─▶ providers ─▶ EvidenceSet ─▶ manifest digest
+IOC ─┘ │                                    │
+ThreatIntelResult ─┘                        └─▶ bound to a decision
+CloudPostureFinding ─┘                          (Phase D)
+```
+
+There is no evidence table, no write path, and no endpoint that creates or
+edits an item. That is how "an analyst must not silently rewrite historical
+evidence" is enforced: not by a policy, but by the absence of a door.
+
+Evidence does **not** claim uniform immutability. Three integrity levels —
+`write_once`, `append_only`, `mutable` — because `ThreatIntelResult` is
+overwritten on re-lookup and `IOC.sighting_count` is incremented in place. A
+decision's recorded manifest is compared against the current one and classified
+`unchanged < extended < refreshed < tampered`.
+
+### Decide, then approve
+
+A consequential transition binds the evidence it was taken on. A containment
+request is decided by a **second** person holding `incidents:respond_approve` —
+a permission analysts deliberately do not hold, so four-eyes cannot be satisfied
+by logging in twice. An approval must state the evidence manifest it was given
+and is refused with 409 if that evidence moved.
+
+**Nothing is executed.** No executor, no provider, no result column.
+
+### Cloud posture is simulated
+
+`app/cloud/` runs nine real checks over a configuration snapshot committed to
+this repository. There is no cloud SDK in the project, no credentials, and no
+socket opened on that path. Every row, every response and the provider's own
+health state say so. See `docs/CLAUDE_HANDOFF_V9.md` §9.
+
+### Metrics that cannot grow without limit
+
+HTTP metrics are labelled with the matched **route template**, never the request
+path, so `/api/v1/incidents/{incident_id}` is one series rather than one per
+incident. Unmatched requests collapse to a single series. Each metric has a
+ceiling; past it a new label combination is dropped and the drop is counted.
+Nothing is keyed by user, incident, account or indicator.
+
+Full reasoning, measurements and traps: `docs/CLAUDE_HANDOFF_V9.md`.

@@ -8,14 +8,20 @@ from app.api.v1 import (
     analytics,
     audit,
     auth,
+    cloud,
+    decisions,
     detection,
     evaluation,
     events,
+    evidence,
     health,
     incidents,
     iocs,
+    metrics,
     ml,
     notifications,
+    providers,
+    response_actions,
     sequences,
     telemetry,
     threat_intel,
@@ -27,6 +33,21 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(events.router)
 api_router.include_router(incidents.router)
+# V9: investigation evidence, mounted under the incidents prefix because
+# every question about evidence starts from an incident.
+api_router.include_router(evidence.router)
+# V9: what evidence each consequential decision was taken on, and whether
+# it still holds.
+api_router.include_router(decisions.router)
+# V9 Phase E: requesting containment, and a second person deciding on it.
+# Nothing here executes an action.
+api_router.include_router(response_actions.router)
+# V9 Phase F: which evidence sources are answering, and which are degraded.
+api_router.include_router(providers.router)
+# V9 Phase G: cloud security posture. Simulated - see app/cloud/__init__.py.
+api_router.include_router(cloud.router)
+# V9 Phase H: the metrics scrape. Session-gated - see the module docstring.
+api_router.include_router(metrics.router)
 api_router.include_router(iocs.router)
 api_router.include_router(notifications.router)
 api_router.include_router(analytics.router)

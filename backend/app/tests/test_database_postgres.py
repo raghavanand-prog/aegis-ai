@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 
 import pytest
 import sqlalchemy as sa
@@ -75,12 +76,25 @@ def _refuses(engine, sql: str, **params) -> bool:
 
 class TestTheSchemaMigratesOnPostgres:
     def test_the_head_revision_is_applied(self, engine) -> None:
+        """The applied revision is the migration tree's head.
+
+        Derived from the scripts rather than hard-coded. It *was* hard-coded to
+        `0011_v7_approval_governance`, and because these tests skip without a
+        server, nobody saw it go stale while V9 moved the head three times. A
+        test that only fails when somebody remembers to run it is a test that
+        pins the wrong thing eventually.
+        """
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        head = ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
+
         with engine.connect() as connection:
             version = connection.execute(
                 sa.text("select version_num from alembic_version")
             ).scalar()
 
-        assert version == "0011_v7_approval_governance"
+        assert version == head
 
     def test_the_v7_feedback_identity_columns_exist(self, inspector) -> None:
         columns = {c["name"]: c for c in inspector.get_columns("analyst_feedback")}
@@ -400,3 +414,304 @@ class TestFeedbackPersistenceOnPostgres:
             assert dataset.selection["adjudication"]["conflictedTargets"] == []
 
             session.rollback()
+
+
+
+# --- V9 -------------------------------------------------------------------
+#
+# Every identifier below is suffixed with a per-session token. The test
+# database named by AEGISX_TEST_POSTGRES_URL is reused across runs - in CI and
+# on a developer's machine alike - so fixed identifiers pass once and then fail
+# forever on a unique-constraint violation. That is not hypothetical: the first
+# cut of these tests used fixed refs, passed on a fresh database, and failed on
+# the very next run.
+
+RUN = uuid.uuid4().hex[:8]
+
+
+def _ref(prefix: str, name: str) -> str:
+    return f"{prefix}-PG-{name}-{RUN}"
+
+
+def _incident(connection, ref: str, status: str = "Open") -> int:
+    """A minimal incident row, for the V9 tables that hang off one."""
+    return connection.execute(
+        sa.text(
+            "insert into incidents (incident_id, title, description, severity,"
+            " status, source, risk_score, analyst, mitre_techniques, timeline,"
+            " risk_signals, created_at, updated_at) values (:ref, 'pg', '',"
+            " 'Medium', :status, 'AEGISX', 0, 'Unassigned', '[]', '[]', '[]',"
+            " now(), now()) returning id"
+        ),
+        {"ref": ref, "status": status},
+    ).scalar()
+
+
+def _binding(connection, incident_id: int, incident_ref: str, decision_ref: str,
+             decision_type: str = "incident.status_change",
+             to_state: str = "Contained", snapshot: str = "{}") -> int:
+    return connection.execute(
+        sa.text(
+            "insert into decision_evidence_bindings (decision_ref,"
+            " decision_type, incident_id, incident_ref, from_state, to_state,"
+            " reason, decided_by, decided_by_role, decided_at, manifest_digest,"
+            " evidence_snapshot, evidence_count) values (:decision_ref,"
+            " :decision_type, :incident_id, :incident_ref, 'Investigating',"
+            " :to_state, 'pg', 'admin@aegisx.dev', 'admin', now(), :digest,"
+            " cast(:snapshot as jsonb), 1) returning id"
+        ),
+        {
+            "decision_ref": decision_ref,
+            "decision_type": decision_type,
+            "incident_id": incident_id,
+            "incident_ref": incident_ref,
+            "to_state": to_state,
+            "digest": "a" * 64,
+            "snapshot": snapshot,
+        },
+    ).scalar()
+
+
+class TestV9IncidentLifecycleOnPostgres:
+    """Migration 0012 widened a CHECK constraint through ``batch_alter_table``.
+
+    On SQLite that rebuilds the table; on PostgreSQL it is a plain DROP/ADD
+    CONSTRAINT. The two backends genuinely execute different DDL, so a green
+    SQLite run says nothing about whether the constraint here is the widened one.
+    """
+
+    def test_every_v9_status_is_accepted(self, engine) -> None:
+        for index, status in enumerate(
+            [
+                "Open",
+                "Triaged",
+                "Investigating",
+                "Containment Pending",
+                "Contained",
+                "Resolved",
+                "Closed",
+            ]
+        ):
+            with engine.begin() as connection:
+                assert _incident(connection, _ref("INC", f"ST{index}"), status)
+
+    def test_a_status_outside_the_lifecycle_is_still_refused(self, engine) -> None:
+        """Widened, not removed. The constraint must still be a constraint."""
+        assert _refuses(
+            engine,
+            "insert into incidents (incident_id, title, description, severity,"
+            " status, source, risk_score, analyst, mitre_techniques, timeline,"
+            " risk_signals, created_at, updated_at) values (:ref, 'pg', '',"
+            " 'Medium', 'Quarantined', 'AEGISX', 0, 'Unassigned', '[]', '[]',"
+            " '[]', now(), now())",
+            ref=_ref("INC", "BAD"),
+        )
+
+
+class TestV9DecisionBindingsOnPostgres:
+    def test_the_snapshot_column_is_jsonb(self, inspector) -> None:
+        """It was plain ``json`` when the migration was first written, while the
+        model declared JSONB. Nothing on SQLite could have shown that."""
+        found = {
+            c["name"]: str(c["type"])
+            for c in inspector.get_columns("decision_evidence_bindings")
+        }
+        assert found["evidence_snapshot"].upper() == "JSONB"
+
+    def test_a_snapshot_is_queryable_by_path(self, engine) -> None:
+        """The snapshot is only useful if it can be read back field by field.
+        On SQLite it is a string that happens to parse."""
+        incident_ref = _ref("INC", "BIND1")
+        decision_ref = _ref("DEC", "PATH")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+            _binding(
+                connection,
+                incident_id,
+                incident_ref,
+                decision_ref,
+                snapshot=json.dumps(
+                    {
+                        "manifestDigest": "a" * 64,
+                        "truncated": False,
+                        "entries": [
+                            {
+                                "evidenceId": "EV-0123456789abcdef",
+                                "contentDigest": "b" * 64,
+                                "integrity": "write_once",
+                            }
+                        ],
+                    }
+                ),
+            )
+
+        with engine.connect() as connection:
+            row = connection.execute(
+                sa.text(
+                    "select evidence_snapshot #>> '{entries,0,integrity}' as integrity,"
+                    " evidence_snapshot ->> 'truncated' as truncated"
+                    " from decision_evidence_bindings where decision_ref = :ref"
+                ),
+                {"ref": decision_ref},
+            ).one()
+
+        assert row.integrity == "write_once"
+        assert row.truncated == "false"
+
+    def test_the_snapshot_supports_jsonb_containment(self, engine) -> None:
+        """``@>`` exists on jsonb and not on json. This is the operator the
+        column type was silently costing us."""
+        incident_ref = _ref("INC", "BIND3")
+        decision_ref = _ref("DEC", "CONTAIN")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+            _binding(
+                connection,
+                incident_id,
+                incident_ref,
+                decision_ref,
+                snapshot=json.dumps({"truncated": False, "entryCount": 3}),
+            )
+
+        with engine.connect() as connection:
+            found = connection.execute(
+                sa.text(
+                    "select count(*) from decision_evidence_bindings"
+                    " where decision_ref = :ref"
+                    " and evidence_snapshot @> '{\"truncated\": false}'::jsonb"
+                ),
+                {"ref": decision_ref},
+            ).scalar()
+        assert found == 1
+
+    def test_a_duplicate_decision_reference_is_refused(self, engine) -> None:
+        incident_ref = _ref("INC", "BIND2")
+        decision_ref = _ref("DEC", "DUP")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+            _binding(connection, incident_id, incident_ref, decision_ref)
+
+        assert _refuses(
+            engine,
+            "insert into decision_evidence_bindings (decision_ref, decision_type,"
+            " incident_id, incident_ref, to_state, decided_by, decided_at,"
+            " manifest_digest, evidence_snapshot, evidence_count) values (:ref,"
+            " 'incident.status_change', :incident_id, :incident_ref, 'Contained',"
+            " 'x@aegisx.dev', now(), :digest, '{}', 0)",
+            ref=decision_ref,
+            incident_id=incident_id,
+            incident_ref=incident_ref,
+            digest="c" * 64,
+        )
+
+    def test_deleting_an_incident_removes_its_bindings(self, engine) -> None:
+        """``ON DELETE CASCADE``, enforced here and not by SQLite unless a
+        pragma is on. A binding orphaned from its incident would be a decision
+        record nothing can resolve."""
+        incident_ref = _ref("INC", "CASC")
+        decision_ref = _ref("DEC", "CASC")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+            _binding(connection, incident_id, incident_ref, decision_ref)
+
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("delete from incidents where id = :i"), {"i": incident_id}
+            )
+
+        with engine.connect() as connection:
+            remaining = connection.execute(
+                sa.text(
+                    "select count(*) from decision_evidence_bindings"
+                    " where decision_ref = :ref"
+                ),
+                {"ref": decision_ref},
+            ).scalar()
+        assert remaining == 0
+
+
+class TestV9ResponseActionsOnPostgres:
+    def test_the_parameters_column_is_jsonb(self, inspector) -> None:
+        found = {
+            c["name"]: str(c["type"])
+            for c in inspector.get_columns("response_action_requests")
+        }
+        assert found["parameters"].upper() == "JSONB"
+
+    def test_the_status_check_constraint_holds(self, engine) -> None:
+        """``executed`` is not a status this system has. If it ever becomes one
+        it will be because an executor exists, not because a row asserted it."""
+        incident_ref = _ref("INC", "RAR1")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+
+        assert _refuses(
+            engine,
+            "insert into response_action_requests (request_ref, incident_id,"
+            " incident_ref, action_type, parameters, parameters_digest,"
+            " justification, status, requested_by, requested_at) values (:ref,"
+            " :incident_id, :incident_ref, 'isolate_endpoint', '{}', :digest,"
+            " 'why', 'executed', 'a@aegisx.dev', now())",
+            ref=_ref("RAR", "BAD"),
+            incident_id=incident_id,
+            incident_ref=incident_ref,
+            digest="e" * 64,
+        )
+
+    def test_losing_the_binding_keeps_the_approval_record(self, engine) -> None:
+        """``ON DELETE SET NULL`` on the evidence binding, deliberately.
+
+        Losing the binding must not delete the record that a containment action
+        was approved - that is the fact with the most consequence attached.
+        """
+        incident_ref = _ref("INC", "RAR2")
+        decision_ref = _ref("DEC", "RAR")
+        request_ref = _ref("RAR", "KEEP")
+        with engine.begin() as connection:
+            incident_id = _incident(connection, incident_ref)
+            binding_id = _binding(
+                connection,
+                incident_id,
+                incident_ref,
+                decision_ref,
+                decision_type="response_action.approval",
+                to_state="approved",
+            )
+            connection.execute(
+                sa.text(
+                    "insert into response_action_requests (request_ref,"
+                    " incident_id, incident_ref, action_type, parameters,"
+                    " parameters_digest, justification, status, requested_by,"
+                    " requested_at, decided_by, decided_at, evidence_binding_id)"
+                    " values (:ref, :incident_id, :incident_ref,"
+                    " 'isolate_endpoint', '{}', :digest, 'why', 'approved',"
+                    " 'analyst@aegisx.dev', now(), 'admin@aegisx.dev', now(),"
+                    " :binding_id)"
+                ),
+                {
+                    "ref": request_ref,
+                    "incident_id": incident_id,
+                    "incident_ref": incident_ref,
+                    "digest": "e" * 64,
+                    "binding_id": binding_id,
+                },
+            )
+
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text("delete from decision_evidence_bindings where id = :b"),
+                {"b": binding_id},
+            )
+
+        with engine.connect() as connection:
+            row = connection.execute(
+                sa.text(
+                    "select status, decided_by, evidence_binding_id from"
+                    " response_action_requests where request_ref = :ref"
+                ),
+                {"ref": request_ref},
+            ).one()
+
+        assert row.status == "approved"
+        assert row.decided_by == "admin@aegisx.dev"
+        assert row.evidence_binding_id is None

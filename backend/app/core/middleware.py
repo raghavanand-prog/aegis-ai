@@ -19,13 +19,50 @@ from starlette.responses import JSONResponse, Response
 
 from app.core.config import settings
 from app.core.logging_config import bind_request, clear_request_context
+from app.observability import instruments
 
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
 #: Paths that must stay cheap and quiet: probes and docs.
-QUIET_PATHS = {"/api/v1/health", "/api/v1/health/ready", "/metrics", "/favicon.ico"}
+QUIET_PATHS = {
+    "/api/v1/health",
+    "/api/v1/health/ready",
+    # This said "/metrics" and pointed at an endpoint that did not exist
+    # until Phase H. A scrape every fifteen seconds would have logged a
+    # line every fifteen seconds.
+    "/api/v1/metrics",
+    "/favicon.ico",
+}
+
+
+def _route_template(request: Request) -> str:
+    """The matched route's template, or ``unmatched``.
+
+    FastAPI puts the matched route in the ASGI scope, so this is available
+    after the response and is bounded by the number of routes in the
+    application. A request that matched nothing has no template - and every
+    such request shares one label value, so a flood of random 404 paths costs
+    a single series rather than one apiece.
+
+    The version prefix has to be added back. This FastAPI version keeps an
+    included router nested rather than copying its routes onto the app, so the
+    matched route reports its path *within* that router - ``/incidents``, not
+    ``/api/v1/incidents`` - and no scope key carries the mount point
+    (``root_path`` is empty). Left alone the label would not match the endpoint
+    anyone actually calls, which is the sort of small wrongness that wastes an
+    afternoon when a dashboard is being built.
+    """
+    route = request.scope.get("route")
+    template = getattr(route, "path", None)
+    if not isinstance(template, str):
+        return "unmatched"
+
+    prefix = settings.api_v1_prefix
+    if prefix and request.url.path.startswith(prefix) and not template.startswith(prefix):
+        return f"{prefix}{template}"
+    return template
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -59,11 +96,28 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "result": "error",
                 },
             )
+            instruments.http_exceptions.increment(
+                labels={"route": _route_template(request)}
+            )
             clear_request_context()
             raise
 
         duration_ms = (time.perf_counter() - started) * 1000
         response.headers[REQUEST_ID_HEADER] = request_id
+
+        # The route *template*, never the path: one series for
+        # /api/v1/incidents/{incident_id}, not one per incident.
+        route = _route_template(request)
+        instruments.http_requests.increment(
+            labels={
+                "route": route,
+                "method": request.method,
+                "status": instruments.status_class(response.status_code),
+            }
+        )
+        instruments.http_request_seconds.observe(
+            duration_ms / 1000, labels={"route": route}
+        )
 
         if request.url.path not in QUIET_PATHS:
             logger.info(
