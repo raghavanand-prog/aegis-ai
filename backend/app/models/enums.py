@@ -212,6 +212,9 @@ class AuditAction(str, Enum):
     RESPONSE_ACTION_APPROVED = "response_action.approved"
     RESPONSE_ACTION_REJECTED = "response_action.rejected"
     RESPONSE_ACTION_REFUSED = "response_action.refused"
+    # V9 Phase G: a simulated cloud posture scan was run. Audited because
+    # it writes findings the whole SOC then reads.
+    CLOUD_POSTURE_SCANNED = "cloud.posture_scanned"
     DETECTION_EVALUATION_RUN = "detection.evaluation_run"
     # --- V3: AI / ML / enrichment -----------------------------------------
     ML_MODEL_TRAINED = "ml.model_trained"
