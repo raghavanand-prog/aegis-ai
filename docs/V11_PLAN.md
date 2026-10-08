@@ -9,7 +9,7 @@
 > Written at the end of the V9 session as `V10_PLAN.md`, and renamed when
 > V10 shipped something else: the approval-boundary work merged in #2. The
 > scope described here was never V10's, so the file is named for the version
-> that will actually do it. Supersedes `CLAUDE_HANDOFF_V9.md` §14, which
+> that will actually do it. Supersedes the V9 handoff notes §14, which
 > sketched this in five lines.
 
 Tags as in V4–V9: **[MEASURED]**, **[IMPLEMENTATION]**, **[SIMULATED]**,
@@ -213,7 +213,7 @@ Phase C:
 - `cloud_posture_health()` can return **healthy** for the first time, instead of
   the permanent "degraded: cloud posture is simulated";
 - the UI distinguishes live findings from fixture ones;
-- `docs/CLAUDE_HANDOFF_V9.md` §9 shrinks to a paragraph about the fallback.
+- the V9 handoff notes §9 shrinks to a paragraph about the fallback.
 
 Live and simulated findings must remain distinguishable **in the same table at
 the same time**, because a developer will run both. They already are — that is
@@ -243,7 +243,7 @@ a default to copy.
 
 ## 9. Phase F — documentation and the V11 handoff
 
-`docs/CLAUDE_HANDOFF_V11.md`, in the established form. The V9 documents that
+the V11 handoff notes, in the established form. The V9 documents that
 describe cloud posture as simulated must be corrected in the same phase that
 makes them untrue — that is the V9 Phase K lesson: documents do not go wrong,
 they go stale, and staleness is invisible.

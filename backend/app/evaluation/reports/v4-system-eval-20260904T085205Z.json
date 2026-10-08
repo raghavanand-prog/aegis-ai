@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-04T08:52:04.454781+00:00",
-  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/evaluation/run_system_eval.py --output-dir /private/tmp/claude-501/-Users-raghavanand-Desktop/73ddb0a4-e1ca-46e4-b19e-4dd259ed7611/scratchpad/v8-system",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/evaluation/run_system_eval.py --output-dir /tmp/aegis-eval",
   "correlation": {
     "schemaVersion": "1.0",
     "generatedAt": "2026-09-04T08:52:04.411399+00:00",

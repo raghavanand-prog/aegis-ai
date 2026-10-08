@@ -515,7 +515,7 @@ and is refused with 409 if that evidence moved.
 `app/cloud/` runs nine real checks over a configuration snapshot committed to
 this repository. There is no cloud SDK in the project, no credentials, and no
 socket opened on that path. Every row, every response and the provider's own
-health state say so. See `docs/CLAUDE_HANDOFF_V9.md` §9.
+health state say so.
 
 ### Metrics that cannot grow without limit
 
@@ -524,5 +524,3 @@ path, so `/api/v1/incidents/{incident_id}` is one series rather than one per
 incident. Unmatched requests collapse to a single series. Each metric has a
 ceiling; past it a new label combination is dropped and the drop is counted.
 Nothing is keyed by user, incident, account or indicator.
-
-Full reasoning, measurements and traps: `docs/CLAUDE_HANDOFF_V9.md`.

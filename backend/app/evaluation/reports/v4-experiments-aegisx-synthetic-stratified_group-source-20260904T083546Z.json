@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-04T08:35:46.645758+00:00",
-  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/evaluation/run_experiments.py --dataset aegisx-synthetic --seed 1337 --include-registered --max-seconds 1800 --output-dir /private/tmp/claude-501/-Users-raghavanand-Desktop/73ddb0a4-e1ca-46e4-b19e-4dd259ed7611/scratchpad/v8-reg3",
+  "command": "/Users/raghavanand/Cyber/aegis-ai/backend/app/evaluation/run_experiments.py --dataset aegisx-synthetic --seed 1337 --include-registered --max-seconds 1800 --output-dir /tmp/aegis-eval",
   "dataset": {
     "name": "aegisx-detection-eval",
     "version": "1.0",

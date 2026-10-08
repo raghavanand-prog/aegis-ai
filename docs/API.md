@@ -256,8 +256,7 @@ Read-only. There is no enable, disable, reconfigure or retry.
 | POST | `/cloud/scan` | `cloud:scan` | Re-run the local checks over the committed snapshots. Audited |
 
 Every response carries a `note` stating that no cloud account was contacted.
-The scan takes no path, URL or credential from the caller. See
-`docs/CLAUDE_HANDOFF_V9.md` §9.
+The scan takes no path, URL or credential from the caller.
 
 ### Metrics
 

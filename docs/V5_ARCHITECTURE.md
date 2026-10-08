@@ -366,7 +366,7 @@ R 74.4%, F1 0.663, FPR 33.3%); the small gap is the full corpus at threshold
 | **J** | AI-assisted proposals through the existing grounding pipeline |
 | **K** | Adaptive SOC dashboard |
 | **L** | V5 scientific evaluation — static vs adaptive |
-| **M** | Documentation, provenance corrections, `CLAUDE_HANDOFF_V5.md`, research report |
+| **M** | Documentation, provenance corrections, the V5 handoff notes, research report |
 | **N** | Full verification against the V5 definition of done |
 
 D and E depend only on B/C. F–I are strictly sequential. Verification
