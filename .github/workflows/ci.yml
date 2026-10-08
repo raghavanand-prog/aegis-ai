@@ -105,7 +105,7 @@ jobs:
 
       - name: Upload evaluation report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: detection-evaluation
           path: ${{ runner.temp }}/eval-reports/
