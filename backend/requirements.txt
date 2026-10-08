@@ -20,7 +20,7 @@ psycopg[binary]==3.3.5
 # it, and the loader verifies the artifact digest.
 scikit-learn==1.7.2
 numpy==2.3.4
-joblib==1.5.2
+joblib==1.6.0
 
 # --- V4: research datasets -------------------------------------------------
 # Public evaluation corpora ship as parquet. Used only by the evaluation
