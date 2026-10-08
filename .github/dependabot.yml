@@ -4,24 +4,39 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      docker-updates:
+        patterns: ["*"]
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      docker-updates:
+        patterns: ["*"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      github-actions-updates:
+        patterns: ["*"]
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      npm-updates:
+        patterns: ["*"]
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    groups:
+      pip-updates:
+        patterns: ["*"]
