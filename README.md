@@ -1,5 +1,21 @@
 # AEGISX
 
+**A security monitoring console (a small Security Operations Centre) that collects activity, flags suspicious events with rules and machine learning, and has an AI assistant explain them.**
+
+Why it exists: security analysts face more alerts than they can check. AEGISX shows how every risk score can be traced to its cause, and how an AI explanation can be checked against the evidence it was given.
+
+## How to run
+
+1. `cp .env.example .env`
+2. `docker compose -f infrastructure/docker-compose.yml up --build`
+3. Open the console and sign in with the account in `backend/.env`. Ports, the local (non-Docker) setup and the default account are in [Quick start](#quick-start).
+
+---
+
+## Technical details
+
+Everything below is the full write-up for engineers and reviewers.
+
 AI-assisted Security Operations Center platform. Live telemetry is ingested,
 normalized, scored by a **hybrid detection stack** — deterministic rules plus an
 unsupervised anomaly model — correlated into behavioural sequences, enriched
